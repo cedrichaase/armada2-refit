@@ -12,6 +12,7 @@ image_size = 0x101000
 sections = 0x05060708
 image_base = 0x400000
 code = [0x401000, 0x408000]
+file_crc = { ".text" = 0xef690537, ".test" = 0xe7a4061b }
 
 [[changed]]
 fn = "Toy::Update"
@@ -21,3 +22,7 @@ verified = ["toy.speed"]
 [[disable]]
 hooks = ["toyc.*"]
 why = "the 1.1 rules differ"
+
+[[module]]
+name = "Hook.dll"
+text_crc = 0x28c90d19

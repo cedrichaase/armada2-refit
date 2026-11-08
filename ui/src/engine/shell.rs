@@ -479,7 +479,10 @@ fn set_shell_display_and(r: i32) -> i32 {
 /// with `ALL_BLACK_8_BY_6_BACKGROUND`), so the next menu opens over black as it does
 /// after the stock Credits.
 fn black_background() {
-    if !unsafe { READY } {
+    // On Fleet Operations: Roots `SetCurrentBackground` is FleetOpsHook's, which takes a
+    // bitmap object of its own: the hook stands down there and the next screen (a form of
+    // FleetOpsHook's, drawn by the UI) opens over what it draws (PLAN-FLEETOPS.md, decision 607).
+    if !unsafe { READY } || eng().ready(hook::SHELL_BACKGROUND).is_err() {
         return;
     }
     let w = window();

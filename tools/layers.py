@@ -105,12 +105,19 @@ def resolve(reg, only=None, without=None, game=None):
     `game`: the game's id (default: the chosen one); only the layers its descriptor
     offers are installed, and a game not offered is refused."""
     gid, desc = game_layers(game)
-    if not desc.get('offered'):
+    # `installable`: not offered to players (the release, the GUI installer), but ./install
+    # and a2mod work on it for the bench and the maintainer's own clones.
+    if not (desc.get('offered') or desc.get('installable')):
         raise Refused(f'{gid}: not offered yet (games/{gid}.toml)')
     mine = game_ids(reg, gid)
     ids = by_id(reg)
     offered = [lay['id'] for lay in reg['layer'] if lay['select'] in ('on', 'off') and lay['id'] in mine]
     core = [lay['id'] for lay in reg['layer'] if lay['select'] == 'core' and lay['id'] in mine]
+    def need(i):
+        # A requirement the game does not have is not one: Display8 on Roots needs no platform
+        # layer (its widescreen patch and ASI loader are Armada II's).
+        return [r for r in ids[i]['requires'] if r in mine or ids[r]['select'] == 'retired']
+
     for i in (only or []) + (without or []):
         if i not in ids:
             raise Refused(f'{i}: no such layer (tools/layers.py --list)')
@@ -128,7 +135,7 @@ def resolve(reg, only=None, without=None, game=None):
         # Requirements: added, transitively.
         todo = list(want)
         while todo:
-            for r in ids[todo.pop()]['requires']:
+            for r in need(todo.pop()):
                 if r not in want:
                     if ids[r]['select'] == 'retired':
                         raise Refused(f'{r}: required, but a {ids[r]["select"]} layer')
@@ -139,7 +146,7 @@ def resolve(reg, only=None, without=None, game=None):
     for i in without or []:
         want.discard(i)
     for i in sorted(want):
-        for r in ids[i]['requires']:
+        for r in need(i):
             if r not in want:
                 raise Refused(f'{i} requires {r}, which --without takes out')
     return [lay['id'] for lay in reg['layer'] if lay['id'] in want]
@@ -180,31 +187,42 @@ def _spec(pat):
     return len(pat) if m is None else m.start()
 
 
-def classify(reg, rel, suffix=None):
+def _mine(lay, game=None):
+    """Is the layer the game's? A layer with no `games` (the selftest's toy) is every game's."""
+    gid = game or a2env.GAME_ID
+    return gid in lay.get('games', [gid])
+
+
+def classify(reg, rel, suffix=None, game=None):
     """The layer a2mod files `rel` (relative to the game directory) under, or None.
-    `suffix`: the backup it was found by, for a replaced file; None for an added one."""
+    `suffix`: the backup it was found by, for a replaced file; None for an added one.
+    Only the layers of `game` (default: the chosen one) are considered, retired ones
+    included: a pattern of another game's layer (the ASI loader's winmm.dll on Roots)
+    must never claim a file of this one (Armada II's winmm.dll is the platform's)."""
     if suffix and suffix != BACKUP:
         for lay in reg['layer']:
-            if suffix in lay['backups']:
+            if suffix in lay['backups'] and _mine(lay, game):
                 return lay['id']
         return None
     key = 'replaces' if suffix else 'files'
     best, best_n = None, -1
     low = rel.lower()
     for lay in reg['layer']:
+        if not _mine(lay, game):
+            continue
         for pat in lay[key]:
             if fnmatch.fnmatchcase(low, pat.lower()) and _spec(pat) > best_n:
                 best, best_n = lay['id'], _spec(pat)
     return best
 
 
-def backup_suffixes(reg):
-    return (BACKUP,) + tuple(s for lay in reg['layer'] for s in lay['backups'])
+def backup_suffixes(reg, game=None):
+    return (BACKUP,) + tuple(s for lay in reg['layer'] if _mine(lay, game) for s in lay['backups'])
 
 
-def added_patterns(reg):
-    """(pattern, id) for every file a layer adds."""
-    return [(p, lay['id']) for lay in reg['layer'] for p in lay['files']]
+def added_patterns(reg, game=None):
+    """(pattern, id) for every file a layer of the game adds."""
+    return [(p, lay['id']) for lay in reg['layer'] if _mine(lay, game) for p in lay['files']]
 
 
 # --- --check ----------------------------------------------------------------------------
@@ -255,10 +273,21 @@ def _check_registry(reg, errs):
     for s in steps:
         if s not in owned and s not in rel.get('own', []):
             errs.append(f'[release] step {s}: no layer has it and it is not in own')
-    # Every added file is filed under exactly the layer that names it.
-    for pat, i in added_patterns(reg):
-        if not re.search(r'[*?\[]', pat) and classify(reg, pat) != i:
-            errs.append(f'{i}: {pat} would be filed under {classify(reg, pat)}')
+    # Every added file is filed under exactly the layer that names it, in each game the
+    # layer is for.
+    for lay in reg.get('layer', []):
+        for g in lay.get('games', []):
+            for pat in lay.get('files', []):
+                if not re.search(r'[*?\[]', pat) and classify(reg, pat, game=g) != lay['id']:
+                    errs.append(f'{lay["id"]}: {pat} would be filed under '
+                                f'{classify(reg, pat, game=g)} on {g}')
+    # winmm.dll is the ASI loader. Armada II's is the platform's, which a2mod never
+    # switches (no layer files it); on Roots it is the asiloader layer's.
+    if any(lay.get('id') == 'asiloader' for lay in reg.get('layer', [])):
+        for g, want in (('armada2', None), ('fo-roots', 'asiloader')):
+            got = classify(reg, 'winmm.dll', game=g)
+            if got != want:
+                errs.append(f'winmm.dll would be filed under {got} on {g}, expected {want}')
 
 
 def _load_a2mod():
@@ -283,6 +312,7 @@ def _check_a2mod(reg, errs):
     want = [lay['id'] for lay in reg['layer']] + ['other']
     if list(m.LAYERS) != want:
         errs.append(f'a2mod: LAYERS {list(m.LAYERS)} is not the registry\'s {want}')
+    # a2mod works on the chosen game: only that game's layers' patterns and backups.
     added = {p: i for p, i in added_patterns(reg)}
     for p, i in m.ADDED:
         if added.get(p) != i:
@@ -358,6 +388,7 @@ GAME_FIELDS = {
     'install.heroic': list, 'install.gog': list, 'install.folder': str, 'install.prefix': str,
     'settings.kind': str, 'settings.file': str, 'settings.keep': list,
     'display.shell': list, 'display.hud_canvas': list,
+    'logs.crash': str, 'logs.dirs': list,
     'files.textures': list, 'files.texture_formats': list, 'files.sod': list,
     'files.sprites': list, 'files.odf': list, 'files.archives': list, 'paths.stem': str,
 }
@@ -368,7 +399,7 @@ ARCHIVE_KINDS = ('fpq', 'zfs')
 TEXTURE_FORMATS = ('tga', 'dds')
 # The plugins' mount lists (a2fmt::vfs), each a `LAYOUT` between `// files: layout <game>`
 # and `// files: end`, whose rows named in FILE_DIRS must be that game's [files].
-LAYOUTS = ('render3d/core/src/files.rs', 'ui/src/files.rs')
+LAYOUTS = ('render3d/core/src/files/mod.rs', 'ui/src/files.rs')
 
 
 def _check_files(gid, d, errs):
@@ -401,6 +432,12 @@ def _check_files(gid, d, errs):
         if a['at'] not in FILE_DIRS:
             errs.append(f'games/{gid}.toml: files.archives: at {a["at"]!r} is none of '
                         f'{", ".join(FILE_DIRS)}')
+    m = f.get('mods')
+    if m is not None and not (isinstance(m, dict) and set(m) == {'dir', 'switches'}
+                              and isinstance(m['dir'], str) and m['dir'] and '/' not in m['dir']
+                              and isinstance(m['switches'], list) and m['switches']
+                              and all(isinstance(x, str) and x for x in m['switches'])):
+        errs.append(f'games/{gid}.toml: files.mods: {m!r} is not {{dir = "<folder>", switches = [...]}}')
 
 
 def _layout_rows(path):
@@ -437,6 +474,22 @@ def _check_layouts(descs, errs):
                                 f'files.{k} is {want}')
             if 'textures' not in rows:
                 errs.append(f'{path}: layout {gid} mounts no textures')
+    # render3d's mod rules, `// files: mods <game>` ... `// files: end`: the descriptor's
+    # [files] mods, both ways.
+    path = LAYOUTS[0]
+    with open(os.path.join(ROOT, path), encoding='utf-8') as fh:
+        text = fh.read()
+    have = {}
+    for m in re.finditer(r'^// files: mods (\S+).*?$(.*?)^// files: end', text, re.M | re.S):
+        d = re.search(r'dir:\s*"([^"]*)"', m.group(2))
+        sw = re.search(r'switches:\s*&\[([^\]]*)\]', m.group(2))
+        have[m.group(1)] = {'dir': d.group(1) if d else None,
+                            'switches': re.findall(r'"([^"]*)"', sw.group(1)) if sw else None}
+    for gid, d in descs.items():
+        want = _field(d, 'files.mods')
+        if (want or None) != have.get(gid):
+            errs.append(f'{path}: {gid} mod rules are {have.get(gid)}, games/{gid}.toml '
+                        f'files.mods is {want}')
 
 
 def _field(d, dotted):
@@ -450,7 +503,7 @@ def _field(d, dotted):
 def _check_games(reg, errs):
     """Every `games` entry names a descriptor, every descriptor's layers exist and list
     it back, one descriptor is the default, the profiles' builds name a descriptor and
-    one of its executables, and a2env's built-in fallback is the default descriptor."""
+    one of its executables (or another descriptor's: Roots' build of armada2), and a2env's built-in fallback is the default descriptor."""
     gids = a2env.game_ids()
     descs = {}
     for g in gids:
@@ -500,9 +553,13 @@ def _check_games(reg, errs):
         if d is None:
             errs.append(f'{rel}: game {b.get("game")!r} has no games/<id>.toml')
             continue
+        # Another build of the same engine may be its own game for the tools (Roots:
+        # profile game armada2, descriptor fo-roots, which names ArmadaL.exe).
+        named = {x for dd in descs.values() for x in (_field(dd, 'exe.names') or [])}
         for x in b.get('exe', []):
-            if x not in (_field(d, 'exe.names') or []):
-                errs.append(f'{rel}: exe {x} is not one of games/{b["game"]}.toml exe.names')
+            if x not in (_field(d, 'exe.names') or []) and x not in named:
+                errs.append(f'{rel}: exe {x} is not one of games/{b["game"]}.toml exe.names '
+                            f'(nor of any other descriptor)')
     # a2env's fallback, for the release package that ships a2env.py without games/.
     if len(defaults) == 1:
         d = descs[defaults[0]]
@@ -514,6 +571,30 @@ def _check_games(reg, errs):
     _check_layouts(descs, errs)
 
 
+def _check_unoffered(errs):
+    """A game that is not offered (`offered = false`, Fleet Operations: Roots) stays out of
+    the release package and the GUI installer: publish/, gui-installer/ and the workflows
+    never name it, and package.sh filters the manifest's games by `offered`."""
+    quiet = [g for g in a2env.game_ids() if not a2env.load(g).get('offered')]
+    pkg = os.path.join(ROOT, 'publish', 'package.sh')
+    with open(pkg, encoding='utf-8') as fh:
+        if 'OFFERED' not in fh.read():
+            errs.append('publish/package.sh: the manifest games are not filtered by `offered`')
+    for g in quiet:
+        for top in ('publish', 'gui-installer', '.github'):
+            for dp, _, fs in os.walk(os.path.join(ROOT, top)):
+                for f in fs:
+                    p = os.path.join(dp, f)
+                    try:
+                        with open(p, encoding='utf-8') as fh:
+                            text = fh.read()
+                    except (UnicodeDecodeError, OSError):
+                        continue
+                    if g in text:
+                        errs.append(f'{os.path.relpath(p, ROOT)}: names {g}, which is not offered '
+                                    f'(games/README.md, "Not offered, not released")')
+
+
 def check(reg):
     errs = []
     _check_registry(reg, errs)
@@ -521,6 +602,7 @@ def check(reg):
         _check_games(reg, errs)
         _check_a2mod(reg, errs)
         _check_release(reg, errs)
+        _check_unoffered(errs)
     return errs
 
 

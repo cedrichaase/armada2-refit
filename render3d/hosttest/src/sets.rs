@@ -132,9 +132,24 @@ mod tests {
             resource_colours: &[[0.0, 1.0, 0.0], [1.0, 1.0, 1.0], [0.6, 0.9, 1.0], [1.0, 1.0, 0.0], [0.8, 0.8, 0.8], [1.0, 0.0, 0.0]],
             // The prefix of the `Borg*` keys look.rs read by name.
             bump_profile: "Borg",
+            profile_by_race: false,
+            profile_races: &[],
+            race_key: "race",
+            bump_maps_normal: false,
         };
         assert_eq!(c, old);
         assert_eq!(parse(""), NONE);
+    }
+
+    #[test]
+    fn hulls_fleetops_keys_the_profile_by_race() {
+        use hulls::*;
+        let c = parse(include_str!("../../content/sets/fleetops/hulls.ini"));
+        assert!(c.profile_by_race);
+        assert!(c.bump_maps_normal);
+        assert_eq!(c.profile_races, ["borg", "freeborg"]);
+        assert_eq!(c.race_key, "race");
+        assert_eq!(c.bump_profile, "Borg");
     }
 
     #[test]
@@ -149,8 +164,14 @@ mod tests {
     #[test]
     fn overlays_stock_is_the_old_table() {
         use overlays::*;
-        assert_eq!(parse(stock("overlays")), Content { selection_model: "select" });
+        assert_eq!(parse(stock("overlays")), Content { selection_model: "select", engine_moves_all: false });
         assert_eq!(parse(""), NONE);
+    }
+
+    #[test]
+    fn overlays_fleetops_draws_every_engine_move() {
+        use overlays::*;
+        assert_eq!(parse(fleetops("overlays")), Content { selection_model: "select", engine_moves_all: true });
     }
 
     #[test]
@@ -244,6 +265,120 @@ mod tests {
         }
     }
 
+    /// The fleetops set's table for a module.
+    fn fleetops(module: &str) -> &'static str {
+        content::file(&format!("sets/fleetops/{module}.ini")).unwrap_or_else(|| panic!("no fleetops {module}.ini"))
+    }
+
+    /// Every module has a table in the fleetops set, and every file one names is built in.
+    #[test]
+    fn fleetops_has_every_module_and_only_files_that_exist() {
+        for m in ["effects", "hulls", "ordnance", "overlays", "particles", "sky", "specials", "world"] {
+            let t = a2ini::Table::parse(fleetops(m));
+            for (sec, es) in &t.sections {
+                if ["Recipes", "Surfaces", "Nebulae"].contains(sec) {
+                    for (n, f) in es {
+                        assert!(content::file(f).is_some(), "fleetops {m}.ini [{sec}] {n} names {f}, which is not in render3d/content/");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn fleetops_effects_key_factions_by_race() {
+        use effects::*;
+        let c = parse(fleetops("effects"));
+        assert!(c.by_race());
+        let key = |race: &str| c.faction_of_race(race).map(|i| c.factions[i].key);
+        assert_eq!(key("unitedfederation"), Some("Federation"));
+        assert_eq!(key("FreeBorg"), Some("Borg"));
+        assert_eq!(key("species8472"), Some("Species8472"));
+        assert_eq!(key("dominion"), Some("Other"));
+        assert_eq!(key(""), Some("Other"));
+        // The stock set keys by initial, as before.
+        assert!(!parse(stock("effects")).by_race());
+        assert_eq!(parse(stock("effects")).faction_of_race("borg"), Some(6));
+    }
+
+    /// Every ODF the fleetops ordnance table names maps to a section of the built-in
+    /// recipes, and Roots' ionstm (another weapon than stock's) is not named.
+    #[test]
+    fn fleetops_ordnance_names_name_recipes() {
+        use ordnance::*;
+        let c = parse(fleetops("ordnance"));
+        assert_eq!(c.recipes, parse(stock("ordnance")).recipes);
+        assert!(!c.names.is_empty());
+        let recipes = a2ini::Table::parse(c.recipes[0].1);
+        for &(odf, sec) in c.names {
+            let prefix = if odf.starts_with("Ordnance.") { "Ordnance." } else if odf.starts_with("Wave.") { "Wave." } else { panic!("{odf}: neither Ordnance. nor Wave.") };
+            let want = format!("{prefix}{sec}");
+            assert!(recipes.sections.iter().any(|(s, _)| s.eq_ignore_ascii_case(&want)), "{odf} = {sec}: no [{want}] in the recipes");
+        }
+        assert!(!c.names.iter().any(|(o, _)| o.eq_ignore_ascii_case("Ordnance.ionstm")));
+        assert!(parse(stock("ordnance")).names.is_empty());
+    }
+
+    /// Roots as installed, when it is: every ODF the fleetops set names is in its
+    /// `ODF.fpq` with the classLabel the set's comments give it, and the nebula classes'
+    /// stock recipes are the stock nebula of the same nebulaType.
+    #[test]
+    fn fleetops_names_are_roots_odfs() {
+        let Some(fpq) = roots_odf_fpq() else { return };
+        let a = a2fmt::fpq::Archive::parse(fpq).unwrap();
+        let class = |name: &str| -> Option<String> {
+            let d = a.open(&format!("{name}.odf"))?;
+            a2fmt::odf::Odf::parse_single(name, &d).class_label()
+        };
+        let want = [
+            ("npc_tractorbeamo", "tractor_bm"), ("borg_ships_holo", "holding_bm"), ("borg_stations_holo", "holding_bm"),
+            ("clairvoyance", "cvoyantlink"), ("gdisso", "micro"), ("hologen", "hologenerator"), ("shieldi", "shieldinv"),
+            ("overrid", "override"), ("all_mine_dilithiumo", "minebm"), ("all_mine_dilithium2o", "minebm"),
+            ("all_mine_tritaniumo", "minebm"), ("all_mine_tritanium2o", "minebm"), ("fed_repair_beamo", "minebm"),
+            ("gcloakenhancew", "shockwavexplode"), ("weaponenhancerwave", "shockwavexplode"), ("ionstm", "utribeam"),
+        ];
+        for (odf, cl) in want {
+            assert_eq!(class(odf).as_deref(), Some(cl), "{odf}");
+        }
+        let c = ordnance::parse(fleetops("ordnance"));
+        for &(odf, _) in c.names {
+            let n = odf.split_once('.').unwrap().1;
+            assert!(want.iter().any(|(w, _)| w.eq_ignore_ascii_case(n)), "{n} is named but not checked here");
+        }
+        let w = world::parse(fleetops("world"));
+        assert!(!w.nebulae.is_empty());
+        let t = a2ini::Table::parse(fleetops("world"));
+        for (odf, file) in t.entries("Nebulae") {
+            let d = a.open(&format!("{odf}.odf")).unwrap_or_else(|| panic!("{odf} is not in ODF.fpq"));
+            let o = a2fmt::odf::Odf::parse_single(odf, &d);
+            assert_eq!(o.class_label().as_deref(), Some("nebula_obj"), "{odf}");
+            let ty = o.get_i32("nebulaType").unwrap();
+            let stock_ty = match *file {
+                "nebulae/mnebula7.ini" => 2,
+                "nebulae/mnebula8.ini" => 3,
+                "nebulae/mnebula9.ini" => 4,
+                "nebulae/mnebula10.ini" => 5,
+                f => panic!("{odf}: {f} is not checked here"),
+            };
+            assert_eq!(ty, stock_ty, "{odf}: nebulaType");
+        }
+    }
+
+    /// Roots' `Data/ODF.fpq`, when Roots is installed (`a2env.py --game fo-roots`).
+    fn roots_odf_fpq() -> Option<Vec<u8>> {
+        let out = std::process::Command::new("python3")
+            .args([concat!(env!("CARGO_MANIFEST_DIR"), "/../../a2env.py"), "--game", "fo-roots", "--sh"])
+            .output()
+            .ok()?;
+        let text = String::from_utf8_lossy(&out.stdout).into_owned();
+        let game = text.lines().find_map(|l| l.strip_prefix("export A2_GAME="))?.trim_matches('\'').to_string();
+        let d = std::fs::read(std::path::Path::new(&game).join("Data/ODF.fpq")).ok();
+        if d.is_none() {
+            eprintln!("no Roots install: skipped");
+        }
+        d
+    }
+
     #[test]
     fn ui_stock_is_the_old_table() {
         use ui::*;
@@ -286,6 +421,9 @@ mod tests {
                 credits: "Credits.txt",
                 credits_logos: "textures\\logos.tga",
                 cursor_sprites: "Sprites/cursor.spr",
+                menu_title: "",
+                gui_sprites: "",
+                icon_font: "",
             }
         );
         // gallery.rs's lists before.
@@ -296,6 +434,73 @@ mod tests {
         ];
         assert_eq!(c.gallery_ships, ships);
         assert_eq!(c.gallery_factions, ["Federation", "Klingon", "Romulan", "Borg", "Cardassian", "Species 8472"]);
+        // Stock's fonts draw Windows-1252 throughout: no glyph of their own.
+        assert!(c.glyphs.is_empty());
         assert_eq!(parse(""), NONE);
+    }
+
+    #[test]
+    fn ui_fleetops_info_layout() {
+        use ui::*;
+        let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../ui/content/sets/fleetops/ui.ini")).unwrap();
+        let c = parse(Box::leak(text.into_boxed_str()));
+        let l = &c.info;
+        // Roots' panel (infoPanelArea_1) and the places its children were measured at on the bench.
+        assert_eq!(l.size, [1249.0, 163.0]);
+        assert!(l.lamps);
+        let e = |n: &str| l.element(n).unwrap_or_else(|| panic!("no {n}"));
+        assert_eq!((e("Name").anchor, e("Name").rect), (Anchor::Left, [29.0, 28.0, 240.0, 20.0]));
+        assert_eq!(e("Image").rect, [10.0, 18.0, 512.0, 128.0]);
+        let systems: Vec<[f32; 2]> = (0..5).map(|i| { let r = e(&format!("System{i}")).rect; [r[0], r[1]] }).collect();
+        assert_eq!(systems, [[537.0, 42.0], [508.0, 71.0], [508.0, 42.0], [537.0, 71.0], [508.0, 100.0]]);
+        assert_eq!((e("Queue0").anchor, e("Queue0").rect), (Anchor::Right, [570.0, 31.0, 96.0, 96.0]));
+        assert_eq!(e("Progress").anchor, Anchor::Flex);
+        assert_eq!(l.number("QueueStep", 0.0), 60.0);
+        assert_eq!(l.numbers("SmallStep"), [120.0, 39.0]);
+        assert_eq!(l.numbers("WeaponTint"), [153.0, 153.0, 242.0]);
+        assert_eq!(l.name("ImageSuffix"), "_si");
+        assert_eq!(l.name("WireSuffix"), "w1");
+        // Every element lies inside the panel.
+        for el in l.elements.iter().filter(|e| !e.name.starts_with("Group") && !e.name.starts_with("Small")) {
+            let r = el.rect;
+            assert!(r[0] >= 0.0 && r[1] >= 0.0 && r[0] + r[2] <= l.size[0] && r[1] + r[3] <= l.size[1], "{} is outside the panel", el.name);
+        }
+        // Armada II's set lays its panel out itself.
+        let stock = parse(Box::leak(std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../ui/content/sets/stock/ui.ini")).unwrap().into_boxed_str()));
+        assert!(stock.info.is_empty());
+    }
+
+    #[test]
+    fn ui_fleetops_glyphs() {
+        use ui::*;
+        let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../ui/content/sets/fleetops/ui.ini")).unwrap();
+        let c = parse(Box::leak(text.into_boxed_str()));
+        let g = |b: u8| c.glyphs.iter().find(|x| x.0 == b).map(|x| x.1);
+        // Roots' red figures, in order, the cost lines' separator (a space, quoted), a
+        // resource icon and a unit class (ui/README.md, "The engine's text").
+        let figures: Vec<&str> = [0x7f, 0x81, 0x8d, 0x8f, 0x90, 0x9d, 0xa0, 0xad, 0xbe, 0xd7].iter().map(|&b| g(b).unwrap()).collect();
+        assert_eq!(figures, ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]);
+        assert_eq!(g(b'$'), Some(" "));
+        assert_eq!(g(0x85), Some("Dilithium"));
+        assert_eq!(g(0xf8), Some("Station"));
+        assert_eq!(g(b'A'), None);
+        // One line per code.
+        let mut codes: Vec<u8> = c.glyphs.iter().map(|x| x.0).collect();
+        codes.sort();
+        codes.dedup();
+        assert_eq!(codes.len(), c.glyphs.len());
+        // Tooltips from a player's UI.log on Roots (2026-11-06), as the UI now draws them.
+        let cost = "350$\u{85}$/$175$\u{86}$/$8$\u{87}$/$150$\u{89}$/$50$\u{80}";
+        assert_eq!(c.display(cost), "350 Dilithium / 175 Tritanium / 8 Supply / 150 Crew / 50 s");
+        assert_eq!(c.display("Buy \u{85} for:\n\n -1000 \u{85} / 1000 \u{86} / 100 \u{87}"), "Buy Dilithium for:\n\n -1000 Dilithium / 1000 Tritanium / 100 Supply");
+        assert_eq!(c.display(" \u{81}\u{9d}\u{7f}\u{7f} Hitpoints\n\t  \u{aa}"), " 1500 Hitpoints\n   Construction Ship");
+        assert_eq!(c.display("Weak vs: \u{a9}, \u{a8}, \u{a3}, \n\t  \u{a5}"), "Weak vs: Artillery, Berserker, Battleship, \n   Dreadnought");
+        assert_eq!(c.display("\u{95} Tachyon Detection Grid"), "\u{2022} Tachyon Detection Grid");
+        // Twice is once.
+        let once = c.display(cost);
+        assert_eq!(c.display(&once), once);
+        // Stock reads the code page only: 0x95 is the bullet, '$' and 0x85 its own.
+        let stock = parse(Box::leak(std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../ui/content/sets/stock/ui.ini")).unwrap().into_boxed_str()));
+        assert_eq!(stock.display("\u{95} 5$ \u{85}\t"), "\u{2022} 5$ \u{2026} ");
     }
 }

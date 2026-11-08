@@ -360,7 +360,8 @@ nothing (None, an empty list, 0) while their hook is not ready.
 
 | Hook | What it needs of `Armada2.exe` |
 |---|---|
-| `ui.shell.screens` | `DispatchDialog`'s call of `Show_Credits` (re-pointed at the Credits of ours, or at the demo screen), and the functions a screen of ours calls between two shell screens: `SetActiveDisplay` (2 the 3D display, 3 the shell's), `ClearDeviceDisplays` with `ST3D_Colour_Black`, `GetWindowHandle`, `HandleMessageQueue`, `TestCooperativeLevel`, `SetCurrentBackground`, `ShellBitmap`'s constructor (0x30 bytes, from `operator new`) with `ALL_BLACK_8_BY_6_BACKGROUND`, and `g_shellMode` (1: main menu); feeds `Menus.Credits` |
+| `ui.shell.screens` | `DispatchDialog`'s call of `Show_Credits` (re-pointed at the Credits of ours, or at the demo screen), and the functions a screen of ours calls between two shell screens: `SetActiveDisplay` (2 the 3D display, 3 the shell's), `ClearDeviceDisplays` with `ST3D_Colour_Black`, `GetWindowHandle`, `HandleMessageQueue`, `TestCooperativeLevel`, and `g_shellMode` (1: main menu); feeds `Menus.Credits` |
+| `ui.shell.background` | the black background a screen of ours in the Credits' place leaves behind, as the stock Credits do: `SetCurrentBackground` with a `ShellBitmap` (0x30 bytes, from `operator new`) of `ALL_BLACK_8_BY_6_BACKGROUND`; stands down on Roots, whose `SetCurrentBackground` is FleetOpsHook's (PLAN-FLEETOPS.md, decision 607) |
 | `ui.shell.reads_device` | Storm3D's display, device index and device table (+0x10c, +0xc0, +0xcc), `ST3D_DeviceDirectX8`'s vtable (to tell the device) and its `FlipToGDISurface` slot, `ExitCode` (a `WM_QUIT`'s code) and the `star_trek` `Program`'s first byte (lets Alt+Tab through); read by the screens, the dialog host and the loading screen |
 | `ui.shell.cursor` | the one `call [SetCursor]` in `WindowProc`'s `WM_SETCURSOR` case, bytes checked, replaced by a call of ours; the arrow over a screen of ours or a hosted dialog |
 | `ui.shell.widgets` | `Shell::Widget`'s constructor, re-pointed (its bytes checked) at one that stores the same two fields and remembers the object, and `Shell::Widget`'s vtable; feeds `Menus.Enable` |
@@ -579,6 +580,14 @@ is the only thing that presents while a mission's menu is up, and the modal draw
 host's frame (`menus::frame`, after the dialog stack, before the frame's claim) works the
 same in the shell and in a mission with the stock dialog still running under it.
 
+- **By its key, over a mission.** With `[UI] RefitKey` set (a virtual-key code, pressed
+  with Ctrl; 0, none, in the shipped `UI.ini`), the same modal opens over a running
+  mission without Options: `crate::input` keeps the key from the engine and
+  `refit::mission_frame`, called last in the mission frame, opens it (`refit: opened in a
+  mission, by its key`) and draws it; Esc, Done or the key again closes it. The game is
+  not paused. Rows count as "over a mission" for the locks and the Next mission badges.
+  This is how Fleet Operations: Roots reaches the screen (Ctrl+F12 in its defaults;
+  PLAN-FLEETOPS.md, FO-6, decision 86), whose Options the host does not draw.
 - **Life.** The Options spec's **Refit settings** button calls `refit::open(host)` (with the
   shell's click sound). The modal closes on Done, on Esc, when its host leaves
   `dialogs::stack()` (`menus::closed`; log `refit: closed (Options ended)`) and when a
@@ -996,6 +1005,13 @@ a Mutara nebula with the queen's Diamond (`render3d/README.md`, "The menu scene"
   stock tutorial card shows, drawn as an outline round the Federation icon's delta.
   Without `allrace.tga` the names stand alone (UI.log: `menus: campaign emblems`).
   Without the scene the four cards draw in a 2x2 grid as before.
+- **Campaign emblems from a picture** (`Emblem = <TGA path>` in a content set's
+  `[Campaign.*]`, `menus::screens::single_player::campaign_picture`): the column draws the
+  file whole, in the name's tint, in place of the race icon cell or the card's cut; the file
+  is read from the player's game files at run time. A file that cannot be read keeps the
+  card's own art. `[Menus] Emblem<Id>=` in UI.ini (`EmblemAllied`, `EmblemDominion`,
+  `EmblemSpecies8472`, `EmblemFreeBorg`: the section's id) names another picture, or `none`
+  for the card's own art; empty takes the set's. UI.log: `menus: campaign <Id> emblem <file>`.
 - **Locked campaigns** (`src/menus/locks.rs`, `src/engine/progress.rs`, issue #13): the
   stock screen draws a campaign the player cannot play yet exactly as an open one, and a
   click on it does nothing (no mission list, no sound of its own). Ours greys it: its
@@ -1062,6 +1078,363 @@ a Mutara nebula with the queen's Diamond (`render3d/README.md`, "The menu scene"
   each change of screen. `testbench/ui.json` gives the main menu's and the campaign
   selection's targets a `label`, which `Click the <target>` clicks (by OCR) while the
   scene is on, since their stock points are on nothing then.
+
+## Roots' forms
+
+Fleet Operations: Roots only (PLAN-FLEETOPS.md, FO-6 step 7, option C), with
+`[Menus] Forms=1` (0 in `UI.ini` and in Roots' defaults until each screen is seen in game;
+the Refit screen shows an advanced "Redrawn front-end forms" row, Interface tab, only on a build
+that has forms; it applies at the next start and does not need `Enable`).
+On Roots the main menu, Options (the in-mission menu too), Yes/No, Manual IP, Multiplayer
+Connection, Map Select, Graphics and Advanced Options never run the executable's dialogs:
+`FleetOpsHook.dll` shows a VCL form of its own (a Delphi library's window class), modal,
+over the engine's device window, and frees it when the screen closes. Its buttons are
+graphic controls with no window. The dialog host above cannot reach them, so the forms have
+a host of their own, `engine/forms.rs` (drawn by `menus/roots.rs`):
+
+- **Found by its window.** A thread CBT hook on the game's thread (the one `DllMain` runs
+  on, which is the thread the library made its windows on) sees each window activate. A
+  window whose class is one of the forms the UI takes is a form; its object is the data of
+  the window property the VCL sets on every window it makes, named `ControlOfs` and the
+  library's module handle and thread id in hex. The object counts only when its class lies
+  in FleetOpsHook's image, is named as the window's class and derives from the VCL's form
+  class (read through the class's own name and parent slots, which the language runtime
+  lays out).
+- **Roots' main menu title** (decisions 360 to 366, `menus/title_art.rs`). The column's
+  heading is the lettering of `bitmaps\main\transparant.png` in the game directory (Roots'
+  `Data\`), the title alone over transparency, read from the player's install at run time
+  and never copied; `mainbkgr.png`, the same title over the DS9 picture, is never read.
+  `[Menus] TitleImage=` in UI.ini names another file (a Fleet Operations mod's own), `none`
+  keeps the text heading, empty takes the content set's `Files.MenuTitle`. The file is
+  decoded by `a2fmt::png`, cropped by `a2fmt::png::title_box` (the first band of rows with
+  gold or silver ink of alpha 128 or more, inside a 3% margin; the frame line and the faint
+  panel, which are blue, are left out), cut down by whole factors in premultiplied space and
+  uploaded as straight alpha with the colour of transparent texels borrowed from their
+  neighbours. A missing or unreadable file logs `menus: title picture ...` and the column
+  keeps the text heading of decision 206. Armada II's main menu draws no picture.
+- **The main menu's layout file** (decisions 410 to 419, `menus/main_layout.rs`). The
+  column's place, sizes, spacing, title (two lines of text or a picture) and the words and
+  presence of its entries are data, in the menu scene's way: `Menu\mainmenu.ini` in the
+  game directory (Roots: `Data\Menu\mainmenu.ini`) over the content set's `[MainMenu]`
+  (`ui/content/sets/<set>/ui.ini`, entries in `[MainMenu.Entries]`) over the built-in
+  defaults, which are Armada II's look to the pixel. The file is looked at twice a second
+  and read again when it changes. The title picture's path: UI.ini `[Menus] TitleImage=`
+  first (`none`: text), then the file's, then the set's `[MainMenu]`, then `Files.MenuTitle`.
+  `TitleGap` is measured from the title's bottom (a picture's real height, or the text
+  title's rule) to the first entry; the built-in 14 units is the old text layout, and the
+  `fleetops` set says more. Every key and its default is `main_layout::resolve`'s. UI.log says which sources spoke
+  (`menus: main menu layout: ...`) and the first frame lists the entries' keys. Scenarios:
+  `fo-ui-mainmenu-ini` (the set's default at 2150x900 and 3440x1440) and
+  `fo-ui-mainmenu-ini-custom` (a right-side text-title file with an entry hidden and one
+  relabelled); `ui-menus-scene` holds Armada II's menu unchanged.
+- **Read, never written.** Each tick the form's owned components are walked: each control's
+  name, class, rectangle, visibility, enabled state and text, at the VCL's field offsets
+  (`profiles/gog-1.1/ui.forms.toml`, hook `ui.forms.vcl`: the VCL's fields, read only on a
+  build whose `forms_present` is 1). Every pointer is checked (aligned, in user memory,
+  readable), only on the game thread, only while the form is the modal one and not being
+  destroyed, and the frame sees only copies. Text fields and combo boxes have windows: their
+  text and entries come through those (`WM_GETTEXT`, `CB_GETLBTEXT`).
+- **Hidden by moving it off screen.** An empty window region clips the form's painting but
+  on Wine under XWayland its pop-up still covers the screen in black, and a layered window
+  at alpha 1 does the same (the probe of step 0): the form is moved far off screen, its size
+  kept, and moved again whenever it comes back. It keeps the activation, the keyboard focus
+  and its modal loop. It is off screen from the moment it is shown, not from its
+  activation: the game thread's sent messages are watched (`WH_CALLWNDPROC`), a window the
+  forms may take is subclassed while still hidden, and the `WM_WINDOWPOSCHANGING` that
+  shows it is moved off screen, so Wine never maps it and the window manager never sees
+  it (PLAN-FLEETOPS.md, decision 310). The same holds for the dialogs the forms adopt.
+- **Drawn from a timer.** While a form is modal the engine draws nothing. A thread timer of
+  the UI's (16 ms) is dispatched by the form's own loop; each tick runs the actions the last
+  frame queued, reads the form, prints it into a memory DC every 0.1 s (`WM_PRINT`, the
+  mirror's picture) and presents a whole frame of ours on the engine's device. The design
+  space is the full-screen forms' client size, Roots' 1200x900 shell
+  (`forms_design_width`/`_height`), fitted to the back buffer; UI.log says `menus: forms
+  1200x900 @0,0 -> WxH @X,Y`. The pointer's shape is set to the arrow each tick: with the
+  form away nothing else sets it.
+- **Acting as a player would.** A press of ours is a posted mouse move, left down and left
+  up at the control's centre, to the form's window: the VCL finds the graphic control there
+  and Roots' own button code runs the action Roots binds at that moment (Back is bound at
+  run time). Combo boxes are set by `CB_SETCURSEL` and the parent's `CBN_SELCHANGE`, which
+  the VCL turns into the control's change event. A click on a text field gives the real
+  field the keyboard; the typing goes to it, and ours shows its text. Areas the UI does not
+  draw as its own (check boxes, sliders, grids) are crops of the form's picture with the
+  mouse forwarded to the window under the point. Nothing calls a handler of Roots' and
+  nothing writes a setting: Roots' handlers write what they write (Graphics saves the
+  profile on Back; Manual IP saves its settings file on Join).
+- **A grid's rows are read, not printed.** NextSuite's `TNextGrid` (Map Select's list, the
+  Mods list) paints through its own window's device context, which is clipped to nothing
+  while the form is off screen: neither a print of the form nor of the grid's window has
+  the rows. The UI reads the cells (read only, `grid_of`): the grid's cells object holds a
+  list of cells for each column, a string cell a wide string and an integer cell the
+  integer, told by the class's name; the selected row and the first row shown are fields of
+  the grid, its row and header sizes published properties. Offsets are the profile's
+  (`forms_grid_*`, found in the grid's `GetCells`, `GetRowCount` and `GetSelectedRow` and
+  the string cell's `GetAsString`, measured on Roots 5.0Z11's FleetOpsHook). A row is
+  chosen by a posted click at the row in the grid's own window, or the arrow keys when the
+  grid shows another part of its list.
+- **A poke is not seen.** `Action::Poke` moves the form under the real pointer for one
+  message and back (decision 242). On the bench (sway, window events and a 20 Hz tree
+  sample during seven pokes) the form never became a window: no `new`, `focus` or
+  `urgent` event and the game window kept the focus, because Wine has the off-screen form
+  unmapped and the two moves of one tick do not map it (decision 261). Hyprland is not
+  measured.
+- **Keyed to FleetOpsHook alone.** `FAMILY` lists the measured builds by the CRC-32 of their
+  file's `.text` (`a2engine::companion_crc`; Roots 4.0.93, Roots 5.0Z11, Tactical Maneuvers
+  5.2.3); any other stands the forms down, logged once, and Roots draws its own menus.
+  `tools/engine/fo-forms.py` reads a new FleetOpsHook (and its map) once, prints its line
+  and checks the forms and controls the UI uses are there.
+- **What stays Roots'.** Tunngle's wait. The nine screens
+  FleetOpsHook opens through its own `DialogBoxParamA` (Single Player, Game Setup, Game
+  Settings, Load, Save, the licence, the Technology Tree, the Admiral's Log, Internet) are
+  Roots' dialogs drawn by the UI: "The nine dialogs, adopted" below. Still Roots' or the
+  engine's (PLAN-FLEETOPS.md, "The leftover menus"): the map editor's Load Map and Save Map file dialog (a window of its own,
+  not owned by the device window, so neither adopted nor hidden), and, unreached, the
+  Technology Tree, a game's password and the map transfer, which stay the picture.
+- **The fallback: the nine framed** (PLAN-FLEETOPS.md, decision 200), when the
+  executable's paint imports cannot be ours (decision 230). The shell sizes a
+  full-screen screen to the device window's client area, which on Display8 is the
+  desktop's size, while Roots paints its 1200x900 art at the top left: the rest of the
+  dialog stayed white (Forms=0 shows the same; it is not the forms' doing). With the forms
+  on, every `#32770` owned by the device window is put where the frame wants it as it
+  activates: a full-screen one cut to the design size and centred, a smaller one left
+  where the shell put it unless that is off the client area (its owner a form of ours,
+  moved off screen), then centred. It is checked every tick and put back if anything moves
+  it. The pump goes on under it (the scene or the backdrop, the forms under it inert, a
+  panel of ours round the dialog), so the area around it is ours. It stays a Win32 window
+  at 1:1, and the window manager sees it as a window of its own. UI.log: `forms: #32770
+  ... framed at X,Y WxH on the device window`.
+- **The menu scene** (`[Menus] Scene=1`, decision 201): the forms' frame draws render3d's
+  menu scene first, as the dialog host's does; the main menu's form stands over the
+  `main` view and every other form and dialog over the view last shown. The `fleetops`
+  set names only `Main` in `[Scenes]` (Roots' campaigns are not the stock four, so no
+  campaign view is chosen). The screens' backdrop is then the scene, dimmed
+  (`theme::backdrop`), as on stock, but under the main menu, which shades only its column;
+without render3d, or when it draws nothing, it is the gradient as before. render3d draws the
+`fleetops` set's own map there (DS9 and the Defiant: render3d/README.md, "The menu scene").
+
+The screens: the main menu is Armada II's main menu over the scene (decisions 205 and 206:
+`screens::main_menu::scene_column`, the same function Armada II's spec draws with, titled
+FLEET OPERATIONS over ROOTS, the entries as text in capitals down the left, no window, the
+scene showing through); Options is a window with a column of our buttons. Both take the
+form's visible buttons in their on-screen order, each labelled with the caption Roots set on
+it and pressed at its own rectangle, so
+a button is what the player sees whatever its field is called (on Roots' main menu the
+field named for Options reads "Map Editor" and runs the map editor, and the one named for
+the map editor reads "Options"; decision 204). Options' Back, which Roots binds when the
+form opens, stands at the window's foot, and the main menu's version line (Roots' `labelVersion`) at
+the bottom right, small and dim, as Armada II's version. Yes/No is the Warning prompt of every confirmation
+(Exit to Desktop, End Mission, ...): a dialog of ours, the executable's words wrapped to it, the form's icon smaller
+and its buttons (below, "The Warning prompt"); it falls back to the form's picture (Roots draws the question into
+it) under our two buttons when the words are not readable;
+Graphics, Sound, Mods, Advanced Options, Multiplayer Connection and Manual IP have specs of
+their own (below); every other form is generic (`Generic=widgets` in Roots' defaults). The in-mission Options
+stands over the mission's last frame, as the stock host's in-mission menus do.
+
+**The specs** (`src/menus/roots/`, decisions 240 to 244; one file per form, `kit.rs` for the
+controls they share, `specs.rs` choosing by the form's class) lay each screen out with
+Armada II's functions (`screens::form::frame` and `connection_layout`) and draw Roots' controls
+as ours: a combo as a dropdown (its choice is the window's selection and the parent's
+notification), a check box with the state the control holds, a slider at its value, a text
+field of Roots' own with the keyboard. A check box or slider is read through its published
+properties (`engine/forms_props.rs`) and acted on through `forms::Action::Poke`, since
+Roots' check boxes test a click against the real pointer's place. Graphics: driver,
+resolution, anti-aliasing, detail, gamma and the switches; Sound: four volumes, the
+channel count, unit speech, hardware acceleration, device and speaker set-up; Mods: the list
+(a crop of the form's picture with the mouse forwarded), the mod's screenshot, title and
+description, three buttons; Advanced Options ("Game Settings"): four dropdowns, the
+switches, six sliders with end captions, OK, Cancel, Default; Multiplayer Connection and
+Manual IP as Armada II's; Map Select: the filter, the list of maps, the preview and the two
+buttons, with the rows read from the grid's memory (decision 260); the map editor's list
+(the main menu's Map Editor: the same grid list with six columns, the preview and name, Create
+new map, Delete Map and Edit Map) and its new-map name form (as Manual IP, Create dimmed while the
+field is empty; decision 280). Edit Map ends, on Roots as for a player, in the editor's licence
+dialog. Advanced Settings has a spec that nothing on Roots 5.0Z11 opens (decision 281), so it is
+unbenched. Tunngle's wait is the one form left to Roots.
+
+### The map editor's Load Map and Save Map (`TMapSaveForm`, `TMessageForm`)
+
+PLAN-FLEETOPS.md, decisions 620 to 629; `menus/roots/mapsave.rs` and `menus/roots/msgdlg.rs`.
+The editor's Options menu (`TOptionsMenuForm`, its captions Load Map... and Save Map...) ends
+in the engine's `MissionDialog::GetLoadName` and `GetSaveName`, which on Roots are
+FleetOpsHook's replacements (`MissionDialog_GetLoadName_New`, `MissionDialog_GetSaveName_New`
+in its map). Each makes a VCL form of its own, `TMapSaveForm` (a pop-up owned by the device
+window, 586x360), shows it modally on the game thread and hands the file name it confirmed
+back to the engine; the mission's loop waits inside that call, so the forms' timer is the
+only thing that presents, as for every form. One form serves both: Save shows a text field
+(`edtSaveName`) and a confirm reading "Save"; Load hides the field and its confirm reads
+"Open". Its controls: a NextSuite grid of the map files (`grdMaps`, two columns, Filename and
+Location; a map the player saved lies in `settings_saves_logs\bzn` and its location reads
+`userdir:bzn`), the label, and two windowed VCL buttons, the confirm (the form's default
+button: Enter) and Cancel (its cancel button: Escape). Before Save overwrites a map, FleetOpsHook asks
+through a task dialog unit that, under Wine, falls back to the VCL's `MessageDlg`: a
+`TMessageForm` titled "Warning", the question in its `Message` label and two windowed
+buttons, Yes and No, owned by the library's own window rather than the device window.
+
+Both are forms of `TAKEN` and need no hook of their own. `TMapSaveForm` is drawn as a dialog
+of ours over the editor: the grid's rows as our list (Map Select's `list`, the rows read from
+the grid's memory), our field over Roots' text field (Save) or the chosen row's name (Load),
+and Roots' two buttons; a click on a row is the grid's row clicked, so Roots' handler fills
+the field, and a double click (or two presses on one row within 0.45 s, as the device window
+under a form gives no double click) is the confirm. `TMessageForm` is Armada II's message
+window (`notice::notice_window`) with the form's caption, its words and its buttons, and
+any message box FleetOpsHook shows through the VCL is drawn the same way. A windowed button
+is pressed in its own window (`forms::press`: down and up at its centre), and its caption is
+read through its window. The keyboard stays on Roots' forms: Enter and Escape are theirs.
+With the message box on top the device window is disabled and the pointer's button is read
+by the pump (decision 183); the device window is found through the forms under it, since the
+box's owner is not the device window. A window that activates over the forms and is not one
+the forms take is logged once by class (`forms: <class> ... activated over the forms: not one
+the forms take`). After Save, Roots leaves its Options menu up (Return to Editor); Load closes
+Options before the form opens, and the mission's frames are no longer recent, so the form
+stands over the menu scene. Scenario: `fo-mapedit-filedlg`.
+
+**Armada II (gog-1.1) is not covered.** Its `MissionDialog::GetSaveName` and `GetLoadName`
+call comdlg32's `GetSaveFileNameA` and `GetOpenFileNameA` (imports of the executable,
+reached from `PromptSaveMission`, `PromptLoadMission` and `do_loadGame`), Wine's own file
+dialog, a path Roots does not take. A picker of ours there would take those two imports and
+run a modal loop of its own (as the dialog host does), which is left for later (decision 627).
+
+| Hook | What it reads |
+|---|---|
+| `ui.forms.vcl` | the VCL's fields of FleetOpsHook's forms and controls (owner list, name, rectangle, visibility, enabled, text, window, form and component state), and whether the build has forms; feeds `Menus.Forms` |
+
+`[Menus] Forms=probe` is the bench's probe of step 0: the same host, plus a fixed walk of
+posted presses (main menu, Options, Graphics, Back, Back, Instant Action), a combo set on
+Graphics, and a log line of the pointer and focus every two seconds
+(`testbench/scenarios/fo-ui-forms-probe.md`).
+
+### The nine dialogs, adopted
+
+PLAN-FLEETOPS.md, "Phase two, step one: the dialogs adopted", decisions 230–238;
+`engine/fodialogs.rs`, drawn by `menus/roots.rs`. With the forms on, each `#32770` over
+the device window (the nine, and what they open: the mission list, the one-button
+message, the Admiral's Log's pop-up panes) is **adopted** as it activates. It is the
+dialog host's model for a dialog the UI did not create:
+
+- **Off screen, so the window manager never sees it.** It is cut and placed as the
+  framing above would put it (its place in the design space), then moved off screen with
+  its size kept, as the forms are. A window wholly off every output is not mapped, so the
+  compositor manages only the game's window (sway's tree on the bench; the bench step
+  `Expect the window manager to see one window`). A dialog whose place would not fit in the design space
+  (the map editor's licence, which Roots leaves at the device window's origin) is centred
+  in it (PLAN-FLEETOPS.md, decision 503). The dialog keeps the activation, the
+  keyboard focus and FleetOpsHook's modal loop; the UI's timer goes on inside that loop.
+  A dialog with no control to take the focus is given it (decision 236).
+- **Painted into a surface of ours.** The stock procedures draw through the executable's
+  imports of `GetDC`, `ReleaseDC`, `BeginPaint`, `EndPaint`, `InvalidateRect` and
+  `RedrawWindow`, which are pointed at functions of ours (each slot checked to hold
+  user32's own function first; never while the dialog host owns them, which it does on
+  Armada II). An adopted dialog gets a memory DC of its client size; any other window
+  goes to user32. An off-screen window is never sent `WM_PAINT`, so the invalidations
+  are noted and the pump sends the paint; the top dialog is painted at least four times
+  a second besides, since an invalidation from FleetOpsHook's or user32's own code never
+  passes the imports (decision 233). The surface's bitmap is selected back whenever its DC
+  is handed out, as the host's is.
+- **Composed into a picture** each time it drew, and every 0.1 s: the surface, then each
+  visible child window printed with `WM_PRINT` (bottom of the z-order first). An
+  owner-drawn button is printed into a metafile and played back at its place: the
+  Admiral's Log's drawing helper selects a bitmap of its own into the DC it is handed,
+  which on a memory DC replaced the picture and lost every tab (decision 237).
+- **Drawn in the forms' frame**, in the design space with the forms, scaled to fit by
+  any factor (decision 232: 1.6 at 3440x1440), in a panel of ours. Forms and dialogs are
+  drawn in the order they opened, and a full-screen one hides what is under it. A pane (a
+  pop-up owned by an adopted dialog) stands at its place against its owner, just above
+  it, without a panel, only while shown (decision 235).
+- **Driven as a player would.** The pointer over the picture is posted to the window
+  under it in the dialog's client coordinates: every move (the stock buttons light up,
+  and take a click, only under the pointer), the press, the moves while held and the
+  release; to the uppermost live dialog it is over (a pane before its owner). The real
+  pointer's messages can only reach an off-screen dialog through a capture it took on a
+  press of ours, and their points lie outside its client area: a message hook drops them
+  (decision 234). Keys reach the dialog's focus as they would: a click into an edit
+  gives it the focus, and typing goes there (Save Game's name).
+- **A model for a spec.** Its child windows (class, id, text, rectangle, style) and
+  FleetOpsHook's record of the stock procedure (the record in the window's user data, read
+  once; for a dialog the executable opens through its own import, which has no record,
+  the dialog's own procedure, `DWL_DLGPROC`) are what the frame sees (`forms::Dialog`),
+  and the shell's own widgets are read as under the host ("Roots' dialogs, laid out"
+  below). A dialog without a spec is the mirror (`[Menus] Generic` does not apply to
+  them). UI.log: `forms: #32770 ... adopted: client WxH, style ..., stock procedure
+  0x...`, `... adopted at X,Y WxH in the design space`, and once, the child windows;
+  `Trace=1` also writes the picture as a BMP into the game directory.
+- **The shell background kept off the game window** (hook `ui.forms.shell_background`,
+  decision 300 in PLAN-FLEETOPS.md). Game Setup's paint has the shell set its background,
+  and on Roots that is FleetOpsHook's replacement of `SetCurrentBackground`
+  (`ShellBitmapImp.SetCurrentBackgroundNew` in its map): it keeps the picture in
+  `hCurrentBackground`, then draws it, 1200x900 with magenta as the transparent colour,
+  onto the window `ST3D_GraphicsEngine::GetWindowHandle` (0x62bc70) names, the device
+  window, through the executable's `DrawTransparentBitmap` (0x608100) and a DC from
+  FleetOpsHook's own `GetDC`. No import of the executable sees it, and the GDI draw shows
+  at 1:1 at the window's top left over the frame until a later image of the swap chain
+  covers it: the flash of decision 258, once per paint. Measured with Wine's relay of
+  FleetOpsHook's calls on the bench (one `GetDC` of the device window and one 1200x900
+  draw onto it in each of the dialog's 46 paints). The UI takes `DrawTransparentBitmap`
+  at its entry (the six bytes of its first three instructions, checked) and skips a draw
+  whose DC is the device window's (`WindowFromDC`) while the forms' frame covers it
+  (`forms::covers`); every other draw, the stock procedures' into our surfaces among
+  them, runs as stock, and `hCurrentBackground` is set as before. FleetOpsHook's memory
+  is not written. UI.log: `forms: DrawTransparentBitmap taken at its entry` and, at the
+  first draw skipped, `the shell background's draw onto the game window skipped`.
+
+### Roots' dialogs, laid out
+
+PLAN-FLEETOPS.md, decisions 250 onwards; `menus/roots_dialogs/`. An adopted dialog with a
+spec is drawn by it, from the same two things a hosted dialog's spec reads:
+
+- **Its model** (`model::read_adopted`), the host's walk over the adopted window: the
+  shell's widgets that draw into it and its child windows, in Roots' design space
+  (1200x900, the dialog at its place in it). The widget reader (`engine/shellui.rs`, the
+  `Shell::Widget` constructor re-pointed) is installed by the forms on Roots, at DllMain,
+  as the host installs it on Armada II: Roots' shell classes are stock's (the same
+  vtables, the same fields), and it reads them as on Armada II once one difference is
+  allowed for: FleetOpsHook re-protects pages of the executable's `.rdata` as it patches
+  them, which splits `.rdata` into regions, and the buttons' vtable (`ShellButton`'s
+  family) straddles two; the reader's check that a vtable can be read now spans regions
+  (on Armada II the check gives what it gave). UI.log has each dialog's model, as the
+  host logs it (`menus: model of "single player" ...`), and the widgets made for it that
+  the reader does not know.
+- **Its picture**, cut for what a theme cannot draw (a campaign's art).
+
+The spec is chosen by the stock procedure (`forms::dialog_screen`): the profile's
+`ui.forms.dialog_specs` lists the thirteen procedures FleetOpsHook opens or that open from
+them (Single Player, the mission list, Load, Save, Game Settings, Game Setup, the
+Admiral's Log, the one-button message, the map editor's licence, the lobby, Please Wait,
+the lobby's Help and Create Game's name), told apart by address only; Roots' build marks
+each verified beside its edit, since FleetOpsHook's record (or the dialog's own procedure,
+for those the executable opens) was measured to hold stock's address for every one. A spec acts as a player: `Screen::click` moves the pointer to the
+stock control's point, and once it has rested there (0.12 s; Roots' screens take a press
+only on a control already under the pointer, decision 190) presses, and releases 0.06 s
+later, each in a pass of its own through the dialog's messages; one click at a time, in
+order, and the clicks still waiting when something opens over the dialog (Roots' Yes/No)
+are dropped, as a player's would land on it. Load and Save never click a stock row that is
+already picked: two clicks on one are its own double click, which loaded nothing after
+Roots' question answered Yes (decision 255). Typing into an edit is `End`, a Backspace for each character
+it held, and the new text, posted to the edit as the keyboard would send them. Nothing
+writes a setting. A spec that does not recognise its dialog returns false and the frame
+draws the picture.
+
+The specs reuse Armada II's layouts, factored out of `screens/` with Armada II's
+behaviour unchanged: `single_player::campaign_column` and `campaign_cards`,
+`mission_select::mission_list`, `saves::saves_screen`, `notice::notice_window`, `admirals_log::log_frame`. `setup_kit` acts through the trait `menus::Host`, which Armada II's `Screen` and Roots' `roots_dialogs::Screen` both are (a click, the picture, keys, Enter, a selection), and Game Setup's places are a `game_setup::Layout` (`ARMADA`, `ROOTS`). Return in a text field of ours on an adopted dialog never reaches it: user32's modal loop turns it into the dialog's OK command first (decision 253).
+
+| Dialog | Spec | What it shows |
+|---|---|---|
+| Single Player (`SingleDlgProc`) | `roots_dialogs/single_player.rs` | Armada II's campaign selection: over render3d's map the column (the four campaigns, each named by the dialog's hidden hover label and marked by a cut of its own card's art, then Load Game and Previous Menu), pointing at one moving the camera to its view (`federation`, `dominion`, `species8472`, `freeborg` in the fleetops map); without the scene, the cards (2x2). The top two cards are hit areas of the procedure, the bottom two picture `ShellButton`s, as on Armada II |
+| The mission list (`MissionSelectDlgProc`) | `roots_dialogs/mission_select.rs` | Armada II's list in a window of ours over the campaign selection: the stock rows by their labels, OK and Cancel |
+| Load Game, Save Game (`LoadGameDlgProc`, `SaveGameDlgProc`) | `roots_dialogs/saves.rs` | Armada II's save list: name and date, the stock list's two scroll buttons and the wheel, Save's name field writing the stock `Edit` (id 2100), the foot |
+| The Admiral's Log (`AdmiralsLogDlgProc`) | `roots_dialogs/admirals_log.rs` | Armada II's log frame (`admirals_log::log_frame`): the tabs (words of ours by id: Roots paints them), the players and Done, the stock owner-drawn buttons; the page is the shown pane's picture (the panes are adopted pop-ups, not drawn again by the frame), the pointer posted to it (decision 259) |
+| Game Setup (`MultiplayerSetupDlgProc`) | `roots_dialogs/game_setup.rs` | Armada II's Game Setup (`game_setup::draw_with`) with Roots' places (`ROOTS`, a `game_setup::Layout`): the players' rows as our drop-downs over the stock `ComboBox`es, the palette, the map's window with its preview and settings, the bottom row; the column headings are Armada II's words, Roots paints its own (decision 257) |
+| Game Settings (`GameSettingsDlgProc`) | `roots_dialogs/game_settings.rs` | Armada II's settings form (a caption over each control): the six stock sliders (set by a click on the track, `generic::click_scroll_with`) and the two cycle buttons; Roots' labels hold no text, so the captions are words of ours, given in the order Roots stacks the controls (decision 256) |
+| The one-button message (`OneButtonDlgProc`) | `roots_dialogs/notice.rs` | Armada II's message window (`notice::notice_window`): the labels as title and text, the stock OK |
+| The map editor's licence, the lobby's Help (`LicenseAgreementWindowDlgProc`, `HelpWindowDlgProc`) | `roots_dialogs/text_window.rs` | Armada II's text window (`text_window::text_window`): the text read whole from the stock edit (`WM_GETTEXT`), in our scroll area, the stock buttons (ACCEPT and CANCEL, OK) in a row; the edit is never printed, so Roots' picture of it with the whole agreement selected is gone (decision 600) |
+| The lobby (`InternetGameDlgProc`) | `roots_dialogs/lobby.rs` | Armada II's lobby (`lobby::draw_with`): Roots' lobby is Armada II's widgets at 1.5 times their places (1200x900 against 800x600), so the spec's places are scaled by the design width over 800; the title LOBBY, which Roots paints (decision 601) |
+| Please Wait (`NetWaitingDlgProc`) | `roots_dialogs/notice.rs` | Armada II's message window with no button, the two labels as title and text (decision 602) |
+| Create Game's name (`GameNameDlgProc`) | `roots_dialogs/lobby.rs` | a window of ours: "Game Name" and "Password" over the two stock edits (words of ours: Roots' labels are of a class the reader does not read), OK and Cancel (decision 603) |
+
+**The campaign tiles are Roots' art**: the column draws each card's own picture, cut from
+the dialog's picture at run time (never stored; decision 251), because the α, γ, V and
+B on them are the only marks Roots gives its campaigns and no theme of ours can draw them;
+the names, the layout and everything else are ours.
 
 ## Testing
 
@@ -1165,5 +1538,43 @@ the Credits' place does: the black shell background and `g_shellMode` = main men
   key); Space, Enter, the right arrow or a left click turn the page, the left arrow goes
   back; the last page's end returns too. The foot of the screen says so.
 
+**On Fleet Operations: Roots** (PLAN-FLEETOPS.md, decisions 607 to 609; off in Roots' defaults):
+the same screen from the main menu form's Credits, over Roots' own `Credits.txt` and
+`textures\logos.tga` and a tour of the `fleetops` map's five views. The black background it
+leaves on Armada II (`ui.shell.background`) stands down there: Roots' `SetCurrentBackground` is
+FleetOpsHook's and takes a bitmap of its own, and the next screen is a form of FleetOpsHook's.
+`fo-ui-credits` checks it.
+
 Seen on the bench (2026-10-17, 1280x720): the title page over the fleet with the four
 logos, page 5 of 30, Esc back to the main menu (`credits: left (0)`).
+
+## The Warning prompt (Roots' `TYesNoForm`, decisions 540 and 541)
+
+Every confirmation and warning of Roots is one form, `TYesNoForm` (a background picture and
+two buttons, `btnYes` and `btnNo`; the form's own "Warning" title, icon and question are
+painted into its picture, in a system font that runs off the form's right edge: the form's
+657 px against a question that starts 157 px in). `menus/roots/message.rs` draws it as our
+notice window (`screens::notice::notice_window_icon`, the same panel as Armada II's one- and
+two-button messages): the title in the heading font, the question in the body font wrapped to
+the panel, the panel sized to its text and centred over a dimming of what asked, the form's
+buttons in a row at its foot, a press going to the form's own button as a click would.
+
+- **The words** are the executable's own: the title, the question and the two captions are
+  four 128-byte C buffers (`yesNoTitleText`, `yesNoMessageText`, `yesNoCancelText`,
+  `yesNoOKText`) that a caller fills before the prompt opens and that FleetOpsHook's form
+  paints into its picture. Hook `ui.forms.message_text` reads the first two (the captions are the form's controls') (a global each, no check: the
+  data of the stock image, which Roots' file keeps at the same addresses); with the question
+  empty the prompt falls back to the picture under our buttons. The buttons' captions come from
+  the form's controls, so a Roots that renames them is followed.
+- **The icon** is a cut of the form's printed picture, found each time the form opens: the
+  bounding box of what is lit (brightness over 24 of 255) in the band left of the question, between
+  the title and the buttons, when it is about as wide as tall. It is cut down by area to the
+  size it is drawn at (44 units, `ICON`) with alpha from brightness, since Roots paints it on
+  black, into a texture of our own; nothing is copied into the repository and the picture is
+  read from the running form. A prompt with another icon (question, information) shows that
+  one, because the cut is of whatever the form painted; a prompt with none shows none.
+- **The keys** are read by the form's pump (`poll_keys`): while the form is the thread's
+  active window it reads Enter and Escape with `GetAsyncKeyState` and records their downs
+  (`input::note_message`), as `poll_button` does the left button, since the form holds the
+  focus and a key never reaches the device window's procedure. Enter presses the first button
+  (Yes, marked by the focus ring), Escape the last (No).

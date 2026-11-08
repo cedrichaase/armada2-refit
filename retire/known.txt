@@ -34,6 +34,18 @@ glob-hash Sky mbg*.ini 00058900fd41b59d20f0ce898bc7fae10f4a28d93f0a941d333922b58
 # Written by the bench's fault injection, never shipped.
 file A2EngineTest.ini
 
+# The logs the plugins wrote beside the exe before 13.50.0 (since then they write to
+# %LOCALAPPDATA%\armada2-refit\logs, the game folder only as a fallback, rewritten at each
+# launch). Left behind, a stale one is easily sent with a bug report as the current one
+# (issue #87: logs of 13.36 sent for a crash on 15.x).
+file Display8.log
+file Render3D.log
+file UI.log
+file QOL.log
+file QOLRules.log
+file Online.log
+file BinkProxy.log
+
 hud-files
 bloom
 

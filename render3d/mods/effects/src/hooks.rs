@@ -11,6 +11,7 @@
 //! | `Craft::Explode` (0x4c6bfc), its call of `ST3D_Instance::Fragment` | call (chained) | a craft the module can draw as debris is noted instead of broken up by the engine |
 //! | the Evolver's four calls of `Fragment` on its cocoon (0x4b07b4, 0x4b0872, 0x4b0914, 0x4b09b4) | call, one hook each (chained) | the cocoon bursting is noted the same way |
 //! | `BuildingEffect::SafeDestroyConstruction` (0x46a0f1), its call of `Fragment` | call (chained) | a cancelled construction's faces built so far are noted |
+//! | `ST3D_Instance::Fragment` (0x62eb20) itself, on a build whose profile says so (`ef_debris_at_callee`, Roots) in place of the three above | entry (first instructions moved to a trampoline) | a dying craft noted as above, only while the build's companion module (FleetOpsHook) calls it; every other caller gets the function as it was |
 //! | `Craft::RepairSystem` (0x4c90c0), its call of `NodeParticleEffect::AddParticle` | call (chained) | the new tail of the particle list is noted as a weld |
 //! | `NodeParticleEffect::Render` (0x473767), its call of `ST3D_Sprite::DrawScaled3D` | call (chained) | the particle's node is noted (in `esi`) and a weld, or every particle while the sparks are ours, is skipped |
 //! | the four calls of `CreateShieldHit` (0x58bb95, 0x58cad8, 0x58d502, 0x58dd65) | call, one hook each (chained) | records which weapon made a hit and its damage (a passive tap, see below) |
@@ -604,6 +605,99 @@ pub mod shields {
         crate::log!("effects: shields: the weapons' hits noted at:{}", names);
     }
 
+    // Roots: FleetOpsHook picks a hit's model per ship class and type (the class's ODF:
+    // shieldHit, shieldHitCritical, shieldDown, ...) in place of CreateShieldHit's pick from
+    // m_logical_db, so no hit there carries the shield database's models. Its call is
+    // chained, and the model it gave each hit is noted against the type it was asked for.
+    const NMODELS: usize = 512;
+    static mut MODELS: [(usize, u8); NMODELS] = [(0, 0); NMODELS];
+    static mut NMODEL: usize = 0;
+    static mut MODELS_FULL: bool = false;
+    static mut PREV_MODEL: Prev = Prev(0);
+
+    /// The pick (thiscall: the hit, its shield type, the struck object), and what it set
+    /// noted. Passive, as the tap: it records and calls on, so it has no gate.
+    unsafe extern "thiscall" fn model_pick(hit: usize, ty: i32, o: usize) {
+        unsafe {
+            let f: unsafe extern "thiscall" fn(usize, i32, usize) = core::mem::transmute(PREV_MODEL.addr());
+            f(hit, ty, o);
+            if hit == 0 || !(0..8).contains(&ty) {
+                return;
+            }
+            let m = hit_model(hit);
+            if m == 0 {
+                return;
+            }
+            let n = NMODEL;
+            let list = &mut *core::ptr::addr_of_mut!(MODELS);
+            if let Some(e) = list[..n].iter_mut().find(|e| e.0 == m) {
+                e.1 = ty as u8;
+            } else if n < NMODELS {
+                list[n] = (m, ty as u8);
+                NMODEL = n + 1;
+            } else if !MODELS_FULL {
+                MODELS_FULL = true;
+                crate::log!("effects: shields: {} hit models noted, no room for more: further ones are left to the engine", NMODELS);
+            }
+        }
+    }
+
+    /// The shield type a hit model was picked for by the build's companion module (Roots),
+    /// if it was noted; None on stock, where nothing is noted.
+    pub fn model_type(model: usize) -> Option<usize> {
+        if model == 0 {
+            return None;
+        }
+        unsafe {
+            let list = &*core::ptr::addr_of!(MODELS);
+            list[..NMODEL].iter().find(|e| e.0 == model).map(|e| e.1 as usize)
+        }
+    }
+
+    /// Chains the companion module's pick of a hit's model, on a build that has it (Roots;
+    /// stock has no such call and logs nothing).
+    pub fn install_models(h: &mut Hooks) -> bool {
+        if !h.present(&TABLE, crate::syms::hook::EFFECTS_SHIELD_MODELS) {
+            return false;
+        }
+        if !h.ready(&TABLE, crate::syms::hook::EFFECTS_SHIELD_MODELS) {
+            crate::log!("effects: shields: the companion's pick of a hit's model is not as profiled: its hits are left to the engine");
+            return false;
+        }
+        let hk = Hook {
+            owner: h.owner(),
+            used_by: "effects' shield hit models",
+            kind: Kind::Call,
+            site: Site::of(&TABLE, sym::SITE_HIT_MODEL),
+            to: model_pick as *const () as usize,
+            chain: true,
+        };
+        let Some(prev) = h.install(hk) else { return false };
+        unsafe { PREV_MODEL = prev };
+        crate::log!("effects: shields: the companion's pick of each hit's model chained: hits known by their shield type");
+        true
+    }
+
+    /// What this build's `RTS_CFG.h` says of the shield hits, for a build whose profile
+    /// says it follows the keys (Roots, FO-5 step 5): (the shell's scale factor, whether
+    /// a hit is coloured by the shields' level). Stock: (1, true), and RTS_CFG.h unread.
+    pub fn rts_keys() -> (f32, bool) {
+        static mut KEYS: Option<(f32, bool)> = None;
+        unsafe {
+            if let Some(k) = KEYS {
+                return k;
+            }
+            let pct = crate::syms::value::EF_SHIELD_RESCALE_PCT();
+            let scale = if pct > 0 && r3d_core::rtscfg::int("SHIELD_EFFECT_RESCALE") == Some(1) { pct as f32 / 100.0 } else { 1.0 };
+            let coloured = crate::syms::value::EF_SHIELD_DAMAGE_KEY() == 0 || r3d_core::rtscfg::int("SHIELD_EFFECT_DAMAGE_COLORED") == Some(1);
+            if pct > 0 || crate::syms::value::EF_SHIELD_DAMAGE_KEY() != 0 {
+                crate::log!("effects: shields: RTS_CFG.h: the shell scaled x{:.2}, hits {}", scale, if coloured { "coloured by the shields' level" } else { "white" });
+            }
+            KEYS = Some((scale, coloured));
+            (scale, coloured)
+        }
+    }
+
     /// Walks `m_shieldList` in order (as `ShieldEffect::Render` does): (id, ShieldHit).
     pub fn walk(mut f: impl FnMut(i32, usize)) {
         let head = unsafe { rd::<usize>(shield_list() + off::EF_MAP_HEAD()) };
@@ -816,6 +910,69 @@ pub mod chunks {
                 crate::log!("effects: debris: a cancelled construction's Fragment{} hooked: our own chunks", if p.addr() != fn_fragment() { " (chained)" } else { "" });
             }
         }
+        true
+    }
+
+    // ---- the callee hook (a build whose companion module owns Craft::Explode's call) ----
+
+    static mut PREV_CALLEE: Prev = Prev(0);
+    /// The return address of the latest call of `Fragment` that reached the entry detour
+    /// (the game calls it on one thread).
+    static mut CALLER: usize = 0;
+
+    /// `Fragment`'s entry: notes who called (the return address, `[esp]`) and goes on to
+    /// `fragment_callee` with the call as it was (`ecx` and the stack untouched).
+    #[unsafe(naked)]
+    unsafe extern "C" fn fragment_entry() {
+        core::arch::naked_asm!(
+            "mov eax, dword ptr [esp]",
+            "mov dword ptr [{caller}], eax",
+            "jmp {f}",
+            caller = sym CALLER,
+            f = sym fragment_callee,
+        )
+    }
+
+    /// `Fragment` at its entry: a dying craft noted as our debris only while the build's
+    /// companion module calls it (Roots: FleetOpsHook's call for `Craft::Explode`, made
+    /// only when the class lets the craft break up); any other caller (a cancelled
+    /// construction, the Evolver's cocoon, render3d itself) gets the function as it was.
+    unsafe extern "thiscall" fn fragment_callee(inst: usize, colour: *const f32, vel: usize, smoking: u32, faces: i32, attractor: usize) {
+        unsafe {
+            if open() && engine::in_companion(CALLER) && super::super::chunks::note_craft(inst, faces, colour_arg(colour)) {
+                static mut SAID: bool = false;
+                if !SAID {
+                    SAID = true;
+                    crate::log!("effects: debris: first dying craft taken at the callee (the companion module's Fragment call), faces {}", faces);
+                }
+                return;
+            }
+            let f: FragmentFn = core::mem::transmute(PREV_CALLEE.addr());
+            f(inst, colour, vel, smoking, faces, attractor);
+        }
+    }
+
+    /// Whether this build takes the debris at `Fragment`'s entry (the profile's value).
+    pub fn at_callee() -> bool {
+        crate::syms::value::EF_DEBRIS_AT_CALLEE() != 0
+    }
+
+    /// Installs the callee hook (`effects.debris_callee`; PLAN-FLEETOPS.md, "The rules of
+    /// (c)", rule 4), for a build whose profile asks for it. False (logged) otherwise.
+    pub fn install_callee(h: &mut Hooks) -> bool {
+        if !at_callee() {
+            return false;
+        }
+        if !h.ready(&TABLE, crate::syms::hook::EFFECTS_DEBRIS_CALLEE) {
+            crate::log!("effects: debris: Fragment's entry is not stock's here: the engine's chunks");
+            return false;
+        }
+        let len = crate::syms::value::EF_FRAGMENT_MOVED().max(0) as usize;
+        let Some(prev) = h.install_entry("effects' debris of a dying craft (at the callee)", &TABLE, sym::FN_FRAGMENT, len, fragment_entry as *const () as usize) else {
+            return false;
+        };
+        unsafe { PREV_CALLEE = prev };
+        crate::log!("effects: debris: Fragment hooked at its entry, ours only while the companion module calls it (a dying craft); its other callers keep the engine's chunks");
         true
     }
 }

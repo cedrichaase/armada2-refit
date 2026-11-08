@@ -32,7 +32,7 @@ armada2-refit.conf (A2_CONF overrides), then the default:
 The config file holds KEY=value lines, `~` and `$HOME` expanded, `#` comments. Keys
 before any section apply to the default game (A2_GAME, A2_PREFIX) and to every game
 (A2_HEROIC, A2_PROTON, A2_DATA, and A2_PROFILE, the game chosen); a `[<id>]` section
-holds another game's (`[fo-roots]` then `A2_GAME=...`). A2_GAME_DIR and A2_DIR, the
+holds another game's (`[<id>]` then `A2_GAME=...`). A2_GAME_DIR and A2_DIR, the
 names some scripts used before, are still read for A2_GAME.
 
 Derived, never read: A2_PROFILE (the game's id), A2_EXE (its executable,

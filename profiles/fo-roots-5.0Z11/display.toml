@@ -1,0 +1,34 @@
+# Fleet Operations: Roots: the modes the engine asks for, as Roots asks for them. The file
+# raises the shell's request in SetActiveDisplay_Internal to 1200x900, and FleetOpsHook.dll,
+# as it loads, raises its depth to 32 bits and the intro's two requests in
+# Program::PlayIntroMovie to 1200x900 (display/README.md, "On Fleet Operations: Roots").
+# Display8 names the front end's request by these values when it answers it, and raises
+# the intro's under [Window] RaiseIntro.
+schema = 1
+plugin = "display"
+
+[[sym]]
+id = "front_end_width"
+value = 1200
+
+[[sym]]
+id = "front_end_height"
+value = 900
+
+[[sym]]
+id = "front_end_depth"
+value = 32
+
+[[sym]]
+id = "intro_width"
+value = 1200
+
+[[sym]]
+id = "intro_height"
+value = 900
+
+# FleetOpsHook makes a new device window at each switch (PLAN-FLEETOPS.md, decision 311):
+# Display8's one window from the first CreateDevice on (decision 314).
+[[sym]]
+id = "device_windows"
+value = 1

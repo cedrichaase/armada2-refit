@@ -1,0 +1,17 @@
+# Fleet Operations: Roots: FleetOpsHook.dll takes over this function at its entry as it
+# loads (a jump to its own replacement). Our hooks only call it, and what Roots puts there
+# is what Roots means, so this build checks nothing at its entry (PLAN-FLEETOPS.md,
+# "FleetOpsHook.dll at run time").
+schema = 1
+plugin = "ui"
+
+[[sym]]
+id = "panels_operator_new"
+check = ""
+
+# Written by hand, kept when fo-scan writes the file again. No button sounds of the UI's on
+# Roots: every call site's `operator new` and constructor are FleetOpsHook's FMOD classes, of
+# a size we do not know (PLAN-FLEETOPS.md, FO-6 step 4, decision 126).
+[[sym]]
+id = "panels_sound_ours"
+value = 0

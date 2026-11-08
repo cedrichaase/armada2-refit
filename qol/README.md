@@ -109,10 +109,12 @@ the build's own variables (`_a2f_qol_<id>`), filled at start-up.
 | `qol.selection` | `MaxSelection` | `cOverViewImp` (`global`), its 31 selection-array sites and 3 caps (`patch`, each with the bytes it replaces) | selection of 16 |
 | `qol.special_select` | `MaxSelection` | the five special-weapon array sequences (`patch`) and three continue points | selection of 16 (it is moved only with this hook) |
 | `qol.stations` | `StationGroups` | the eight stub sites (`patch`/`fn`), nine continue points, the engine functions and RTTI the stations code calls, and the object fields | stations as stock |
+| `qol.rebind` | `BarKeys` | the parsed key map: the named controls' array and count (`FieldDesc`: the name inline, the state cell at `+0x20`) and the discrete maps' array and count (`DiscreteMap`: its state cell, its chord's length and keys) | no key moves; the game's own key map |
 | `qol.bar_keys` | `BarKeys` | the call of `mProcessKeyboardInput` in `PopupPaletteImp::Update` (`call`) and that function, the three hotkey counts and the six menu toggles, a button's state and press slot, and the click's sound (`operator new`, the `AudioSound2D` constructor, the click-sound global), `TextInput_IsActive`, `CinematicView::IsPlayingVideo` | position keys off, stock's bar keys |
 | `qol.warp` | `WarpDistance` | the Alt block (`patch`) and its continue point, the warp globals and functions | moves as stock |
 | `qol.move_paths` | `PathStartsAtOnce` | `mAddPathPoint`'s two calls in `mNormalModeRightClick` and `QueueCommand`'s in `mProcessWaypoints` (`call`), those two functions, the craft process's command, path and point fields, the action's no-order flag, the order's packet limit | paths sent on release, as stock |
 | `qol.rig_self` | `RigIgnoresSelf` | two patches in `ConstructionRig::GetAction` (`patch`, each with two continue points as `label`) and the two vtable slots the stubs call | the ghost as stock |
+| `qol.script_input` | none (always on) | `ScriptInputCallbacks::AlwaysSimulate` at its entry (`patch`, its whole body as the check) and the callback's field | the editor after a scripted mission crashes, as stock |
 
 `MaxSelection` needs both of its hooks; the log names the one that failed.
 
@@ -172,6 +174,13 @@ button of that cell", and which button sits in which cell is the UI's layout.
   keys with `MapVirtualKeyA` and read with `GetAsyncKeyState`, so they are positions on
   any layout. A key goes down once. Nothing happens while chat has the keyboard
   (`TextInput_IsActive`), Ctrl or Alt is held, or the game is not the foreground window.
+- **Cells without a key.** `bk_key_cells` (a value of the build's profile, one bit per cell)
+  says which cells get a key: all fifteen, on Armada II and on Fleet Operations: Roots.
+  `QOL_BarLabel` answers NULL for a cell without one and the UI draws no badge there. Roots'
+  own plain W (`select_next_ship`, reworked by Roots to select the damaged ships of the
+  selection, which emptied a shipyard's) moves to M while the keys are on ("Key rebinds" below;
+  PLAN-FLEETOPS.md, decision 349), so the W cell is the bar's there too. On Roots the keys press the UI's grid of Roots' bar (decisions 330 to 338); `qol.bar_keys` is verified there (the call in `Update` is stock's; Roots' edits to
+  `mProcessKeyboardInput` leave its hotkey tables at stock's fields, which the hook empties).
 - **A press** is what releasing a click does: nothing for a disabled button, else the
   click (a fire-and-forget `AudioSound2D` made with the game's `operator new`, named by
   `StandardButton::s_buttonClickSound`, unless a video plays) and the press slot.
@@ -221,6 +230,47 @@ working beside the grid?
 in a real game, the user doesn't have to look down.
 
 ---
+
+### Key rebinds (`rebind.c`, hook `qol.rebind`)
+
+`[BarKeys] Rebind` in `QOL.ini` is a table of rows `action:FROM>TO` (apart by commas): while the
+grid's position keys are on (`BarKeys=1` and the Refit bar drawn), every chord of `action` that
+holds FROM holds TO instead, its other keys (the modifiers it wants held or up) kept; when the keys
+stop, the game's own keys come back. Fleet Operations: Roots ships one row,
+`select_next_ship:W>M` (`qol/defaults/fo-roots.ini`): Roots gives plain W to `select_next_ship`,
+which it reworked to select the damaged ships of the selection, and the overview reads that before
+the bar's keys, so W emptied a shipyard's selection instead of pressing the bar's W cell. Plain M is
+free in Roots' `Input.map` (only Alt+M, `memory_toggle`, is bound; its metal lines are comments).
+Stock ships the key empty.
+
+- **In memory, never in a file.** `Input.map` is parsed once at start (`InputInit`) into two arrays
+  the input thread tests each frame: the named controls (`FieldDesc`: the name, and the state cell
+  the game reads) and the discrete maps (`DiscreteMap`: the state cell it sets and a chord of up to
+  eight keys, each a device, a code and held or up; `s_FindOrAppendDiscreteMap` shares one map
+  among the controls of one chord). A rebind finds the control by name, its maps by its state cell,
+  and writes the held key's code (set-1 scancodes for the keyboard) in each: one aligned word, put
+  back when the keys stop. `RTS_CFG.h` is not involved.
+- **A key never does two things.** While a row has not moved its action off FROM (the hook stood
+  down, the action not in the key map, the target refused, or the table not applied yet), FROM is
+  still the game's: its cell of the bar gets no position key (`QOL_BarLabel` NULL) and the UI puts
+  no button there, as `bk_key_cells` does for a cell without a key; logged once per change
+  (`rebind not applied: W stays the game's (select_next_ship); the W cell is left without a key
+  and empty`). Generic over the table's rows, not tied to W.
+- **Refused, logged:** a target another chord already fires on (it holds TO and wants none of the
+  keys held that ours wants up: Roots' Alt+M is not a clash for M with Alt up), an action not in
+  the key map, a key name not known, a chord without FROM held (its keys' codes logged).
+- **Multiplayer.** The key map is the player's own: a network game checks the executable and
+  `RTS_CFG.h`, the ODF, SOD, TT and AIP/FRM files ("... files do not match node %d"), never
+  `Input.map`, and a key only makes the ordinary command it always made. A player with a rebind
+  plays with stock players and with Roots players as before.
+
+### Keybinds page (later)
+
+The user wants a keybinds page in the game's settings (the Refit screen or Options) where every
+binding can be seen and changed, and where switching the hotkey layout to the grid applies its
+rebinds. The table is meant to feed it: the page lists the key map's controls and chords (the two
+arrays above), writes its changes as rows of `[BarKeys] Rebind` (or a table of the same rows per
+layout), and the grid preset is the rows a layout brings. Not built.
 
 ## QOL-2: Configurable right-drag pan speed
 
@@ -971,3 +1021,92 @@ the check ignores that one. The palette sends one BUILD per selected rig, so wit
 several selected the others still count as blockers in the ghost: step 2 deals with it.
 
 **Seen on the bench:** `testbench/scenarios/qol-rig-ignores-self.md`.
+
+## A script's input monitor (a crash fix, hook `qol.script_input`)
+
+*`QOL.asi`, no key: it changes nothing a player sees, only a crash. Found on Fleet Operations:
+Roots (PLAN-FLEETOPS.md, decision 500); the bug is stock's code.*
+
+**The crash.** Starting the map editor (a new map or Edit Map) after playing Roots' first
+tutorial, *TUTORIAL: Gameplay*, in the same run of the game kills the game at the first frame
+after the load: madExcept's `exceptArmada2.txt` names an access violation at address 0, from
+`DisplayInterface::SimulateAll` (through FleetOpsHook's `DisplayInterface_SimulateAll_Callback`).
+Stock Roots, with nothing of ours installed, crashes the same way (bench, below); the editor
+started without a scripted mission first works.
+
+**Why.** A mission script watches the player's input through
+`ScriptInterfaceImp::MonitorInputControls(fn)`: it stores `fn` in the engine's static
+`s_inputCallbacks` (a `ScriptInputCallbacks`, at +0x24) and registers that object in the
+simulate lists of view 0 and view 1 (`DisplayInterface::AddViewSimulate`); a null `fn` takes it
+out of both again (`RemViewSimulate`). Each frame `ScriptInputCallbacks::AlwaysSimulate` (0x451dc0)
+calls `fn` with no test, and when `fn` answers false it clears the field and leaves the object
+registered. The tutorial's script ends that way, so the next view that simulates the object,
+the editor's, calls address 0.
+
+**The fix.** QOL replaces `AlwaysSimulate` at its entry with a jump to a `__fastcall` function
+of its own (`script_always` in `qol.c`: `this` in ecx, the float popped by its `ret 4`, as the
+original's), which does the same with the test the original lacks: no function, nothing called.
+It leaves the registration as it is (taking it out from inside the list's own walk would free
+the node the walk is on). It is display-side only: nothing the simulation or the network reads
+changes, so a player with it plays a player without it. `QOL.log` says
+`--- QOL script input monitor: called only while a script has one set, patched` at start-up and,
+the first time the guard is needed, `script: the input monitor is registered with no function`.
+On Armada II the editor is started with `-edit`, in a run of its own, so no mission script has
+run before it there; the guard is the same on both builds.
+
+**Seen on the bench:** `testbench/scenarios/fo-mapedit-after-tutorial.md` (Roots with every layer: the tutorial,
+End Mission, Map Editor, Create new map, the editor up). Roots as it ships was driven the same way
+by hand in a stock session (PLAN-FLEETOPS.md, decision 500): the editor opens from a fresh start
+and crashes after the tutorial.
+
+## On Fleet Operations: Roots
+
+`./install --game fo-roots` puts QOL.asi into Roots' `Data/` with `qol/defaults/fo-roots.ini`
+applied over `QOL.ini`: `PanSpeed`, `ShiftAddsToGroup` and `PathStartsAtOnce` run, every other key is 0
+because it was measured beside Roots' own behaviour and found moot or blocked (PLAN-FLEETOPS.md,
+"FO-7: QOL on Roots", decisions 100-115).
+
+- **The pan hook** is `RTS_Configure`'s store over the parsed `FASTSCROLL_COEFFICIENT`.
+  Roots' executable has the function byte for byte as stock, FleetOpsHook's one run-time
+  write inside it is a call far past the site, and Roots' `RTS_CFG.h` has stock's value, so the
+  hook is the same as on Armada II; `QOL.log` says `RTS_CFG.h parsed: ... now 0.0125`.
+- **The overview** is read through `g_pOverView` (`ov_base()` in `qol.c`), since Roots
+  constructs an enlarged one of its own instead of the static object. Anything of QOL that
+  addresses the overview must do the same.
+- **`ShiftAddsToGroup` is on** (decision 108): Roots has no Shift+number of its own, and every
+  site `qol.shift_group` uses is stock's in the file and in memory. Roots jumps out of
+  `mCheckGroupSelect` before its key loop to take **Alt+number** itself, and Roots' Alt+number
+  empties the selection and recalls the *station* group, not QOL's "select and centre the ship
+  group" (the log and Refit text say so): on Roots Shift+number adds, and Shift's old
+  select-and-centre is gone (the second tap still centres). `fo-qol-groups` shows it.
+- **`MaxSelection` stays 16 and `selection` and `special_select` are disabled** (decision 109):
+  FleetOpsHook has moved the selection into an array of its own in the enlarged overview, at
+  +0x3d0 (so the `+0xbc` sites are not stock's), with a cap of 30 in its own `Select` and in the
+  group add of `mBindGroup`, and its own special-weapon gathering. Its readers are not ours to
+  re-point, so QOL's array would disagree with them; Roots' 30 is already past stock's 16.
+- **`BarKeys` stays off**: Roots' bar is FleetOpsHook's, up to 64 buttons with several per
+  weapon classlabel, so the slot plan of QOL-1 does not hold there.
+- **`PathStartsAtOnce` is on** (decision 114): QOL-10's queue reads and hooks only functions
+  that Roots leaves byte for byte as stock's (the right-click and its release, `mAddPathPoint`,
+  `QueueCommand` and `DeQueueCommand`, the `NetOrder*::Execute` family, the formation manager's
+  two entries), reads the selection through `GetSelectList` and the overview through
+  `g_pOverView`, and the three functions of Roots that it shares ground with
+  (`mProcessKeyboardInput`, `Simulate`, `Craft::Say`) are marked verified. Two differences:
+  `Craft::Say` is FleetOpsHook's port, so the re-pointed call of `CaptainsVoice::Say` never
+  runs and the ships **speak as they take each leg** (QOL's own sends are not quiet there); and
+  the engine moves a path on about 300 short of a point for the Mediterranean class, not the
+  150 of stock's destroyers, which the log marks `short of it`. render3d (`EngineMoves = all` on
+  Roots) draws QOL's queue where a ship has one and the engine's path for its ordinary moves.
+  `fo-qol-move-queue` stages it: the bench cannot hold Tab, so `testbench/bench/roots-waypoint.sh`
+  binds Roots' `enter_waypoint` to the middle mouse button in the clone.
+- **`StationGroups` is off and `stations` is disabled** (decision 111): Roots replaces
+  `cOverViewImp::Select` (the site that lets a second station be selected) and the bar's
+  `mUpdateButtonsAndPosition` (the build button's enable site) with FleetOpsHook's own ports, so
+  two of QOL-6's sites are in bodies that never run; Roots has station groups of its own.
+- **`WarpDistance` stays 0** (decision 112): the hook is verified and installed, but Roots has no
+  warp in its games (`GAME_OPTIONS_WARP = 0`, no warp option on the Instant Action settings, AI
+  warp distance 999999), and the hook asks `isAllowWarpSpeed` first.
+- **`RigIgnoresSelf` stays 0** (decision 113): the hook is verified and works (the log says the
+  ship is ignored, the ghost is green, the click builds), but Roots' ghost is green over its
+  own construction ship, and over other ships, with the key at 0 as well (`fo-qol-rig`,
+  `fo-qol-rig-off`).

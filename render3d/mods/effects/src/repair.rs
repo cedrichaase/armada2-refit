@@ -45,6 +45,8 @@ impl Weld {
 
 static mut WELDS: Vec<Weld> = Vec::new();
 static mut MADE: u32 = 0;
+/// When `lights` last ran: welds dropped after a gap (a load, the shell) are logged.
+static mut LIGHTS_AT: f64 = 0.0;
 /// The welds are ours: new ones are noted and the engine's sprite for them is skipped
 /// (the part is on and its hooks are in).
 static mut TAKING: bool = false;
@@ -213,11 +215,13 @@ impl Repair {
         unsafe { TAKING = on };
     }
 
-    /// Drop the welds whose particle the engine has erased.
-    fn gather(&self) {
+    /// Drop the welds whose particle the engine has erased; how many went.
+    fn gather(&self) -> usize {
         let mut live = Vec::new();
         nodes::each(|n| live.push(n));
+        let was = welds().len();
         welds().retain(|w| live.iter().any(|&n| w.matches(n)));
+        was - welds().len()
     }
 
     fn place(&self, w: &Weld) -> Option<Place> {
@@ -279,10 +283,22 @@ impl Repair {
         if pl.age < end { up } else { up * libm::expf(-(pl.age - end) / self.s.hot_time) }
     }
 
-    /// The arcs' light on the hull.
+    /// The arcs' light on the hull. The welds whose particle is gone are dropped first,
+    /// as `draw` does: the lights come before the draw in a view, and at the first view
+    /// of the next mission the welds of the one before were still listed, their handle
+    /// naming an object of the new mission and their hardpoint node freed memory, which
+    /// `Entity::GetWorldPosition` read and faulted on (the engine then made its display
+    /// windowed and hung in its crash dump: a black screen).
     pub fn lights(&mut self, v: &View) {
         if !self.on || self.s.light <= 0.0 {
             return;
+        }
+        let gone = self.gather();
+        let now_s = crate::rt::now();
+        let gap = now_s - unsafe { LIGHTS_AT };
+        unsafe { LIGHTS_AT = now_s };
+        if gone > 0 && gap > 1.0 {
+            log!("effects: repair: {} weld(s) of a view {:.1} s ago dropped before their light (their particle is gone)", gone, gap);
         }
         let now = v.time as f64;
         let ws: Vec<Weld> = welds().clone();

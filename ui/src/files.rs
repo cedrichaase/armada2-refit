@@ -8,6 +8,11 @@
 //! itself is mounted at the root, behind the folders: a mount shadows the folder of its
 //! name there, so `textures\` is only the texture roots. With this layout every path
 //! reads the file the game directory held at that path before.
+//!
+//! Another game's executable picks its own list (`GAMES`, by the executable's file name,
+//! as render3d's): Fleet Operations: Roots (`LAYOUT_FO_ROOTS`, `games/fo-roots.toml`)
+//! keeps its textures in `Textures\` itself, TGA and DDS (`texture_exts`). Roots' mods
+//! (`Data\Mods\<name>`) are not mounted: the UI reads only a map's sky from there today.
 use a2fmt::vfs::{Entry, FnIo, Layered, Loose, Vfs};
 use alloc::boxed::Box;
 use alloc::string::String;
@@ -19,6 +24,35 @@ pub const LAYOUT: &[(&str, &[&str])] = &[
     ("textures", &["Textures\\RGB"]),
 ];
 // files: end
+
+// files: layout fo-roots (tools/layers.py --check reads these rows)
+/// Fleet Operations: Roots' mount list (`games/fo-roots.toml` `[files]`): the game
+/// directory is its `Data\`.
+pub const LAYOUT_FO_ROOTS: &[(&str, &[&str])] = &[
+    ("textures", &["Textures"]),
+];
+// files: end
+
+/// A game's files: its mount list and its texture file extensions, in the order a name
+/// present with both is taken.
+pub struct Game {
+    pub layout: &'static [(&'static str, &'static [&'static str])],
+    pub texture_exts: &'static [&'static str],
+    /// The HUD draws the game's own icon art before the UI's flat icons (`icons::game_art_first`):
+    /// on Roots, whose icons are Roots' own (PLAN-FLEETOPS.md, decision 340).
+    pub game_icons: bool,
+}
+
+const ARMADA2: Game = Game { layout: LAYOUT, texture_exts: &[".tga"], game_icons: false };
+
+/// The games other than Armada II, by their executable's file name (any case).
+const GAMES: &[(&str, Game)] = &[("ArmadaL.exe", Game { layout: LAYOUT_FO_ROOTS, texture_exts: &[".tga", ".dds"], game_icons: true })];
+
+/// This process's game: by the executable's name, Armada II's for any other.
+pub fn game() -> &'static Game {
+    let exe = crate::rt::exe_name();
+    GAMES.iter().find(|(n, _)| n.eq_ignore_ascii_case(exe)).map(|(_, g)| g).unwrap_or(&ARMADA2)
+}
 
 fn list(dir: &str) -> Vec<Entry> {
     let mut pat = String::from(dir);
@@ -47,7 +81,7 @@ pub fn vfs() -> &'static Layered {
     unsafe {
         if VFS.is_none() {
             let mut v = Layered::new();
-            for (at, dirs) in LAYOUT {
+            for (at, dirs) in game().layout {
                 for d in *dirs {
                     v.mount(at, Box::new(Loose::new(IO, &crate::rt::game_path(d))));
                 }

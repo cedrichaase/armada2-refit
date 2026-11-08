@@ -203,6 +203,9 @@ fn mouse_message(msg: u32, wp: usize) -> bool {
                 r.double[b] = true;
             }
             r.eaten_button[b] = capture;
+            if capture {
+                note_eaten(["left", "right", "middle"][b]);
+            }
             capture
         }
         _ => {
@@ -211,6 +214,34 @@ fn mouse_message(msg: u32, wp: usize) -> bool {
             core::mem::take(&mut r.eaten_button[b])
         }
     }
+}
+
+/// Button downs kept from the engine that were logged (the first few of a game: what the
+/// bench reads to know a click on the UI did not reach the engine).
+static mut EATEN_LOGGED: u32 = 0;
+
+fn note_eaten(button: &str) {
+    let n = unsafe { EATEN_LOGGED };
+    if n < 20 {
+        unsafe { EATEN_LOGGED = n + 1 };
+        crate::log!("input: a {} button down kept from the engine{}", button, if unsafe { HOSTING } { " (a dialog is hosted)" } else { "" });
+    }
+}
+
+/// The Refit screen's key (`[UI] RefitKey`, with Ctrl, without Alt) was pressed in a mission
+/// since the last `take_refit_request`.
+static mut REFIT_ASKED: bool = false;
+
+/// Whether a key down `vk` is the Refit screen's key, pressed over a running mission.
+fn refit_key(vk: usize) -> bool {
+    let Some(c) = crate::config::try_get() else { return false };
+    let held = |k| unsafe { GetKeyState(k) } as u16 & 0x8000 != 0;
+    c.refit_key != 0 && vk & 0xff == c.refit_key as usize && held(VK_CONTROL) && !held(VK_MENU) && crate::engine::api::ingame::recent()
+}
+
+/// Whether the Refit screen's key was pressed since the last call (it is then cleared).
+pub fn take_refit_request() -> bool {
+    unsafe { core::mem::take(&mut *core::ptr::addr_of_mut!(REFIT_ASKED)) }
 }
 
 fn key_bit(vk: usize) -> (usize, u32) {
@@ -225,6 +256,13 @@ fn key_message(msg: u32, wp: usize) -> bool {
     let r = raw();
     let capture = unsafe { HOSTING } || (r.capture_keys && live(r));
     match msg {
+        WM_KEYDOWN if refit_key(wp) => {
+            // The Refit screen's key in a mission: the UI's alone, down and up.
+            let (w, bit) = key_bit(wp & 0xff);
+            r.eaten_key[w] |= bit;
+            unsafe { REFIT_ASKED = true };
+            true
+        }
         WM_KEYDOWN => {
             if (r.nkeys as usize) < MAX_KEYS {
                 r.keys[r.nkeys as usize] = wp as u8;

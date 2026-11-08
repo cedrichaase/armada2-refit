@@ -3,10 +3,13 @@
 //! - [`sod`]: the binary model format (`SOD/*.sod`), every version the engine accepts.
 //! - [`tga`]: Targa images as stock ships them, decoded to BGRA8 top-down, and the
 //!   named mip chains beside them.
+//! - [`dds`]: DirectDraw Surface images (DXT1/3/5 and uncompressed), base level to BGRA8, as
+//!   Fleet Operations: Roots ships its textures; [`image`] picks TGA or DDS by the bytes.
 //! - [`spr`]: the sprite tables (`Sprites/*.spr`).
 //! - [`odf`]: the object definition files (`odf/**/*.odf`).
-//! - [`vfs`]: one file system over a game's files: loose folders mounted in layers, the
-//!   archive kinds declared; the system calls are the caller's.
+//! - [`fpq`], [`lzo`]: Fleet Operations: Roots' `.fpq` archive and the LZO1X it packs with.
+//! - [`vfs`]: one file system over a game's files: loose folders and `.fpq` archives mounted in
+//!   layers, `.zfs` declared; the system calls are the caller's.
 //!
 //! `no_std` with `alloc`: nothing here makes a system call. Callers hand in bytes, and,
 //! where a format includes other files (`.spr`, ODF), a closure that fetches them by name.
@@ -20,8 +23,13 @@ extern crate alloc;
 extern crate std;
 
 mod bytes;
+pub mod dds;
+pub mod fpq;
+pub mod image;
+pub mod lzo;
 pub mod math;
 pub mod odf;
+pub mod png;
 pub mod sod;
 pub mod spr;
 mod text;

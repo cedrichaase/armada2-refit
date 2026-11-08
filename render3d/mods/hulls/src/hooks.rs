@@ -464,6 +464,41 @@ pub fn instance_database(inst: usize) -> usize {
     core_instance_database(inst)
 }
 
+/// A node of a database by name (`ST3D_Database::FindElement` on its node list), 0 when
+/// it has none; for the instance claim only (`hulls.instance_draw`).
+pub fn database_node(db: usize, name: &str) -> usize {
+    let f = at(sym::FN_FIND_ELEMENT);
+    if db == 0 || f == 0 || name.is_empty() || name.len() > 63 {
+        return 0;
+    }
+    let mut c = [0u8; 64];
+    c[..name.len()].copy_from_slice(name.as_bytes());
+    unsafe {
+        let find: unsafe extern "thiscall" fn(usize, *const u8, u32) -> usize = core::mem::transmute(f);
+        find(db, c.as_ptr(), value::HL_NODE_LIST() as u32)
+    }
+}
+
+/// Whether a database node is not drawn now (its render flags `+0xbc`, bits 0 and 1, as
+/// the engine and Roots write them for the instance about to be drawn).
+pub fn node_hidden(node: usize) -> bool {
+    node != 0 && field(node, off::HL_NODE_RENDER_FLAGS()) & 3 != 0
+}
+
+/// The name of a database mesh's first texture now (`+0x114`, `+0x11c` entries): None
+/// when it has none.
+pub fn mesh_texture(node: usize) -> Option<&'static str> {
+    if node == 0 || (field(node, off::HL_MESH_TEXTURE_COUNT()) as i32) < 1 {
+        return None;
+    }
+    let list = field(node, off::HL_MESH_TEXTURES());
+    if list == 0 {
+        return None;
+    }
+    let t = field(list, 0);
+    if t == 0 { None } else { element_name(t) }
+}
+
 /// The sim time the instance started at (`+0x18`).
 pub fn instance_start(inst: usize) -> f32 {
     engine::view::instance_clock(inst).2
@@ -534,6 +569,14 @@ pub fn class_borg_node(class: usize) -> Option<&'static str> {
 /// reads them): `DisableSpecialNodes` (vtable slot 7) is `CraftClass`'s (0x4bfdf0).
 pub fn is_craft_class(class: usize) -> bool {
     field(engine::vtable(class), off::HL_VT_CLASS_DISABLE_NODES()) == at(sym::FN_CRAFT_CLASS_DISABLE_NODES)
+}
+
+/// A latinum nebula (`LatinumNebula`, vtable 0x6b132c): drawn by the plain
+/// `GameObject::Render`, so it passes the class test of a hull, but its SOD holds only
+/// sprite nodes (Roots' asteroid sets). The particles module draws it, else the engine.
+pub fn is_latinum_nebula(o: usize) -> bool {
+    let vt = at(sym::VT_LATINUM);
+    vt != 0 && engine::vtable(o) == vt
 }
 
 /// The planets in the object list (`vtable 0x6b2b3c`), as the shadow map's occluders:

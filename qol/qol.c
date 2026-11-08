@@ -194,6 +194,20 @@ static const Site k_cap[] = {
 
 static DWORD g_sel[SEL_MAX];
 
+/* The overview the game uses, through the engine's pointer to it (g_pOverView): stock's is
+ * the static object, but Fleet Operations: Roots constructs an enlarged one of its own, and
+ * only the pointer follows (PLAN-FLEETOPS.md, FO-7).  Before the constructor has run the
+ * pointer is NULL; stock's static object is then the answer, and any other build has none
+ * yet (0), so a hook that needs the object stands down rather than guess. */
+static DWORD ov_base(void)
+{
+    DWORD a = a2e_addr(QOL_S_OVERVIEW_PTR);
+    DWORD p = a ? *(volatile DWORD *)a : 0;
+    const char *b = a2e_build();
+    if (p) return p;
+    return (b && a2e_streq(b, "armada2/gog-1.1")) ? a2e_addr(QOL_S_OVERVIEW) : 0;
+}
+
 /* ---- tiny string/log helpers (no CRT) --------------------------------- */
 
 static char g_logpath[320];
@@ -249,6 +263,7 @@ static void logline(const char *s)
     a2_append_line(g_logpath, s);
 }
 
+#include "rebind.c"
 #include "bar.c"
 
 /* ---- the pan-speed hook ----------------------------------------------- */
@@ -1006,6 +1021,45 @@ static int patch_rig(void)
     return 1;
 }
 
+/* ---- a script's input monitor ------------------------------------------ */
+
+/* ScriptInterfaceImp::MonitorInputControls registers the engine's static
+ * ScriptInputCallbacks in the game's and the editor's simulate lists and stores the
+ * script's function in it; AlwaysSimulate calls that function each frame and, when it
+ * answers false, clears it but leaves the object registered, and calls it again with no
+ * test.  Roots' first tutorial leaves it so: the next view that simulates it, the map
+ * editor after the tutorial, calls address 0 (stock Roots crashes the same way).  This
+ * replaces AlwaysSimulate at its entry (a jump to a __fastcall function, which takes
+ * `this` in ecx and pops the float as the original's `ret 4` does) with the same body
+ * and the missing test.  Display-side only: nothing the simulation reads changes. */
+static int g_rdyScript, g_scriptOk;
+
+static void __fastcall script_always(BYTE *self, void *edx, float dt)
+{
+    typedef unsigned char (__cdecl *MonitorFn)(void);
+    static int said;
+    MonitorFn fn = *(MonitorFn *)(self + QOL_F_SI_CALLBACK);
+    (void)edx; (void)dt;
+    if (!fn) {
+        if (!said) {
+            said = 1;
+            logline("script: the input monitor is registered with no function (a script cleared it): "
+                    "skipped, where stock calls address 0");
+        }
+        return;
+    }
+    if (!fn()) *(MonitorFn *)(self + QOL_F_SI_CALLBACK) = 0;
+}
+
+static int patch_script(void)
+{
+    BYTE c[5];
+    if (!g_rdyScript) return 0;
+    jmp_to(c, a2e_addr(QOL_S_SI_ALWAYS), 5, (void (*)(void))script_always);
+    poke((BYTE *)a2e_addr(QOL_S_SI_ALWAYS), c, 5);
+    return 1;
+}
+
 /* ---- bigger selections and groups ------------------------------------- */
 
 /* The button bar's special weapons.  For each special weapon of the selection,
@@ -1105,7 +1159,8 @@ static int patch_selection(int max)
     int   i, k, n = (int)(sizeof k_sel / sizeof k_sel[0]);
 
     if (!g_rdySel) return 0;
-    overview = a2e_addr(QOL_S_OVERVIEW);
+    overview = ov_base();
+    if (!overview) return 0;
     disp = (DWORD)g_sel - overview;
     /* whatever is selected already comes along (nothing is, this early) */
     for (k = 0; k < 16; k++) g_sel[k] = *(volatile DWORD *)(overview + QOL_F_OV_SEL + 4 * k);
@@ -1201,6 +1256,7 @@ __declspec(dllexport) void __cdecl QOL_SettingsChanged(void)
     m[0] = 0;
     s_cat(m, "settings: applied ");
 
+    rebind_settings();
     a2_set_str(&g_ini, QOL_ROW_PANSPEED, val, sizeof val);
     f = pan_factor(val, &ok);
     if (f != g_panSpeed) {
@@ -1285,8 +1341,16 @@ static void startup(void)
     g_rdySpec = a2e_ready(QOL_H_SPECIAL_SELECT);
     g_rdySel = a2e_ready(QOL_H_SELECTION);
     g_rdyBar = a2e_ready(QOL_H_BAR_KEYS);
+    g_rdyRebind = a2e_ready(QOL_H_REBIND);
     g_rdyPaths = a2e_ready(QOL_H_MOVE_PATHS);
     g_rdyRig = a2e_ready(QOL_H_RIG_SELF);
+    g_rdyScript = a2e_ready(QOL_H_SCRIPT_INPUT);
+    g_scriptOk = patch_script();
+    b[0] = 0;
+    s_cat(b, "--- QOL script input monitor: ");
+    if (g_scriptOk) s_cat(b, "called only while a script has one set, patched");
+    else not_patched(b, QOL_H_SCRIPT_INPUT);
+    logline(b);
     a2_set_str(&g_ini, QOL_ROW_PANSPEED, val, sizeof val);
     f = pan_factor(val, &ok);
     g_panSpeed = f;
@@ -1365,6 +1429,14 @@ static void startup(void)
     }
     logline(b);
     if (!g_barKeys) gate("BarKeys", 0, g_barOk);
+    rebind_settings();
+    b[0] = 0;
+    s_cat(b, "--- QOL [BarKeys] Rebind=");
+    s_cat(b, g_rbText);
+    if (!g_rbN) s_cat(b, "  (no key moved)");
+    else if (!g_rdyRebind || !g_barOk) not_patched(b, g_rdyRebind ? QOL_H_BAR_KEYS : QOL_H_REBIND);
+    else s_cat(b, "  -> applied in memory while the position keys are on, the game's own keys back when they stop");
+    logline(b);
 
     g_pathStart = a2_set_int(&g_ini, QOL_ROW_PATHSTARTSATONCE) != 0;
     g_pathsOk = patch_paths();

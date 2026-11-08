@@ -111,6 +111,17 @@ thread, also covers the front end: there is no input thread there, but a screen 
 A first version hooked the `PostThreadMessageA` of the mouse path; it worked in a
 mission and saw no clicks at all in the front end.
 
+**On a build whose window procedure is not `WindowProc`** (Fleet Operations: Roots: the
+game window is FleetOpsHook's own form, which hands the keyboard and mouse messages to
+the two functions itself, so `WindowProc`'s calls never run) the first two rows move to
+the two functions' entries (`core.input_callee`, chosen by the profile's
+`core_input_at_callee`): their first six bytes go to a trampoline, the entry jumps to a
+thunk of ours that notes the caller's return address and records the message, and what
+capture lets through runs the function through the trampoline. The drains are the same.
+UI.log names each caller once (`input: ProcessMouseMessages called from ...`) and the
+thread's windows with their window procedures at the first loading and mission frames
+(`windows at ...`). Stock keeps the call sites.
+
 Each site's bytes are checked against stock first; any mismatch and input stands down
 whole (the UI still reads the pointer, but cannot keep input from the engine and sees
 no keys).
@@ -500,6 +511,20 @@ so a clone of an install from before still tests the UI alone. The UI has no sta
 for the old plugins since ui 2.2.0: they are gone, and a copy `retire.sh` missed would
 hook the same sites as the UI does.
 
+**On Fleet Operations: Roots** (`./install --game fo-roots`, code only; PLAN-FLEETOPS.md,
+"FO-6") `UI.asi` goes into `Data/` beside the executable, and the shipped `UI.ini` has the
+game's own defaults put over it first (`ui/defaults/fo-roots.ini`, applied by
+`ui/apply-defaults.py`, which fails on a key `UI.ini` lacks): the loading screen on, the HUD's
+verified panels on (the resources, the top-right buttons, the pause box, the chat, the
+selection overlay, the frame-rate panel, the order ring, height posts and footprint), and
+the other panels, the menus, the Credits, the menu scene, the cursor and the movies off, each
+until its hook is verified on Roots. The UI plays no button sound there (`panels_sound_ours`
+= 0: every audio class is FleetOpsHook's FMOD). The menu plates are not installed there and the
+game's `Menus/` is never touched. The UI reads the `fleetops` content set (Roots'
+race names, `content/sets/fleetops/ui.ini`). The bar's count (21 inline on stock, 64
+behind a pointer on Roots) and the info panel (found by name in the render lists) are
+read the build's way (`HUD.md`).
+
 **The overlay's retired keys** (`settings.rs`, `RETIRED`). The hub is the overlay's only
 writer, so at its first frame it removes what Direct3D 9's and the forward mode's removal
 left in `RefitPlayer.ini`: the token `d3d9` of `[Display8.Display8] Backend` (a list like
@@ -605,12 +630,13 @@ is checked to be stock. `UI.log`: "cursor: the engine's cursor is kept square".
 | `[UI] Movies` | 1 | the launch reels' and the intro's frames drawn by the UI, fitted ("Movies"), from the cutscene proxy or, without it, from the engine's own copy; 0: copied into the locked back buffer, scaled by the proxy or 640x480 without it |
 | `[UI] Defaults` | 2 | which shipped defaults the file was brought up to ("Installing"); not read by `UI.asi` |
 | `[UI] CursorSize` | 32 | its size in units (32 texels of art at 1080 lines) |
-| `[UI] Theme` | auto | the look (`STYLE.md`): `auto` is the player's race in a mission and the shell's theme elsewhere; or `shell`, `federation`, `klingon`, `romulan`, `cardassian`, `borg`, `species8472` everywhere |
+| `[UI] Theme` | auto | the look (`STYLE.md`): `auto` is the player's race in a mission and the shell's theme elsewhere; or `shell`, `federation`, `klingon`, `romulan`, `cardassian`, `borg`, `species8472`, or a look by its id (`starfleet`, the Federation's look on Roots, and `redline`, `jade`, `bronze`, `circuit`, `bone`, `circuit-teal`, `violet`, the other races'; `lcars`, `blade`, `wing`, `arch`, `cube`, `organic`) everywhere |
 | `[Demo] Mission`, `Shell`, `Loading` | 0 | the demonstration panel in that context (`Shell`: with the widget gallery) |
 | `[Demo] Style` | 0 | the style gallery (`STYLE.md`) in place of the demos: every theme and widget state in the front end (the Credits' place) and over a mission, the loading look on the loading screen |
 | `[HUD] Enable`, `Bar`, `BarLabels` | 1, 1, 1 | the HUD's panels of ours, one key per panel ([`HUD.md`](HUD.md)), every one on |
 | `[HUD] Overview`, `Fade`, `UnitVideo` | 1, 1, 1 | the engine's last draws in a mission drawn by us: the drag box, height posts, order ring and placement markers, the scripts' fade, the unit view's video (`HUD.md`, "The engine's last draws") |
 | `[HUD] SystemIcons`, `ShotScenes`, `MinimapCursor`, `FrameRate` | 1, 1, 1, 1 | what the stock overlay and minimap drew that ours left out, and the frame rate: the pointed unit's damaged systems, the shot director's scenes on the minimap in the tactical view, the action cursor over the minimap, `FRAMERATE_DISPLAY`'s text (`HUD.md`, "What the stock overlay and minimap drew that ours left out") |
+| `[HUD] Hover` | 0 (Roots: 1) | the status line about the ship or station under the pointer (the engine's `SDInfoBar`: name or class, shields, hull, crew, special energy) drawn by us in the engine's places, colours and icons; Armada II draws it inside the info panel, which `Info=1` already replaces, Roots at the top centre (`HUD.md`, "The status line under the pointer") |
 | `[HUD] Placement` | 1 | with `Overview=1`, a placement's markers (the footprint, the cells other objects take) in the theme; 0 with the engine's sprites (`HUD.md`, "The placement markers") |
 | `[HUD] UnitView`, `UnitViewSize` | 1, 260 | the unit view placed by us, a square of that many units at the bottom right, in our frame (`HUD.md`, "The unit view") |
 | `[Menus] Enable` | 1 | the UI hosts the shell's dialogs (`MENUS.md`); stands down on a build it does not know |
@@ -644,7 +670,7 @@ rows a note while the HUD stood down (`hud::STOOD_DOWN`).
 
 ### Settings
 
-`settings.toml` is the table of the keys a player may set (19 rows, tab Interface),
+`settings.toml` is the table of the keys a player may set (20 rows, tab Interface),
 exported as `UI_Settings` (`src/settings_table.rs` is generated: `python3
 tools/settings/gen.py`). `UI_SettingsChanged`, called by the hub after the overlay changes
 (`config.rs`), reads `UI.ini` and the overlay again and swaps the configuration whole
@@ -652,7 +678,7 @@ tools/settings/gen.py`). `UI_SettingsChanged`, called by the hub after the overl
 every frame, or switched by `hud::apply_live`, are taken from the new read; every key a
 patch was installed for keeps its start value. By apply class:
 
-- **LIVE**: `HUD.Minimap`, `Info`, `Tooltips` (`hud::apply_live` gives the stock panel
+- **LIVE**: `HUD.Minimap`, `Info`, `Tooltips`, `Hover` (`hud::apply_live` gives the stock panel
   back or takes it over; the minimap's click hook goes in at the start whatever the key,
   so it can come back), `BarLabels`, `Icons`,
   `SelectionGauges`, `InfoCamera`, `UI.Cursor`, `UI.Theme` (read per frame). Shown
@@ -669,6 +695,7 @@ a MISSION or RESTART row `settings: <Section.Key=v> (next mission or restart)`.
 | `[Menus] Trace` | 0 | UI.log: each hosted dialog's messages of note, its actions, and its surfaces as `UI-dlg<depth>-*.bmp` every 5 s |
 | `[Menus] Host` | 1 | 0 (with `Trace=1`): the dialogs run stock and are only traced, for comparing |
 | `[Loading] Enable` | 1 | the loading screen of ours (`LOADING.md`) in place of the engine's logo scene and bar |
+| `[Loading] Bar` | (empty) | the loading screen's bar: `classic` (rounded, Armada II's), `panel` (square, taller, inset in a thin outline box, a faint glow); empty: the content set's `[Loading] Bar`, else classic (`LOADING.md`, "The bar") |
 | `[Loading] Hold` | 0 | the test bench's: seconds each load waits half-way, the screen still drawn, to be looked at. Never in play |
 | `[Bench] Clock` | wall | the animation clock ("The animation clock"): `wall` in play; `bench` for the test bench, on the simulation's time with transitions settled |
 
@@ -746,7 +773,8 @@ strings use, with real kerning.
 **Baked at build time, never committed.** `fontbake` (a host crate `build.rs` runs)
 reads each TTF with `skrifa` and writes a single-channel signed-distance atlas into
 `OUT_DIR`: 1024x512, 48 texels to the em, distances out to 6 texels (128 on the outline,
-higher inside), for ASCII, Latin-1 and the typographic punctuation (‘ ’ “ ” – — … • € ×).
+higher inside), for ASCII, Latin-1, the rest of Windows-1252 (the game's code page) and
+the typographic punctuation (‘ ’ “ ” – — … • € ×).
 Distances are exact: curves flattened into short segments, the nearest segment found
 for every texel, inside by nonzero winding. Kerning is the font's GPOS `kern` feature.
 The blob (format at the top of `src/text/mod.rs`) is read in place, so a `Font` is a
@@ -756,7 +784,25 @@ static and lookups are binary searches. The bake is brute force and runs with
 **One atlas for every size.** The pixel shader turns distance into coverage over one
 screen pixel: the distance scale is `2 * spread * size / em_texels` screen pixels per unit
 of the atlas, so 14 and 60 pixel text are equally sharp. Baselines snap to whole pixels.
-`layout_wrapped` breaks at spaces and newlines; a character the font lacks draws as `?`.
+`layout_wrapped` breaks at spaces and newlines; a tab is a space, another control
+character draws nothing, and a character the font lacks draws as `?`.
+
+**The engine's text** (`text/game.rs`). The game's strings are bytes in its fonts' code
+page, Windows-1252: 0x80..0x9f are the bullet, the dashes, the curly quotes and the euro,
+where Latin-1 has control characters (a stock tooltip's `•` came out as a control
+character, drawn as `?`). `text::game::display` turns a string of the game's into what the
+UI draws: Windows-1252, a tab as a space, and the content set's `[Glyphs]` (below) as
+their words and figures. It runs where the engine's text enters for display: the string
+streams of `engine::msvc` (every tooltip: the pointer's, the bar's, the panels', the info
+panel's) and `engine::buttons::clean` (labels, chat, overlay text, localised keys). Names
+the UI matches (sprites, ODFs, players) are read raw. A game whose fonts draw codes as
+pictures of their own is the reason for `[Glyphs]`: Fleet Operations: Roots writes its
+tooltips with red figures (0x7f is 0, 0x81 is 1, ...), resource icons (0x85 dilithium,
+0x86 tritanium, 0x87 supply, ...), unit classes drawn as words (0xa4 "Scout", 0xf8
+"Station") and `$` between a cost line's figures and icons, all in its own `Sprites\Font*.spr`
+and atlases. Read as Latin-1, those were the "weird symbols and question marks" of every
+Roots tooltip (`PLAN-FLEETOPS.md`, FO-6, decision 160). The UI writes the words, never the
+pictures: no art of Roots' is copied or drawn (decision 60).
 
 `fontbake`'s preview test renders sample lines through the runtime's own layout code into
 PGM files (outside the repository); the command is at the top of `fontbake/tests/preview.rs`.
@@ -952,7 +998,9 @@ The names of the game's races (display names, the theme's look for each and the 
 (card names, the words that match the stock labels, the view of the map behind each, the
 emblem's cell in the race icons, and the loading screen's map prefix and line for each),
 the credits tour's views, the game files the UI reads (the race icons, `Credits.txt` and
-the logos, the cursor sprites) and the widget gallery's sample lists are data: the content
+the logos, the cursor sprites), the widget gallery's sample lists and the codes the game's
+fonts draw as pictures or figures of their own (`[Glyphs]`, a code in hex = the word or figure
+the UI writes in its place: "The engine's text", above) are data: the content
 set's `ui/content/sets/<set>/ui.ini` (a set is a folder; `MODDING.md`, "Content sets").
 `build.rs` builds every `.ini` under `ui/content/` in (`src/content_sets.rs`), and
 `src/content.rs` parses, once, the table of the set `Engine::content()` of the UI's core
@@ -962,11 +1010,15 @@ theme), `hud/resources.rs`, `credits.rs` (the tour, the text, the logos), `curso
 `loading.rs` (the kicker), `gallery.rs`, `menus/scene.rs` and
 `menus/screens/single_player.rs`.
 
-**The colours stay the theme's.** `widgets/theme.rs` keys its six race palettes by a look
-(`Form`: `lcars`, `blade`, `wing`, `arch`, `cube`, `organic`), and the set maps each race
-to one (`Theme = cube`); `Race` is a race's place in the set's list, so another game's
-races take the looks without a code change, and a race whose look the theme does not know
-draws in the shell's.
+**The colours stay the theme's.** `widgets/theme.rs` keys its palettes by a look
+(`Form`, named by how it looks: `lcars`, `blade`, `wing`, `arch`, `cube`, `organic`, and the
+machined ones `starfleet`, `redline`, `jade`, `bronze`, `circuit`, `bone`,
+`circuit-teal`, `violet`), and the set maps each race to one (`Theme = cube`); `Race` is a
+race's place in the set's list, so another game's races take the looks without a code
+change, and a race whose look the theme does not know draws in the shell's. `[Looks]`
+names the menus' look the same way (`Menus = starfleet`, the front end's with
+`Theme=auto`; `MissionMenus = race`, the menus over a running mission in the HUD's race's
+look); a set without it draws its menus in the shell's.
 
 A build with no set, or a set with no `ui.ini`, has no races (no theme of its own for the
 HUD's race), no resources names, no tour and no main-menu view, no credits text or cursor
@@ -991,7 +1043,6 @@ is not ready. The findings each hook rests on are in the sections named in the t
 |---|---|
 | `ui.core.storm3d` | The `Storm3D` global and its device table (index at +0xc0, devices from +0xcc, the d3d8 device at the `ST3D_DeviceDirectX8`'s +0x90): how every part finds the engine's device. Read lazily, so a part never reads address 0 |
 | `ui.core.mission` | The `call ChatDisplay::Render` in `Armada_RenderFrame`, after which the mission frame is drawn ("The mission frame"), and `ST3D_TrifanBuffer::Flush` on the device's trifan buffer (+0xe4), which flushes the HUD's batched quads first |
-| `ui.core.reads_hud_hidden` | `shipDisplay`'s hidden flag (+0x16): set by `DisplayInterface::SetInterfaceState` in every mode that hides the HUD |
 | `ui.core.cursor` | Slot 26 of `ST3D_DeviceDirectX8`'s vtable, `RefreshDisplay`, wrapped to empty the device's cursor sprite (+0x60) for one present ("The cursor"); +0xe0 says whether the cursor is the synchronous one |
 | `ui.core.cursor_probe` | The `DrawScaled2D` call in `RefreshDisplay` that draws the synchronous cursor, chained to whatever it called (another plugin's wrap); the global 2D scale and the sprite's hotspot (+0x30) |
 | `ui.core.cursor_square` | `SetCursor`'s `fmuls` of the hardware cursor width, its displacement moved from the x scale to the y scale ("The engine's cursor, square") |
@@ -999,6 +1050,7 @@ is not ready. The findings each hook rests on are in the sections named in the t
 | `ui.core.intro_mode32`, `ui.core.intro_mode16` | The pushes of `Program::PlayIntroMovie`'s two 640x480 mode lookups ("The intro without the cutscene proxy"); each is a hook of its own, as each was patched alone |
 | `ui.core.intro_frames` | `NextBinkFrame`'s `call [__imp__BinkCopyToBuffer@28]` and the import's slot, to route the movie's frames to the UI |
 | `ui.core.input` | `WindowProc`'s calls of `ProcessKeyboardMessages` and `ProcessMouseMessages`, and the `PeekMessageA` drains inside them ("Input and capture") |
+| `ui.core.input_callee` | The same two functions at their entries (`push ebp; mov ebp, esp; sub esp, 0x1c`, six bytes moved to a trampoline), and the same drains, for a build whose window procedure is not the engine's `WindowProc` (`core_input_at_callee` = 1: Fleet Operations: Roots, where FleetOpsHook's form calls the two functions itself; "Input and capture") |
 | `ui.core.window` | `ST3D_GraphicsEngine::GetWindowHandle`, thiscall on `Storm3D`, for the game window |
 | `ui.core.device` | `DestroyRenderSurfaces` (slot 28 of the device's vtable), chained: another plugin's wrap is kept; the d3d8 device at +0x90 is held across the engine's release |
 | `ui.core.reads_mouse` | `MouseDriver`'s button bits and the flag `g_bMousePosLocked` ("Focus and the pointer") |

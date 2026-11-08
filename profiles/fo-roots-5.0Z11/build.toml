@@ -1,0 +1,851 @@
+# Star Trek: Armada II -- Fleet Operations: Roots 5.0Z11 (games/fo-roots.toml): its
+# Data/ArmadaL.exe is stock 1.1's image patched (PLAN-FLEETOPS.md, "The executable"), so
+# this build inherits gog-1.1 and only marks what Roots changes. The timestamp is
+# stock's; the image size and the section fingerprint tell it apart.
+#
+# [[changed]] lists only the functions Roots changes that one of our entries is (`symbol`)
+# or sits in (`in`): every hook using one stands down here until it is verified beside
+# Roots' change and named in `verified`. `detour`: Roots jumps or calls into its own code
+# section there; `edit`: constants or branches changed in place; `runtime`: changed in
+# memory by FleetOpsHook.dll, which no file diff shows (PLAN-FLEETOPS.md, FO-2).
+# The file diff and the run-time diff that found them are not published (hard rule 9):
+# they are re-run with the bench's MemDiff.asi (testbench/memdiff/) and the profile tools.
+schema = 1
+game = "armada2"
+build = "fo-roots-5.0Z11"
+label = "Fleet Operations: Roots 5.0Z11"
+exe = ["ArmadaL.exe"]
+inherits = "gog-1.1"
+# No content set yet: stock's recipes are keyed by stock's ODF and model names, and
+# Roots' differ. FO-5 writes Roots' own set; until then the engine's look shows.
+content = "none"
+
+[pe]
+timestamp = 0x3c4c76bd
+image_size = 0x405000
+sections = 0xca07c55a
+image_base = 0x400000
+code = [0x401000, 0x6ae000]
+# CRC-32 of each section's content in the file on disk (FleetOpsHook rewrites .text and
+# .rdata in memory before a plugin runs, so the file is what tells a Roots build apart).
+file_crc = { ".text" = 0xef690537, ".test" = 0xe7a4061b }
+
+# The companion module the run-time marks below describe, named by the CRC-32 of its
+# .text in its file: another one loaded stands down every hook that depends on its
+# patches (crates/a2engine/README.md, "Identity").
+[[module]]
+name = "FleetOpsHook.dll"
+text_crc = 0x28c90d19
+
+[[known]]
+sha256 = "4300ab71731e323f5767d8ee05457e6444401b823253aebee86c5ac23c2b00de"
+note = "Fleet Operations: Roots 5.0Z11 (23 October 2026), Data/ArmadaL.exe as installed"
+
+# ---- off in Roots -----------------------------------------------------------------
+
+[[disable]]
+hooks = ["qolrules.*"]
+why = "Roots has its own rules"
+
+# FleetOpsHook already moves the selection into the overview object it enlarges (an array of its
+# own at +0x3d0, a cap of 30 in its own Select, a group cap of 30 in mBindGroup) and replaces the
+# special-weapon button's gathering with code of its own; QOL's array and buffers would sit beside
+# an array whose readers are FleetOpsHook's, which QOL cannot re-point (FO-7 round two, decision 109).
+[[disable]]
+hooks = ["qol.selection", "qol.special_select"]
+why = "Roots holds its own selection of 30 in an array of its own"
+
+# Station groups (QOL-6) need two things Roots has taken over: `cOverViewImp::Select` is replaced
+# whole (its entry jumps to FleetOpsHook's Select_Callback, which calls the Delphi port
+# Select_Enhancement and never the original; nothing reads the trampoline), so the site
+# `stn_sel` that lets a second station of one kind be selected is in a body that never runs; and
+# both callers of `PopupPaletteImp::mUpdateButtonsAndPosition` are re-pointed at FleetOpsHook's
+# own port of it (64 buttons), so the build button's enable site (`stn_enable`) is dead too.
+# Roots keeps one station selected, and has station groups of its own (Alt+number, decision 108)
+# (FO-7 round three, decision 111).
+[[disable]]
+hooks = ["qol.stations"]
+why = "Roots replaces Select and the bar's update with its own code, where QOL-6's sites never run"
+
+# ---- display ------------------------------------------------------------------------
+# display.modes verified 2026-11-06 (FO-A; display/README.md, "On Fleet Operations:
+# Roots"): its six call sites and FindDisplayMode's checked entry are stock's bytes in the
+# file and in memory after FleetOpsHook has patched; Roots' edits sit beside them (the
+# lookup's width and height tests, the shell's and the intro's requested modes), which
+# display.toml here names.
+
+[[changed]]
+fn = "ST3D_DisplayDevice::FindDisplayMode"
+how = "edit"
+verified = ["display.modes"]
+
+[[changed]]
+fn = "ST3D_GraphicsEngine::SetActiveDisplay_Internal"
+how = "edit"
+verified = ["display.modes"]
+
+[[changed]]
+fn = "WinMain"
+how = "edit"
+verified = []
+
+# ---- render3d -----------------------------------------------------------------------
+
+# Roots' cloak calls and wave-light detours sit past the entry; the hulls module only compares
+# this address with a class's slot 22 and reads the cloak's stock fields (FO-5 step 3). The
+# billboard effect's call (+0x19c) and its arguments are stock's in the file and in memory:
+# FleetOpsHook's cloak call begins on the next instruction, which the call returns to and
+# which no particles code touches (FO-5 step 7).
+[[changed]]
+fn = "GameObject::RenderInternal"
+how = "detour"
+verified = ["render3d.hulls.reads", "render3d.particles.billboard"]
+
+[[changed]]
+fn = "Craft::Explode"
+how = "detour"
+verified = []
+
+[[changed]]
+fn = "BuildingEffect::SafeDestroyConstruction"
+how = "detour"
+verified = []
+
+# Roots' file and FleetOpsHook change how a hit's shell is scaled and coloured (the two
+# RTS_CFG.h keys); the effects module calls the function whole for a hit it does not draw,
+# so Roots' version runs, and its own hits follow the same keys (FO-5 step 5).
+[[changed]]
+fn = "ShieldHit::DrawShield"
+how = "detour"
+verified = ["render3d.effects.reads"]
+
+# The hulls module calls it only for a rig whose Render is ConstructionRig::Render, which
+# no Roots rig has (FleetOpsHook gives them GameObject::Render); were it called, Roots'
+# detour inside it runs as Roots wrote it (FO-5 step 3).
+[[changed]]
+fn = "PlaceholderFeature::sRenderInternal"
+how = "detour"
+verified = ["render3d.hulls.reads"]
+
+# Called for the wave light it returns, as GameObject::RenderInternal calls it: Roots' edit is
+# Roots' meaning of that light (FO-5 step 3).
+[[changed]]
+fn = "GetSensorScramblerWaveLight"
+how = "edit"
+verified = ["render3d.hulls.reads"]
+
+# Roots' edit points the lines' colour pushes at other colours (FleetOpsHook then points the
+# major lines at its own): the overlays module reads the pointer the first push holds
+# (site_grid_colour, checked as a push only) and draws the grid in it (FO-5 step 5).
+[[changed]]
+fn = "Terrain_Geometry::DrawGrid"
+how = "edit"
+verified = ["render3d.overlays.reads"]
+
+# ---- ui -------------------------------------------------------------------------------
+# The shell's dialog procedures ask for 1200x900 where stock asks for 800x600.
+# `ui.forms.dialog_specs` only tells an adopted dialog by its procedure's address, which
+# FleetOpsHook's record holds (or the dialog's own, for those opened through the exe's
+# import): measured equal to stock's for each on the bench (fo6-dialogs-inventory,
+# 2026-11-07; PLAN-FLEETOPS.md, decision 250). Nothing is hooked or read in them.
+
+# Roots' four-byte edit (+0x19b) and FleetOpsHook's audio and close calls (+0x17c..+0x30a)
+# sit away from the splash call at +0xcd, which is stock's in the file and in memory (FO-6
+# step 2, 2026-11-06).
+[[changed]]
+fn = "Program::GameDoOne"
+how = "detour"
+verified = ["ui.loading.own"]
+
+[[changed]]
+fn = "AdmiralsLogDlgProc"
+how = "edit"
+verified = ["ui.forms.dialog_specs"]
+
+[[changed]]
+fn = "EscapeMenuDlgProc"
+how = "edit"
+verified = []
+
+[[changed]]
+fn = "GameNameDlgProc"
+how = "edit"
+verified = ["ui.forms.dialog_specs"]
+
+[[changed]]
+fn = "GameSettingsDlgProc"
+how = "edit"
+verified = ["ui.forms.dialog_specs"]
+
+[[changed]]
+fn = "InternetGameDlgProc"
+how = "edit"
+verified = ["ui.forms.dialog_specs"]
+
+[[changed]]
+fn = "LoadGameDlgProc"
+how = "edit"
+verified = ["ui.forms.dialog_specs"]
+
+[[changed]]
+fn = "MissionSelectDlgProc"
+how = "edit"
+verified = ["ui.forms.dialog_specs"]
+
+[[changed]]
+fn = "MultiplayerSetupDlgProc"
+how = "edit"
+verified = ["ui.forms.dialog_specs"]
+
+[[changed]]
+fn = "NetWaitingDlgProc"
+how = "edit"
+verified = ["ui.forms.dialog_specs"]
+
+[[changed]]
+fn = "OneButtonDlgProc"
+how = "edit"
+verified = ["ui.forms.dialog_specs"]
+
+[[changed]]
+fn = "SaveGameDlgProc"
+how = "edit"
+verified = ["ui.forms.dialog_specs"]
+
+[[changed]]
+fn = "SingleDlgProc"
+how = "edit"
+verified = ["ui.forms.dialog_specs"]
+
+# ---- qol ------------------------------------------------------------------------------
+
+# Roots' file jumps out of the function at +0xde (before the loop over the ten group keys)
+# into its own code, which takes the Alt+number case whole (select the group, centre on a
+# second tap) and returns; with Alt not held it comes back to the stock instruction. Every
+# site qol.shift_group uses (the Control test at +0x18a, the centre test, the three
+# continue points) lies on the stock path, and its bytes are stock's in the file and in
+# memory after FleetOpsHook has patched (FO-7 round two, decision 108). The
+# selection-array sites in the same function are Roots' (0x3d0), so qol.selection stays unverified.
+[[changed]]
+fn = "cOverViewImp::mCheckGroupSelect"
+how = "detour"
+verified = ["qol.shift_group"]
+
+# The move queue's two sites in these (the keyboard step's call in Simulate, and the waypoint
+# key's handler beside it in mProcessKeyboardInput) are stock's bytes in the file and in
+# memory. Roots' edits sit elsewhere in both: the key that selected the next ship now calls
+# mSelectOnscreen (a jump at +0x3f in mProcessKeyboardInput), the selection array's offset, a
+# camera-pan callback and two flag reads at the end of Simulate (FO-7 round three, decision 114).
+[[changed]]
+fn = "cOverViewImp::mProcessKeyboardInput"
+how = "detour"
+verified = ["qol.move_paths"]
+
+[[changed]]
+fn = "cOverViewImp::Simulate"
+how = "detour"
+verified = ["qol.move_paths"]
+
+# FleetOpsHook's edits are inside the body (the stack frame's size, the technology test of the
+# build items, three stack offsets); the hotkey tables' counts it reads are stock's fields
+# (+0xcc, +0xd8, +0xe4). QOL's position keys only call it, through the call in Update
+# (FO-6 decisions 330 to 349).
+[[changed]]
+fn = "PopupPaletteImp::mProcessKeyboardInput"
+how = "detour"
+verified = ["qol.bar_keys"]
+
+[[changed]]
+fn = "Producer::FinishBuild"
+how = "detour"
+verified = []
+
+# ---- scene (the test bench's Scene.asi; testbench/scene/README.md, "On Fleet Operations: Roots") ------
+
+# Roots' file changes the Vector3 overload's body (+0x1c..+0x2c); the three entries Scene.asi turns
+# into `return false` while notices are off (6 bytes each) are stock's in the file and in memory.
+[[changed]]
+fn = "GameEvent::TriggerEvent"
+how = "detour"
+verified = ["scene.notices"]
+
+# Roots' edit points the zoom's lower limit at another constant of the same 1.0; the scene only
+# calls the function through the camera's vtable slot, which holds it.
+[[changed]]
+fn = "TacticalCamera::SetZoomLevel"
+how = "edit"
+verified = ["scene.zoom"]
+
+# Roots' edit is a constant at +0x2d; the step hook calls the function as GameProcess does.
+[[changed]]
+fn = "getGameSpeedModifier"
+how = "edit"
+verified = ["scene.step"]
+
+# FleetOpsHook takes out a test at the entries of both overloads (+0x3..+0x18): the special
+# command is not needed on Roots's bench and stands down.
+[[changed]]
+fn = "Craft::FireAtSpecial"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cPrjID::SetName"
+how = "runtime"
+verified = []
+
+# FleetOpsHook trampolines the entry: the damage-node slot of ours would call its callback, and
+# stands down.
+[[changed]]
+fn = "CraftInstance::Update"
+how = "runtime"
+verified = []
+
+# FleetOpsHook's calls inside the body hide or show its own unit view with the mode; the hud
+# command sets the mode and calls the function whole, so Roots' version runs.
+[[changed]]
+fn = "DisplayInterface::SetInterfaceState"
+how = "runtime"
+verified = ["scene.hud"]
+
+# FleetOpsHook's writes are its audio update (+0x62..+0x73); the step hook's call of
+# getGameSpeedModifier (+0x53) and the product with `ms` after it are stock's in the file and in memory.
+[[changed]]
+fn = "Program::GameProcess"
+how = "runtime"
+verified = ["scene.step"]
+
+# FleetOpsHook's writes are the tech tree file's name (+0x207) and a call at +0x369; the seed hook's
+# call of Starfield_Initialize (+0x2a9) is stock's in the file and in memory.
+[[changed]]
+fn = "Program::GameOpenPostLoad"
+how = "runtime"
+verified = ["scene.seed_load"]
+
+# FleetOpsHook nops two runs of the body (+0x6c, +0x9a); the hover hook's MouseOn call (+0x32) is
+# stock's in the file and in memory.
+[[changed]]
+fn = "SelectionDisplay::PreRender"
+how = "runtime"
+verified = ["scene.hover"]
+
+# TechnologyTree::Available and Possible jump to FleetOpsHook's own tree (TechnologyTreeImp), which
+# does not read the TechItem bytes the tech command writes.
+[[disable]]
+hooks = ["scene.tech"]
+why = "Roots answers the technology tree from a tree of its own"
+
+# ---- qolrules (off above in any case) ------------------------------------------------
+
+[[changed]]
+fn = "ComputerVoice::Say"
+how = "detour"
+verified = []
+
+[[changed]]
+fn = "CraftProcess::Handle_New_Command"
+how = "detour"
+verified = []
+
+# ---- FleetOpsHook.dll, in memory (how = "runtime") -------------------------------
+# Written by FleetOpsHook.dll as it loads (inside Win2kDisableTaskSwitch.dll's attach,
+# before WinMain and before any plugin of ours starts): seen by MemDiff.asi on the bench,
+# and in agreement with a reading of the DLL. Functions marked above for the file are not
+# repeated. Grouped by the first of our plugins whose hooks use them.
+
+# display
+
+[[changed]]
+fn = "GameConfiguration::InitializeGraphicsSystem"
+how = "runtime"
+verified = ["display.modes"]
+
+[[changed]]
+fn = "Program::PlayIntroMovie"
+how = "runtime"
+verified = ["display.modes"]
+
+[[changed]]
+# Roots' load bar: three writes (+0x1b, +0x88, +0x343..+0x35c) in the first half of the body.
+# The UI's sites are the entry (checked, and the call of LoadBarNext into it is stock's), the
+# DeleteRegisteredLights call at +0x3b3 and the EndScene call at +0x400: the same bytes as stock's
+# in the file and in memory after FleetOpsHook (FO-6 step 2, 2026-11-06).
+fn = "RenderLoopAssetLoadStatusUpdate"
+how = "runtime"
+verified = ["ui.loading.overlay", "ui.loading.own"]
+
+# render3d
+
+# FleetOpsHook's edit is the object loop's draw (+0x185..+0x194); the effects module reads
+# only the chunks' call (+0x336), which it leaves as it is (FO-5 step 5); the ordnance
+# module's warp call (+0x313) is a plain call of the untouched RenderWarpSpriteEffects,
+# past the edit (FO-5 step 7).
+[[changed]]
+fn = "Armada_RenderAllOurStuff"
+how = "runtime"
+verified = ["render3d.frame.*", "render3d.effects.reads", "render3d.ordnance.warp"]
+
+# FleetOpsHook's one edit (+0x245) takes out an edit-menu call, away from the seam's call at
+# 0x59886e (FO-5 step 3) and from the UI's call of ChatDisplay::Render at 0x598a16, which
+# is stock's in the file and in memory (FO-6 step 3).
+# The frame-rate prints (+0x286, +0x290), the chat's TextInput_Update call (0x598a07) and the
+# trade call (0x5988d0) are stock's in memory too (FO-6 step 4, decision 123).
+[[changed]]
+fn = "Armada_RenderFrame"
+how = "runtime"
+verified = ["render3d.frame.*", "ui.core.mission", "ui.hud.frame_rate", "ui.panels.chat", "ui.panels.trade"]
+
+# FleetOpsHook re-points the node-particle call at +0x4f8, away from the shield-hit call the
+# effects module taps (+0x345, still stock's in memory) (FO-5 step 5).
+[[changed]]
+fn = "Beam::Simulate"
+how = "runtime"
+verified = ["render3d.effects.shields", "scene.shieldfx"]
+
+# FleetOpsHook edits the body (+0x10, +0x69) and gives rigs GameObject::Render in their
+# vtable: the core only compares this address with a class's Render slot (FO-5 step 3).
+[[changed]]
+fn = "ConstructionRig::Render"
+how = "runtime"
+verified = ["render3d.core.reads"]
+
+# FleetOpsHook's one call (+0x1d9d) is the last key read before the parser is freed, where
+# it reads its own keys; the culling distance's load (+0xebf) is stock's, and FleetOpsHook
+# names neither the far plane nor the culling distance (FO-5 step 7). QOL's pan site
+# (+0xa36, the store over the parsed FASTSCROLL_COEFFICIENT) is stock's bytes: the whole
+# function is identical to stock's in the file, FleetOpsHook's one run-time write (that call) is
+# 0x12f7 bytes past it, and RTS_CFG.h's value is stock's 0.005 (FO-7, decision 100).
+[[changed]]
+fn = "RTS_Configure"
+how = "runtime"
+verified = ["render3d.view.distance", "qol.pan_speed"]
+
+# FleetOpsHook's call inside the body (+0xea) runs as it wrote it: the effects module
+# taps the weapons' calls of the function and calls what they called (FO-5 step 5), and
+# chains that call to note which type each model it picks is (effects.shield_models).
+[[changed]]
+fn = "ShieldEffect::CreateShieldHit"
+how = "runtime"
+verified = ["render3d.effects.reads", "render3d.effects.shields", "render3d.effects.shield_models", "scene.shieldfx"]
+
+# FleetOpsHook takes out the free of the previous background database (+0x16, after its
+# destructor; Background_Close likewise), keeping its memory: the entry, the name and the
+# database the sky module reads are stock's, and the module calls the function only on the
+# bench (`[Sky] Load=`) (FO-5 step 7).
+[[changed]]
+fn = "Starfield_Load_Background_Geometry"
+how = "runtime"
+verified = ["render3d.sky.reads"]
+
+# FleetOpsHook's call at +0x143 is inside the function; the terrain step calls it through its
+# site whole, so Roots' change runs as Roots wrote it (FO-5 step 3).
+[[changed]]
+fn = "Terrain_Geometry::Render"
+how = "runtime"
+verified = ["render3d.frame.*"]
+
+[[changed]]
+fn = "cOverViewImp::mDrawPost"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mDrawPosts"
+how = "runtime"
+verified = []
+
+# FleetOpsHook's three edits are the cursor's height post (+0x40) and the drag box (+0x191,
+# +0x1ca); the move paths' call of mDrawPath (+0x207) and the fields it reads are stock's.
+# FleetOpsHook constructs the overview itself (enlarged), so the module reads it through
+# g_pOverView (FO-5 step 7).
+[[changed]]
+fn = "cOverViewImp::mNormalModeRender"
+how = "runtime"
+verified = ["render3d.overlays.paths"]
+
+# FleetOpsHook replaces the call at +0x9d (0x5222fd) and the one at 0x52220b, away from the two
+# DrawQuad calls the order ring takes (0x5222f0 and mRenderGridFX's 0x522537), which are
+# stock's in the file and in memory (FO-6 step 4, decision 121).
+[[changed]]
+fn = "cOverViewImp::mRenderWhere"
+how = "runtime"
+verified = ["ui.hud.order_ring"]
+
+# ui
+
+[[changed]]
+fn = "ChangePasswordDlgProc"
+how = "runtime"
+verified = []
+
+# FleetOpsHook trampolines the entry (its clean screenshot skips the chat): the UI only
+# re-points Armada_RenderFrame's call of it, which is stock's, and calls it, so Roots'
+# version runs whole (FO-6 step 3).
+[[changed]]
+fn = "ChatDisplay::Render"
+how = "runtime"
+verified = ["ui.core.mission"]
+
+[[changed]]
+fn = "CinematicView::mUpdateVideo"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "CreateNewAccountDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "CreateRoomDlgProc"
+how = "runtime"
+verified = []
+
+# `ui.shell.screens` patches only the call of Show_Credits at +0x514 (checked to call it);
+# FleetOpsHook's entry detour and its two calls at +0x90 and +0xa9 leave that call stock's
+# (PLAN-FLEETOPS.md, decision 607).
+[[changed]]
+fn = "DispatchDialog"
+how = "runtime"
+verified = ["ui.shell.screens"]
+
+# FleetOpsHook trampolines the entry (its clean screenshot skips the HUD) and the stock body runs
+# behind it: the UI's panel switch re-points the Render call at +0x47 (0x51abf7) and the
+# CursorOver call in CursorInterface::RefreshOwner, both stock's in the file and in memory
+# (FO-6 step 4, decision 120).
+[[changed]]
+fn = "DisplayInterface::RenderAll"
+how = "runtime"
+verified = ["ui.hud.panels"]
+
+[[changed]]
+fn = "GameSpyLoginDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "GraphicsOptionsDlgProc"
+how = "runtime"
+verified = []
+
+# `ui.forms.dialog_specs` tells it by address only: FleetOpsHook's record (or the dialog's own
+# procedure) held stock's on the bench (PLAN-FLEETOPS.md, decision 604).
+[[changed]]
+fn = "HelpWindowDlgProc"
+how = "runtime"
+verified = ["ui.forms.dialog_specs"]
+
+# `ui.forms.dialog_specs` tells it by address only: FleetOpsHook's record (or the dialog's own
+# procedure) held stock's on the bench (PLAN-FLEETOPS.md, decision 604).
+[[changed]]
+fn = "LicenseAgreementWindowDlgProc"
+how = "runtime"
+verified = ["ui.forms.dialog_specs"]
+
+[[changed]]
+fn = "MainMenuDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "ManualIPDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "MapSelectDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "MapTransferDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "MultiplayerAdvancedOptionsDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "MultiplayerConnectionDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "PasswordDlgProc"
+how = "runtime"
+verified = []
+
+# FleetOpsHook trampolines the entry (+0x0); the UI's one site, the Entity::ResetVisibility call
+# at +0x1e9 (0x483869), is stock's in the file and in memory (FO-6 step 4, decision 122).
+[[changed]]
+fn = "Program::DisplayInputProcess"
+how = "runtime"
+verified = ["ui.panels.presses"]
+
+[[changed]]
+fn = "RoomSelectDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "ST3D_DeviceDirectX8::SetCursor"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "ST3D_GraphicsEngine::FindLogicalDatabase"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "ST3D_GraphicsEngine::FindVisibleDatabase"
+how = "runtime"
+verified = []
+
+# FleetOpsHook re-points its calls at +0x3b and +0x11c (its window mode, texture
+# parameters); the UI's Credits call it as Roots' own Credits do, through those (decision 607).
+[[changed]]
+fn = "ST3D_GraphicsEngine::SetActiveDisplay"
+how = "runtime"
+verified = ["ui.shell.screens"]
+
+# Replaced whole at its entry. The order ring and the footprints only call it (their entry
+# check is dropped in ui.hud.toml); loading.inner_pixels patches a call inside it, so the
+# function stays marked for that hook alone (FO-6 step 1; decision 74).
+[[changed]]
+fn = "ST3D_Texture::DemandLoad"
+how = "runtime"
+verified = ["ui.hud.footprints", "ui.hud.order_ring"]
+
+[[changed]]
+fn = "SetCurrentBackground"
+how = "runtime"
+verified = []
+
+# FleetOpsHook's tail (at +0x99) only shows a producer whose class is its build yard as a single
+# object; the function is otherwise stock's, and the panel's own Render calls it every frame. The
+# UI calls it as the Render does, for the face and the object (hud.info's reads), and draws Roots'
+# panel over the Render run unseen (hud.info_fo; PLAN-FLEETOPS.md, FO-6, decisions 440 to 459).
+[[changed]]
+fn = "ShipDisplay::DetermineSelectedDisplayType"
+how = "runtime"
+verified = ["ui.hud.info", "ui.hud.info_fo"]
+
+# FleetOpsHook's calls for the one-unit and builder faces (+0x99, +0xa5) and its edits of the group
+# faces (+0xcf..+0x1b7) sit before the strip's call at +0x1fa, which is stock's in the file and in
+# memory (the hook's patch checks its target, SDInfoBar::Render, also stock's); ui.hud.hover takes
+# only that call (decision 461).
+[[changed]]
+fn = "ShipDisplay::Render"
+how = "runtime"
+verified = ["ui.hud.hover"]
+
+# FleetOpsHook re-points two calls inside it (its bitmap object); `ui.shell.screens` never
+# runs it, it only replaces the call to it (decision 607).
+[[changed]]
+fn = "Show_Credits"
+how = "runtime"
+verified = ["ui.shell.screens"]
+
+[[changed]]
+fn = "SoundSettingsDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "TechTreeWindowDlgProc"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "YesNoDlgProc"
+how = "runtime"
+verified = []
+
+# qol
+
+# FleetOpsHook jumps out of the function at its entry into its own port (Craft_Say_New, which
+# picks the topic itself), so the site qol.move_paths re-points (the call of CaptainsVoice::Say)
+# never runs on Roots: a ship speaks its acknowledgement when QOL sends it a leg. The queue
+# does not depend on it (decision 114).
+[[changed]]
+fn = "Craft::Say"
+how = "runtime"
+verified = ["qol.move_paths"]
+
+# FleetOpsHook's four writes are the GetUserTeam call (+0x7d), the layout's call (+0xbc,
+# re-pointed at its port of mUpdateButtonsAndPosition) and the pressed-state loop's array and
+# count (+0xda, +0xde). The two calls our hooks wrap, IsGamePausedAtAll at +0xf2 (the UI's grid)
+# and mProcessKeyboardInput at +0x23a (QOL's position keys), are stock's in the file and in
+# memory after FleetOpsHook (FO-6 decisions 330 to 349).
+[[changed]]
+fn = "PopupPaletteImp::Update"
+how = "runtime"
+verified = ["ui.hud.bar_grid", "qol.bar_keys"]
+
+[[changed]]
+fn = "PopupPaletteImp::mQueueSpecialWeaponCommand"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "PopupPaletteImp::mUpdateButtonsAndPosition"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::FlushLists"
+how = "runtime"
+verified = []
+
+# FleetOpsHook moves the selection's array into its enlarged overview (the offset this
+# returns): the move paths call it through the overview's vtable and read the ids where it
+# says, up to GetSelectNum's count, which is stock's (FO-5 step 7).
+[[changed]]
+fn = "cOverViewImp::GetSelectList"
+how = "runtime"
+verified = ["render3d.overlays.paths"]
+
+[[changed]]
+fn = "cOverViewImp::GetSelectedEntityIds"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::Select"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::SwapLists"
+how = "runtime"
+verified = []
+
+# FleetOpsHook moves the selection to its own array and raises the group's cap in memory; the
+# entry and the arguments are stock's, and qol.shift_group only calls it (FO-7 round two).
+[[changed]]
+fn = "cOverViewImp::mBindGroup"
+how = "runtime"
+verified = ["qol.shift_group"]
+
+[[changed]]
+fn = "cOverViewImp::mClearFromGroup"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mDeselectAll"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mEditModeCopy"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mEditModeDeleteAll"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mEditModeDrag"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mEditModeDragAll"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mEditModeInput"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mEditModeSelect"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mFocusNextSelected"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mMainInput"
+how = "runtime"
+verified = []
+
+# The warp site (the block that turns a GO into GO_WARP while Alt is held) and its continue
+# point are stock's bytes in the file and in memory; FleetOpsHook's one write in the function is
+# the call at +0xda, 0x62 bytes past the block (FO-7 round three, decision 112).
+[[changed]]
+fn = "cOverViewImp::mNormalModeInput"
+how = "runtime"
+verified = ["qol.warp"]
+
+[[changed]]
+fn = "cOverViewImp::mSelectMeanY"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "cOverViewImp::mSetFormationOrientationToCurrentView"
+how = "runtime"
+verified = []
+
+# qolrules
+
+[[changed]]
+fn = "GameObjectClass::Get_Biomatter_Cost"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "GameObjectClass::Get_Crew_Cost"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "GameObjectClass::Get_Dilithium_Cost"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "GameObjectClass::Get_Latinum_Cost"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "GameObjectClass::Get_Metal_Cost"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "Producer::ActDeleteBuildQueueItem"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "Producer::CancelBuild"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "Producer::ClearBuildQueue"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "Producer::PushBuildQueueItem"
+how = "runtime"
+verified = []
+
+[[changed]]
+fn = "Producer::StartBuild"
+how = "runtime"
+verified = []

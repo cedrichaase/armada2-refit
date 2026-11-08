@@ -14,6 +14,14 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$(cd "$here/../.." && pwd)/a2env.sh"; GAME="$A2_GAME"
 [ -d "$GAME" ] || { echo "game directory not found: $GAME" >&2; exit 1; }
 
+# The plates are Armada II's menus', built from its art. Another game's Menus/ is its own
+# (Fleet Operations: Roots keeps its shell's bitmaps there, and the UI hosts no menus on it
+# yet): neither installed nor removed (PLAN-FLEETOPS.md, FO-6, decision 60).
+if [ "$A2_PROFILE" != armada2 ]; then
+    echo "backdrop: $A2_PROFILE: no plates (the menus stay the game's own); Menus/ untouched"
+    exit 0
+fi
+
 # put SRC DST -- copy beside the target, then rename over it, so a running game keeps
 # its old copy on its old inode until the next launch.
 put () { cp "$1" "$2.new" && mv -f "$2.new" "$2"; }

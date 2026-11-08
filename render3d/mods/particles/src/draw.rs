@@ -135,6 +135,8 @@ impl Batch {
             let Some(t) = assets::texture(tex) else { continue };
             let Some(pipe) = self.pipe(*m) else { continue };
             cmd.set_pipeline(&pipe);
+            // `alpha` through its texture's chain as the rest: a DDS file's own levels,
+            // as the engine samples them (decisions 351 and 355).
             let mip = if *m == Material::AdditiveNoMip { MipFilter::None } else { MipFilter::Linear };
             cmd.bind_texture(0, Some(&t), &gfx::sampler(Filter::Linear, mip, Address::Wrap, Address::Wrap));
             // In pieces, as the old dynamic buffer held them.
@@ -149,11 +151,12 @@ impl Batch {
     }
 
     /// A material's pipeline: depth-tested (`LESSEQUAL`), red, green and blue written,
-    /// no culling; added, blended by alpha, or cut out at alpha one half (writing depth).
+    /// no culling; added, blended by alpha (`translucent`, `alpha`), or cut out at alpha
+    /// one half (writing depth).
     fn pipe(&mut self, m: Material) -> Option<Pipeline> {
         let key = match m {
             Material::Additive | Material::AdditiveNoMip => 0,
-            Material::Translucent => 1,
+            Material::Translucent | Material::Alpha => 1,
             Material::Cutout => 2,
         };
         self.pipes.view(key, || {

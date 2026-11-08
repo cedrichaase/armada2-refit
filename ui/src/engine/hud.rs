@@ -45,10 +45,32 @@ fn at(h: a2engine::HookId, s: a2engine::Sym) -> usize {
 pub fn palette_ptr() -> usize {
     at(hook::HUD_READS_COMPONENTS, sym::HUD_PALETTE_PTR)
 }
-/// `shipDisplay`: the info panel (an instance, not a pointer).
+/// The info panel (`ShipDisplay`), found in the render lists by its name, never through
+/// the static global `shipDisplay` (PLAN-FLEETOPS.md, FO-6, decision 64): on Roots,
+/// FleetOpsHook constructs a panel of its own and that global is not it. On stock the
+/// list holds the very instance the global is, so the answer is the same. 0 outside a
+/// mission (no list holds it) and while the components cannot be read.
 pub fn ship_display() -> usize {
-    at(hook::HUD_READS_COMPONENTS, sym::HUD_SHIP_DISPLAY)
+    if eng().ready(hook::HUD_READS_COMPONENTS).is_err() {
+        return 0;
+    }
+    let all = all_components();
+    let known = unsafe { INFO_PANEL };
+    if known != 0 && all.contains(&known) && name(known) == INFO_PANEL_NAME {
+        return known;
+    }
+    let found = all.iter().copied().find(|&c| name(c) == INFO_PANEL_NAME).unwrap_or(0);
+    unsafe { INFO_PANEL = found };
+    found
 }
+
+/// The info panel's `GetName`.
+const INFO_PANEL_NAME: &str = "ShipDisplay";
+/// The panel last found (`ship_display`, `learn`).
+static mut INFO_PANEL: usize = 0;
+/// `set_taken`'s `at` for the info panel: not an address, the panel found by name, which
+/// can be a different object in each mission.
+pub const INFO_PANEL_TAKEN: usize = 1;
 /// `mapRadar`: the minimap.
 pub fn map_radar() -> usize {
     at(hook::HUD_READS_COMPONENTS, sym::HUD_MAP_RADAR)
@@ -86,6 +108,16 @@ pub fn panel_rect(c: usize, w: f32, h: f32) -> Option<[f32; 4]> {
     }
     let (sx, sy) = (w / super::canvas::CANVAS.0, h / super::canvas::CANVAS.1);
     Some([r[0] as f32 * sx, r[1] as f32 * sy, (r[2] + 1) as f32 * sx, (r[3] + 1) as f32 * sy])
+}
+
+/// A panel's origin in back-buffer pixels (its rectangle's top left, scaled as `panel_rect`), whether or
+/// not the rectangle has an area: the origin a child's local rectangle is offset by.
+pub fn panel_origin(c: usize, w: f32, h: f32) -> Option<(f32, f32)> {
+    if c == 0 || !super::readable(c, 0x40) {
+        return None;
+    }
+    let r: [i32; 4] = unsafe { rd(c + field::HUD_DI_RECT()) };
+    Some((r[0] as f32 * w / super::canvas::CANVAS.0, r[1] as f32 * h / super::canvas::CANVAS.1))
 }
 
 /// Whether the panel is hidden: its own flag (`SetIsHidden`; the interface modes hide
@@ -204,7 +236,78 @@ pub fn is_taken(c: usize) -> bool {
 /// stub reach the screen through passthrough.
 #[allow(static_mut_refs)]
 fn taken(c: usize) -> bool {
-    c != 0 && unsafe { INSTALLED } && crate::gfx::drawing() && unsafe { TAKEN.iter().any(|&(a, p)| a != 0 && if p { rd::<usize>(a) == c } else { a == c }) }
+    c != 0
+        && unsafe { INSTALLED }
+        && crate::gfx::drawing()
+        && unsafe { TAKEN.iter().any(|&(a, p)| a != 0 && if a == INFO_PANEL_TAKEN { c == INFO_PANEL } else if p { rd::<usize>(a) == c } else { a == c }) }
+}
+
+/// Notes, for a component the engine's walk is calling (so one of the render list), that
+/// it is the info panel when the panel is taken by name: the panel is known before the
+/// first frame of a mission draws it, whichever object it is.
+#[allow(static_mut_refs)]
+fn learn(c: usize) {
+    unsafe {
+        if !TAKEN.iter().any(|&(a, _)| a == INFO_PANEL_TAKEN) && !INFO_UNSEEN {
+            return;
+        }
+        if name(c) == INFO_PANEL_NAME {
+            INFO_PANEL = c;
+        } else if INFO_PANEL == c {
+            INFO_PANEL = 0;
+        }
+    }
+}
+
+static mut BAR_SKIN: bool = false;
+
+/// The info panel drawn unseen under ours (Roots, `info_fo`; PLAN-FLEETOPS.md, FO-6, decisions
+/// 440 to 459): its `Render` runs with the device's drawing dropped, and it keeps the pointer
+/// over `INFO_AREA` (ours, where it sits on Roots' own place), so the engine's hover, clicks and
+/// FleetOpsHook's range rings follow the panel's own children. None: no pointer for it (ours
+/// handles the pointer itself, or shows nothing).
+static mut INFO_UNSEEN: bool = false;
+static mut INFO_AREA: Option<[f32; 4]> = None;
+
+pub fn set_info_unseen(on: bool) {
+    unsafe { INFO_UNSEEN = on };
+    if !on {
+        set_info_area(None);
+    }
+}
+
+/// Whether the info panel is drawn unseen under ours (and so is not `taken`).
+pub fn info_unseen() -> bool {
+    let on = unsafe { INFO_UNSEEN && INSTALLED };
+    on && crate::gfx::drawing()
+}
+
+pub fn set_info_area(r: Option<[f32; 4]>) {
+    unsafe { INFO_AREA = r };
+}
+
+/// The bar of ours is a skin (FO-6 decision 94): `RenderAll`'s drawing of the palette is skipped, but
+/// `RefreshOwner` still gives it the pointer, so the stock bar's buttons keep the hover state, the
+/// tooltip and the range rings the engine draws from them.
+pub fn set_bar_skin(on: bool) {
+    unsafe { BAR_SKIN = on };
+}
+
+/// The grid of ours on Roots (FO-6 decisions 330 to 349): its frame in back-buffer pixels as the
+/// last UI frame drew it, over which `cursor_over` gives the bar the pointer (and nowhere else),
+/// since the stock buttons are moved onto its cells. None: the bar's own `CursorOver` answers.
+static mut BAR_AREA: Option<[f32; 4]> = None;
+
+pub fn set_bar_area(r: Option<[f32; 4]>) {
+    unsafe { BAR_AREA = r };
+}
+
+/// Whether the pointer is over the grid's frame (`set_bar_area`).
+pub fn pointer_over_bar() -> bool {
+    match unsafe { BAR_AREA } {
+        Some([l, t, r, b]) => crate::input::state().mouse.is_some_and(|(x, y)| x >= l && x < r && y >= t && y < b),
+        None => false,
+    }
 }
 
 /// Whether the pointer is over a panel of ours (the last UI frame's claim): then no
@@ -215,6 +318,7 @@ pub fn set_pointer_over_ui(on: bool) {
 
 unsafe extern "thiscall" fn render_component(c: usize) {
     unsafe {
+        learn(c);
         if c == cursor() && rd::<usize>(cursor() + field::HUD_CURSOR_SPRITE()) == 0 {
             // No cursor named this frame: no owner (the pointer is over a panel of
             // ours), or an owner we have taken, whose stock `Render`, which names it,
@@ -237,6 +341,10 @@ unsafe extern "thiscall" fn render_component(c: usize) {
         }
         if taken(c) {
             return;
+        }
+        if c == INFO_PANEL && info_unseen() && super::info_fo::available() {
+            let f: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_RENDER()));
+            return super::info_fo::render_unseen(c, f);
         }
         if c == cinematic_view() && super::unitview::enabled() {
             return super::unitview::render(c);
@@ -292,6 +400,7 @@ unsafe fn render_cursor_without_tooltip(c: usize) {
 
 unsafe extern "thiscall" fn cursor_over(c: usize) -> bool {
     unsafe {
+        learn(c);
         // The objectives box stays the mouse's owner while it shows, ours or not, as
         // stock's modal box is: `GameKeysProcessInput` opens the chat line on Return
         // unless the owner is this box, and Return is also what closes it.
@@ -299,8 +408,19 @@ unsafe extern "thiscall" fn cursor_over(c: usize) -> bool {
             let f: unsafe extern "thiscall" fn(usize) -> bool = core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_CURSOR_OVER()));
             return f(c);
         }
-        if OVER_UI || taken(c) {
+        if c == INFO_PANEL && info_unseen() {
+            return match INFO_AREA {
+                Some([l, t, r, b]) => !OVER_UI && crate::input::state().mouse.is_some_and(|(x, y)| x >= l && x < r && y >= t && y < b),
+                None => false,
+            };
+        }
+        if OVER_UI || (taken(c) && !(BAR_SKIN && c == palette())) {
             return false;
+        }
+        if BAR_SKIN && c == palette() {
+            if BAR_AREA.is_some() {
+                return pointer_over_bar();
+            }
         }
         let f: unsafe extern "thiscall" fn(usize) -> bool = core::mem::transmute(rd::<usize>(rd::<usize>(c) + field::HUD_VT_CURSOR_OVER()));
         f(c)
@@ -309,25 +429,81 @@ unsafe extern "thiscall" fn cursor_over(c: usize) -> bool {
 
 /// The components of the view in use, in the order `RenderAll` draws them.
 pub fn components() -> alloc::vec::Vec<usize> {
+    let record = at(hook::HUD_READS_COMPONENTS, sym::HUD_VIEW_RECORD);
+    if record == 0 {
+        return alloc::vec::Vec::new();
+    }
+    components_of(unsafe { rd::<u32>(record) } as usize)
+}
+
+/// Every component of every view's list, each once.
+fn all_components() -> alloc::vec::Vec<usize> {
     let mut v = alloc::vec::Vec::new();
-    let (record, lists) = (at(hook::HUD_READS_COMPONENTS, sym::HUD_VIEW_RECORD), at(hook::HUD_READS_COMPONENTS, sym::HUD_RENDER_LISTS));
-    if record == 0 || lists == 0 {
+    for view in 0..=MAX_VIEW {
+        for c in components_of(view) {
+            if !v.contains(&c) {
+                v.push(c);
+            }
+        }
+    }
+    v
+}
+
+/// The component the render lists name `n` (the first, in the lowest view), 0 if none.
+pub fn component_named(n: &str) -> usize {
+    if eng().ready(hook::HUD_READS_COMPONENTS).is_err() {
+        return 0;
+    }
+    all_components().into_iter().find(|&c| name(c) == n).unwrap_or(0)
+}
+
+/// The component that owns the pointer now (`CursorInterface`'s owner, set by `RefreshOwner`
+/// as the pointer moves over the panels), 0 when none does.
+pub fn cursor_owner() -> usize {
+    let c = cursor();
+    if c == 0 { 0 } else { unsafe { rd::<usize>(c + field::HUD_CURSOR_OWNER()) } }
+}
+
+/// The highest view number the render lists are read for (`View_Record` is never above it).
+const MAX_VIEW: usize = 8;
+
+/// The components of view `view`'s render list, in drawing order; none for a view with no list.
+fn components_of(view: usize) -> alloc::vec::Vec<usize> {
+    let mut v = alloc::vec::Vec::new();
+    let lists = at(hook::HUD_READS_COMPONENTS, sym::HUD_RENDER_LISTS);
+    if lists == 0 || view > MAX_VIEW {
         return v;
     }
+    // A pointer the walk follows must look like one: aligned, in the user range above the
+    // first 64 KB. Past the views a build has, the array holds other memory: on Roots the
+    // slots after view 5 led to a "component" at 8 and the rectangle's read faulted
+    // (FO-6 step 3). A list with anything else in it is not a list: the view has none.
+    let ok = |p: usize| p >= 0x10000 && p < 0x8000_0000 && p % 4 == 0;
     unsafe {
-        let view = rd::<u32>(record) as usize;
-        if view > 8 {
+        let list = rd::<usize>(lists + 4 * view);
+        if !ok(list) || !super::readable(list, 8) {
             return v;
         }
-        let list = rd::<usize>(lists + 4 * view);
         let head = peek(list, 4);
-        if head == 0 {
+        if !ok(head) || !super::readable(head, 12) {
             return v;
         }
         let mut node = rd::<usize>(head);
-        while node != head && node != 0 && v.len() < 64 {
-            let c = peek(peek(node, 8), 4);
+        let mut steps = 0;
+        while node != head && v.len() < 64 {
+            steps += 1;
+            if !ok(node) || steps > 256 {
+                return alloc::vec::Vec::new();
+            }
+            let info = peek(node, 8);
+            if !ok(info) {
+                return alloc::vec::Vec::new();
+            }
+            let c = peek(info, 4);
             if c != 0 {
+                if !ok(c) || !ok(rd::<usize>(c)) {
+                    return alloc::vec::Vec::new();
+                }
                 v.push(c);
             }
             node = rd::<usize>(node);
@@ -345,6 +521,53 @@ pub fn log_components() {
         s.push_str(&crate::sfmt!(" {}{}[{},{},{},{}]", name(*c), if hidden(*c) { "(hidden)" } else { "" }, r[0], r[1], r[2], r[3]));
     }
     crate::log!("hud: {} components, in drawing order:{}", list.len(), s);
+}
+
+/// The render lists of every view seen last by `log_render_lists` (their components, in
+/// order), so a mission's lists are logged once and a new mission's again.
+static mut LISTS_LOGGED: alloc::vec::Vec<usize> = alloc::vec::Vec::new();
+/// How many times the lists were logged this game (a cap, so a list that keeps changing
+/// cannot fill the log).
+static mut LISTS_LINES: u32 = 0;
+
+/// Logs every view's render list (each component's name, hidden or not, and its rectangle
+/// in the HUD canvas) when they differ from the last logged: once per mission, whatever
+/// part of the HUD is on (PLAN-FLEETOPS.md, FO-6 decision 77: which name the info panel
+/// answers to on a build that constructs its own). Nothing while the lists cannot be read.
+#[allow(static_mut_refs)]
+pub fn log_render_lists() {
+    if eng().ready(hook::HUD_READS_COMPONENTS).is_err() || unsafe { LISTS_LINES } >= 8 {
+        return;
+    }
+    let mut all = alloc::vec::Vec::new();
+    for view in 0..=MAX_VIEW {
+        let l = components_of(view);
+        all.push(l.len());
+        all.extend(l);
+    }
+    if all.iter().all(|&n| n == 0) || unsafe { LISTS_LOGGED == all } {
+        return;
+    }
+    unsafe {
+        LISTS_LOGGED = all;
+        LISTS_LINES += 1;
+    }
+    let record = at(hook::HUD_READS_COMPONENTS, sym::HUD_VIEW_RECORD);
+    let in_use = if record == 0 { -1 } else { (unsafe { rd::<u32>(record) }) as i32 };
+    let info = ship_display();
+    crate::log!("hud: render lists (view in use {}; the info panel {:#x}{})", in_use, info, if info == 0 { ", none named ShipDisplay" } else { "" });
+    for view in 0..=MAX_VIEW {
+        let list = components_of(view);
+        if list.is_empty() {
+            continue;
+        }
+        let mut s = alloc::string::String::new();
+        for c in &list {
+            let r: [i32; 4] = unsafe { rd(c + field::HUD_DI_RECT()) };
+            s.push_str(&crate::sfmt!(" {}{}[{},{},{},{}]", name(*c), if flag_hidden(*c) { "(hidden)" } else { "" }, r[0], r[1], r[2], r[3]));
+        }
+        crate::log!("hud:   view {}: {} components:{}", view, list.len(), s);
+    }
 }
 
 // ---- small reads every panel needs -------------------------------------------------

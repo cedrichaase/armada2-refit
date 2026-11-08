@@ -88,7 +88,9 @@ copy, and can run while the game is being played.
 
 **Scenes on demand** (`scene/`): `Scene.asi` turns a directly launched, empty map into
 a test scene, so renderer work need not reach a model, an angle or a weapon through
-the menus. Fog, HUD, grid, cursor and notices are off, and the objects come from a
+the menus. It also lists the game's objects and selects and orders them by
+handle on any map (`SCENE=game`; `a2test drive objects`), in Armada II and in Fleet
+Operations: Roots. Fog, HUD, grid, cursor and notices are off, and the objects come from a
 scene file (`SCENE=planet|nebula|firing`). A free camera can be moved while the game
 runs: `a2test drive scene "orbit ship 120 20 250"`. `--install testbench/scene`; see
 `scene/README.md`.
@@ -207,6 +209,110 @@ stock. `a2test run --layers` overrides a scenario's `Layers:`; neither goes with
 `Mod: stock`. The session log's `layers=` and each case's `result.json` and report
 heading record the selection. A checkout from before the registry has no `--only`, so
 its `./install` fails the prepare step.
+
+## Another game: Fleet Operations: Roots
+
+`./a2test --game fo-roots ...` (or `A2_PROFILE=fo-roots`) runs Fleet Operations: Roots
+from `games/fo-roots.toml` (FO-1, `PLAN-FLEETOPS.md`). A session records its game in
+`session.json`, so `drive` and `session stop` on it need no `--game`. What differs from
+Armada II, all read from the descriptor:
+
+- **Nothing is installed.** The descriptor lists no layers, so the clone is the user's
+  install as it ships (no stock cache, no `a2mod`, no `./install`): DxWrapper's `d3d8.dll`,
+  then DXVK's `d3d9.dll`, as Heroic launches it. `--mod`, `--install`, `--layers` and
+  `--assets` have nothing to act on there.
+- **`Data/ArmadaL.exe` is launched directly** (not `FleetOps.exe`), in `Data/`, and found by
+  its name. The plugins' inis and logs, the settings file and the crash file are looked for
+  in `Session.exe_dir` (the clone's `Data/`), not the game folder.
+- **`Settings.xml` is the settings adapter** (`fo-settings-xml`): `displayWidth` and
+  `displayHeight` to the session's resolution, `WindowMode` False, `multisample` 0,
+  `IntroVideo` False; the rest as the user left it (the user's first run wrote it, under
+  `Data/settings_saves_logs/`). `--mute` and `--stems` have no adapter yet.
+- **The output must be at least 1200x900.** The shell runs at 1200x900; on a 1280x720
+  output Roots shows a madExcept dialog one second in (null read in
+  `SetActiveDisplay_Internal`, the engine finding no mode of the size it asks for). The
+  session refuses a smaller one and says which to use; **1280x960** is the bench size.
+- **Roots writes no log** beyond madExcept's crash file
+  (`settings_saves_logs/Logs/exceptArmada2.txt`, with a dialog the process stays under;
+  `Expect no crash` reads it), and DXVK's `ArmadaL_d3d9.log`, gathered with `wine.log`. Waits
+  are OCR (`Wait for "6000"`), until `FleetOpsHook.dll` is measured (FO-2) or a plugin
+  logs; **no tick is logged yet.**
+- **The front end is Roots' own**: the `ui.json` design points are Armada II's, so a step
+  by label (`Click "Instant Action"`) works and a target by name does not; `Quit the game`
+  finds Exit and "Exit to Desktop" by their labels.
+- Scenarios: `fo-launch` (to the main menu) and `fo-skirmish` (Instant Action, Federation
+  against the Klingon AI, to the map with its HUD up), both at 1280x960: about 26 s and
+  65 s. **Pick the sides** (`_fo-sides`): Instant Action deals them at random, and a wait on
+  the HUD's "6000" depended on the race. **Roots' shell takes a click only after the pointer
+  has been over the spot** (a click straight after a jump is lost): move, pause, click, and
+  give a dropdown two seconds. With render3d on Roots (`--install .`, the descriptor's
+  layers) the fragment `_fo-render3d-skirmish` waits on `Render3D.log` saying `(claimed at
+  the instance draw)`, and the `fo-render3d-*` scenarios (FO-5 step 8) check the seam and the hull claim (`-seam`), the range ring
+  of FleetOpsHook with hulls claimed (`-rings`), the debris at the callee hook (`-debris`),
+  the shields' `RTS_CFG.h` keys (`-shields`), the grid's colour (`-grid`) and the logo node's
+  texture (`-stlogo`), and the Enterprise-E of the first allied tutorial (`-tutorial`, the
+  single-player screen's mission list; double-click the item, then OK); with the UI layer, `fo-ui-loading` and `fo-ui-loading-off` (FO-6 step 2: the loading screen of ours over Roots' own, `Setup: display/bench-mode.sh stub Backend=vulkan ui/bench-asi.sh ...`), and the `fo-ui-forms-*` scenarios (FO-6 step 7, option C: Roots' front-end forms drawn by the UI with `Menus.Forms=1`, `ui/MENUS.md`, "Roots' forms"; our buttons carry Roots' captions, so a step clicks them by label). The fight for `-debris` and
+  `-shields` is the Hard AI's own attack on a base left alone, with Game Speed at its top
+  (`_fo-render3d-battle`), a few minutes in; `Scene.asi` now runs on Roots too (below). `Setup: display/bench-mode.sh stub
+  Backend=vulkan` sets Display8's backend and, on Vulkan, `Validate=1` (the validation
+  layer), which is how these scenarios run it before the bench sets it itself. Roots' logs
+  are in the prefix's `AppData/Local/armada2-refit/logs/`, which `"Render3D.log"` and
+  `"Display8.log"` name.
+
+### Roots straight into a map, and scenes on Roots
+
+The menus are only walked where the menus are what is tested. Everything else starts in
+the map (decisions 420 to 439 of `PLAN-FLEETOPS.md`):
+
+- **A mission or tutorial by its map: `Launch: -nointro tutorialgameplay.bzn`.** Roots'
+  `ArmadaL.exe` parses its command line as stock does (the option table, `CommandLine::*`,
+  `Program::MainLoop` and `SetupDefaultGame` are stock's in the file, and FleetOpsHook
+  writes nothing in them at run time; it adds `-mod` and `rec`), so a bare argument is a
+  map, set up by `SetupDefaultGame`. **The `.bzn` is required**: with it the map's details
+  are read, the player is the race its first start location names (`unitedfederation` for
+  the first allied tutorial) and the map's Lua mission runs (Roots' `mmm_loader` finds it
+  from the map; nothing else is needed): the HUD in about 25 s, the tutorial's briefing at
+  about 50 s. Without it (`tutorialgameplay`) the map loads with no title, no units, no
+  script and a random race. The other tutorials and missions go by their `.bzn` names.
+- **A skirmish with an AI opponent: an Instant Action save, `Launch: -nointro
+  save\ia-fed-kli.sav`.** A command-line name with a backslash is a saved game to stock's
+  `MainLoop`, and a save whose header says Instant Action is set up by
+  `LoadInstantActionGameSetup`: the slots, races, AI and game type come back from the
+  file (HUD in about 25 s). Roots needs its own `<name>.ias` beside the `.sav`, or it stops
+  on a black screen. Saves are the game's data: they live in
+  `$A2_DATA/bench/fo-roots/saves/`, and `Setup: testbench/bench/roots-save.sh ia-fed-kli
+  [next setup script ...]` copies a pair into the clone's `Data/settings_saves_logs/save/`.
+  One is made once per machine: walk Instant Action (`_fo-sides`), LAUNCH, Ctrl+S on the
+  map (Roots writes `save/s1.sav` and `s1.ias`), then `testbench/bench/roots-save.sh --keep
+  SESSION_ID s1 ia-fed-kli`. Only `save\<name>.sav` resolves (a longer or absolute path was
+  taken as a map name).
+- **What does not work: a multiplayer map named bare** (`-nointro Battlezone1v1.bzn`).
+  `SetupDefaultGame` always makes a mission game (`GameTypeDLLMission`); it marks the free
+  start locations as computer players, but nobody gets starting units, and the player's
+  race is random (its start locations name none; one run drew the Observer).
+- **Arguments with spaces** go in double quotes (`Launch: -nointro "Blue Skies.bzn"`,
+  `drive launch -nointro "Blue Skies.bzn"`); the bench keeps backslashes as typed.
+- **The race on Roots is spelled as Roots' `races.odf` spells it**: `unitedfederation`,
+  `klingonempire`, `romulanempire`, and `borg`, `cardassian`, `dominion`, `species8472`,
+  `freeborg` as stock. **`federation` is Roots' Observer** (`Race::Find` takes the first
+  exact match), so `Race=federation` in a scene gives the observer's HUD.
+
+**Scenes on Roots.** `Scene.asi` reads its engine knowledge from the symbol profiles
+(`profiles/gog-1.1/scene.toml`, inherited by `fo-roots-5.0Z11`), so on Roots each of its
+parts runs or stands down by the build's marks, as the shipped plugins' hooks do, and it
+reads and calls what FleetOpsHook replaced through the engine's own entries (the
+overview's `Select`, FleetOpsHook's with its cap of 30), never writing it. It loads
+through the ASI loader, so a Roots scene needs `Layers: display asiloader` (or more), and
+goes into `Data/`. `Setup: testbench/scene/bench-setup.sh game` is the harness alone on
+whatever map the game loaded: the object list, selection and orders by id, the camera,
+pause, seed and step (`scene/README.md`; `scenarios/README.md`, "Objects").
+On Roots' first allied tutorial 36 of its 39 hooks are ready; `scene.damage`
+(`CraftInstance::Update` is trampolined), `scene.special` (both `Craft::FireAtSpecial`
+change at their entry) and `scene.tech` (Roots answers from its own tree) stand down, and
+their commands say so (`! scene.<hook> stood down: ...`). `spawn` takes Roots' ODF names
+(`fconst` is the Federation construction ship; `fdestroy` and `fdefiant` do not exist).
+Roots' map planets (`map_planet_*`) are listed as kind `other`: their class is not a
+`PlanetClass`.
 
 ## Audio stems
 
@@ -514,6 +620,38 @@ posts, a hologram, the Evolver, a survey of what no module draws).
   stops reading commands until "Return to Game" is clicked.
 - **Agent sandboxes** may refuse shell lines that mix variables with `sed`, loops of
   `drive` commands or heredocs: put the sequence in a small script and run that.
+- **Find units by what they are, not where they are.** `a2test drive --session ID objects
+  ships mine` (with `Scene.asi` in: `--install testbench/scene`, or `Setup:
+  testbench/scene/bench-setup.sh game` on any map) lists every object with its handle, ODF,
+  class, team, position, hull and shields; `scene "select #<id>"`, `"select+ #<id>"`,
+  `"camera on #<id>"`, `"goto #<id> world X Y Z"` and `"attack #<a> #<b>"` act on them
+  through the engine's own selection and order paths. In a scenario: `Select the ship of
+  class "Mediterranean"`, `Wait up to 60 seconds until a ship named "rig" is within 100 of
+  3500,0,3000` (`scenarios/README.md`, "Objects"). A box drag by an agent was the slow,
+  flaky way to select one ship; a start fleet's ships change places from game to game.
+- **Handles are large unsigned numbers** (`#2147516417`): the top bit is set. Copy them
+  from the list, never from a hex `query` line.
+- **A paused game still takes Scene commands**: with no tick for 500 ms the plugin reads
+  `Scene.cmd` from the camera hook (Roots' tutorial briefing pauses the simulation).
+- **Roots goes straight into a map** (`Launch: -nointro tutorialgameplay.bzn`, `.bzn` and
+  all; or an Instant Action save, `save\<name>.sav` with its `.ias`): walk Roots' menus
+  only where the menus are what is tested ("Roots straight into a map, and scenes on
+  Roots"). Roots' `federation` race is the Observer: `Race=unitedfederation`.
+- **A Roots scenario that points at the HUD sets Display8's `OneWindow=0`** (`display/bench-mode.sh
+  stub Backend=vulkan OneWindow=0 ...`). With one window (#127, Display8's host keeping Roots'
+  device windows as children, the shipped default) the game's own pointer
+  (`DisplayInterface::s_mousePos`, which `UI.log`'s `bar: hover` lines give) stays where it started,
+  12,12 canvas, through every bench move, corner push and click, so no stock button is hovered,
+  clicked or ringed; the window's pointer, which the UI reads, still moves. With `OneWindow=0` it
+  follows the bench (`fo-ui-bar-grid`, 2026-11-07). The user's own game with one window hovers
+  normally (its `UI.log`), so this is the bench's virtual pointer and the child window, not the
+  game. Scenarios that only press keys and use `Scene.asi` keep the default.
+- **After a direct launch, push the pointer into the corner before aiming at anything**
+  (`Move the mouse into the bottom right corner`). No menu has moved the game's own
+  cursor, and in a mission it moves by relative motion only, so the first moves land
+  elsewhere: on `fo-ui-bar-grid` the UI saw the hover at the right cell while the game's
+  cursor sat at the top of the screen, and neither FleetOpsHook's range ring nor the
+  tooltip came up.
 - **Say what you are doing**: `a2test drive --session ID note "what, and why"` when
   you start driving a session and whenever your intent changes (a new scene, a new
   question, waiting on a build). The dashboard shows the latest note as the session's
@@ -566,6 +704,23 @@ picks the globs, so one file runs variants side by side (`engine-mismatch`: `dis
 game are their own files, pending the packages that put their plugin on a profile:
 `engine-mismatch-hulls` (render3d, 8e) and `engine-mismatch-cplugins` (QOL, rules, Online,
 8d). The Display8 shell under a forced `display.modes` is not the engine's.
+
+### What changes in memory: MemDiff.asi
+
+`a2test syms` reads the file; what another module rewrites of the exe at run time
+(Fleet Operations' `FleetOpsHook.dll`, the widescreen `.asi`, our own hooks) only the
+running game shows. `testbench/memdiff/` (`MemDiff.asi`, `--install testbench/memdiff`,
+clones only; the ASI loader goes in beside the exe where a clone has none) compares the
+image's sections with the exe's file at its own load and at 1, 3, 10, 30, 60, 120, 240,
+480 and 900 s, and writes `MemDiff.log` beside the exe: which of `FleetOpsHook.dll`,
+`Win2kDisableTaskSwitch.dll`, `d3d8`, `d3d9` and the D3DX DLLs were loaded when it was, the
+module list in load order, and per pass the changed ranges (section, addresses, the first
+bytes before and after, and for a rel32 `jmp` or `call` the module it now leads into),
+logged only when the set changed. The import table is skipped (every import hook writes
+it), and writable data is compared only at load (the game writes it as it runs). The
+ranges are named by function offline, against the map, outside the repository (hard
+rule 9). On stock 1.1 with nothing else installed it shows the widescreen patch's two
+words in `.text`, from its first second on: the control.
 
 ## Frame dumps
 
@@ -672,9 +827,13 @@ directory of images; a session ID, live or ended; or a baseline's name. `record`
 to a baseline and refuses to replace a shot it holds unless given `--force`.
 
 **Vulkan on the bench.** A game whose clone's `Display8.ini` says
-`Backend=vulkan` runs on the user's GPU with the Khronos validation
-layer on (`bench/session.py`, `vulkan_env`: `VK_INSTANCE_LAYERS`; `display/bench-mode.sh`
-adds `Validate=1`), so errors are caught before they can hang the GPU. Flags of
+`Backend=vulkan` or names Vulkan or `auto` (the shipped default) runs on the user's GPU
+with the Khronos validation layer on, in every launch path (sessions, `a2test run`, films,
+the recorder): at launch `Session.launch` sets `Validate=1` in the clone's `Display8.ini`
+(beside the game's executable, so under `Data/` on Fleet Operations: Roots; never a real
+install) and `bench/session.py`, `vulkan_env`, puts `VK_INSTANCE_LAYERS` in the environment.
+`logs/launch-env.txt` has a `vulkan validation: on|off` line and the session log says
+so too, so errors are caught before they can hang the GPU. Flags of
 `session start`, `run` and `drive`-less runs: `--vulkan-device lavapipe` (or
 `A2TEST_VULKAN_DEVICE=lavapipe`) puts it on lavapipe, Mesa's CPU Vulkan
 (`VK_DRIVER_FILES`, `VK_ICD_FILENAMES`, `Device=llvmpipe`); `--no-validate` (or

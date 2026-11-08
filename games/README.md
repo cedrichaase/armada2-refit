@@ -6,9 +6,34 @@ so the shared code names none. Not a layer; versioned by the root.
 | Descriptor | Game | Offered |
 |---|---|---|
 | `armada2.toml` | Star Trek: Armada II, GOG 1.1 — the default | yes |
-| `fo-roots.toml` | Fleet Operations: Roots ([`PLAN-FLEETOPS.md`](../PLAN-FLEETOPS.md)) | no: a stub, so its paths resolve; FO-1 fills it in |
+| `fo-roots.toml` | Fleet Operations: Roots ([`PLAN-FLEETOPS.md`](../PLAN-FLEETOPS.md)) | no (`installable`: `./install` puts Display8 alone into it, for the bench and the maintainer; see below) |
 
 Armada 1 (`armada1`) gets one of its own by [`PLAN-ARMADA1.md`](../PLAN-ARMADA1.md), A1-1.
+
+## Not offered, not released
+
+**Decided by the user, 2026-11-06:** Fleet Operations: Roots support is in code only. Its
+descriptor stays `offered = false` (with `installable = true`, which lets `./install --game
+fo-roots` and `./a2mod --game fo-roots` work on the maintainer's own Linux install and the
+bench's clones) and it never reaches the GUI installer, the release packages and their
+manifest, `PLAYING.md` or the release notes until the user says otherwise.
+`publish/package.sh` writes into the manifest only the games that are `offered`, and
+`tools/layers.py --check` (CI) fails when `publish/`, `gui-installer/` or `.github/` name a
+game that is not.
+
+What `./install --game fo-roots` puts in `Data/` now: Display8 (`display`), the ASI loader
+Roots ships none of (`asiloader`, `winmm.dll`; `asiloader/README.md`) and render3d. No UI,
+QOL, rules, online, textures or cutscenes yet. a2mod files each layer's files only for the
+games in the layer's `games`.
+
+## Versions and changelogs
+
+Each game has its own version track (`.changeset/README.md`, "Games"): a changeset names
+its games (`games: [armada2]`). The default game's track is the layers' `CHANGELOG.md`
+files, the root `CHANGELOG.md` and the version files; every other game's is one file,
+`games/<id>/CHANGELOG.md`, written by `tools/changeset.py version --game <id>` by hand
+and never released on GitHub. Nothing else lives in `games/<id>/`; the tools read only
+`games/*.toml` as descriptors.
 
 ## Choosing a game
 
@@ -37,6 +62,7 @@ Top-level `A2_GAME` and `A2_PREFIX` are the default game's; top-level `A2_HEROIC
 |---|---|---|
 | `id`, `label` | the id (the file's name) and a name for people | everything |
 | `offered` | whether players get it: `./install` refuses a game that is not | `tools/layers.py` |
+| `installable` | optional: `./install` and `a2mod` work on a game that is not `offered` (the bench, the maintainer's own clones); never the release or the GUI (below) | `tools/layers.py` |
 | `default` | the game resolved when none is chosen; exactly one | `a2env.py` |
 | `layers` | the `layers.toml` ids on offer (none retired); each layer lists the game in its `games` | `tools/layers.py`, `./install` |
 | `exe.names` | the executables, the first the one launched and looked for; a profile build's `exe` is one of them | `a2env.py` (`A2_EXE`), `a2mod`, the bench, `tools/layers.py --check` |
@@ -44,6 +70,7 @@ Top-level `A2_GAME` and `A2_PREFIX` are the default game's; top-level `A2_HEROIC
 | `install.heroic`, `install.gog` | Heroic's app names and GOG's product ids | the GUI and release installers, once AR-9 moves them on |
 | `install.folder`, `install.prefix` | the default names under `~/Games/Heroic/` and `~/Games/Heroic/Prefixes/` | `a2env.py` |
 | `settings.kind`, `settings.file` | the player's settings file and its format (`armada-prf`, `fo-settings-xml`) | the bench's adapter |
+| `logs.crash`, `logs.dirs` | the game's crash record and its log folders, under `data_dir` (`exception.txt` and `Logs` in Armada II; Roots' madExcept file under `settings_saves_logs/Logs`) | the bench (a crash is a change of the file; new files of the folders go into the report) |
 | `settings.keep` | the player's own files `a2mod` never switches | `a2mod` |
 | `display.shell`, `display.hud_canvas` | the shell's resolution and the HUD's design canvas | the bench (`config.SHELL_RES`); the UI later (AR-4) |
 | `files.textures` | the texture roots under `data_dir`, searched in order; `a2tex` installs into the first | `a2env.py` (`A2_TEXTURES`, `TEXTURES`), `a2tex`, `tools/layers.py`'s check of `a2mod`, render3d and the UI ("Files") |
@@ -51,11 +78,13 @@ Top-level `A2_GAME` and `A2_PREFIX` are the default game's; top-level `A2_HEROIC
 | `files.sod`, `files.sprites`, `files.odf` | the folders of models, sprite tables and ODFs | render3d ("Files") |
 | `files.archives` | archives searched behind the folders, `{ kind = "fpq" \| "zfs", file, at }` | `tools/layers.py --check`; their readers come with FO-5 and A1-11 |
 | `paths.stem` | the data directory's name (`A2_DATA`'s default); shared by the games | `a2env.py` |
+| `changesets.quiet` | optional: words a changeset on an offered game's track never holds, besides the id and label (a game not offered) | `tools/changeset.py check` |
 
 `tools/layers.py --check` holds them together: every field present and typed, one
 default, every `layers.toml` `games` entry naming a descriptor, every descriptor's layers
 existing and listing it back, each `profiles/*/build.toml` naming a described game and
-one of its executables, and `a2env.py`'s built-in copy of the default game (what the
+one of its executables (or another descriptor's: Roots' build is a build of `armada2`'s
+engine, `profiles/fo-roots-5.0Z11/`, and its `ArmadaL.exe` is `fo-roots`'), and `a2env.py`'s built-in copy of the default game (what the
 release package's `a2env.py` resolves without this folder) equal to the descriptor.
 
 Nothing here is derived from the game's files (hard rule 8): names, folder names, ids and
@@ -69,7 +98,7 @@ folders: `textures`, `sod`, `sprites` and `odf`, each mounted from the folders `
 lists, in order. render3d adds its recipe override folders (`sky`, `surfaces`, `nebulae`,
 `menu`: `MODDING.md`, "Content recipes"), which are ours and the same for every game, and
 the UI mounts the game folder behind `textures`. The plugins cannot read this folder at
-run time, so each keeps the rows in a `LAYOUT` table (`render3d/core/src/files.rs`,
+run time, so each keeps the rows in a `LAYOUT` table (`render3d/core/src/files/mod.rs`,
 `ui/src/files.rs`) marked with the game's id, and `tools/layers.py --check` fails when a
 row and the descriptor differ. Archives (`fpq`, `zfs`) mount behind the loose folders of
 the same virtual folder and serve nothing until their readers exist.
@@ -77,6 +106,13 @@ the same virtual folder and serve nothing until their readers exist.
 `tools/layers.py --check` holds `[files]` to its shape too: the folder lists relative and
 non-empty, the formats known, each archive of a declared kind and mounted at one of the
 four folders.
+
+A game with mods says how its mods are laid out in `[files] mods` (optional): `dir`, the
+folder of the mods under the data folder, and `switches`, the command-line switches that
+name the active mod (Fleet Operations: `Mods`, `-mod` and `/mod`). render3d then mounts
+its whole list once per folder of the active mod's chain, the mod's over its parent's
+over the game's (`render3d/core/src/files/mods.rs` has the rules), and `tools/layers.py
+--check` holds the descriptor and render3d's `// files: mods <game>` block equal.
 
 ## What does not read it yet
 
@@ -87,3 +123,31 @@ only, until a second game's DLL chooses its layout (`PLAN-ARCHITECTURE.md`, "A D
 game"); the UI's canvas (`ui/src/engine/hud.rs`, AR-4), Display8's trace line naming
 `Armada2.exe`, and the bench's `ARMADA.PRF` parsers, which only the `armada-prf` kind
 uses.
+
+## Fleet Operations: Roots, as observed
+
+Measured by running the shipped game in a bench clone (FO-1; `testbench/README.md`, "Another
+game: Fleet Operations: Roots"), nothing read from its files:
+
+- The install and the Heroic prefix are named as the descriptor says; Heroic's app is
+  `fleetopsroots50` (the Flatpak's `GamesConfig`). `Data/settings_saves_logs/Settings.xml`
+  is the settings file, `FoSettings` with `displayWidth`, `displayHeight`, `WindowMode`,
+  `multisample`, `IntroVideo` and about fifty more keys (0 x 0 is the desktop's mode).
+  Beside it, `Logs/exceptArmada2.txt` appears only on a crash.
+- `Data/ArmadaL.exe` launched directly runs: the front end, Instant Action against the AI
+  and a skirmish map all work through DxWrapper and DXVK as shipped, with `-nointro`.
+  `PROTON_USE_WOW64=1` is not needed.
+- The shell mode is 1200x900 and **the output must offer it**: at 1280x720 the engine
+  dereferences null in `SetActiveDisplay_Internal` (called from `FleetOpsHook`'s
+  `ST3D_GraphicsEngine_SetActiveDisplay_Internal_New`) and madExcept's dialog stands over
+  a black screen, with the process alive. 1280x960 works.
+- The process loads `FleetOpsHook.dll` from the install's root (beside `FleetOps.exe`), not
+  from `Data/`, and `dxwrapper.dll`, `d3d9.dll` (DXVK), `Magnification_Roots.dll`,
+  `Tunngle.dll` and `NetworkManager.dll` from `Data/`.
+- The Roots front end spells its buttons in mixed case (Single Player, Instant Action,
+  Multiplayer, Map Editor, Options, Credits, Exit), its in-mission menu offers "Exit to
+  Desktop" where Armada II says "Exit to Windows", and a skirmish opens on the Instant
+  Action page with "LAUNCH" at the bottom.
+- Heroic's launch brings the prefix's Proton files up to date (DXVK, vkd3d, nvapi and the
+  like are rewritten in a clone's prefix); the install itself is not written beyond
+  `Settings.xml`, which the bench's clone edits.

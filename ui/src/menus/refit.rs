@@ -3,6 +3,11 @@
 //! screen"). The stock Options dialog keeps running under it; the modal owns the keys
 //! (`menus::wants_keys`), so no Enter or Esc reaches it.
 //!
+//! On a build whose Options dialog the menu host does not reach (Fleet Operations: Roots),
+//! the same modal opens over a running mission with a key of the UI's (`[UI] RefitKey`,
+//! with Ctrl; `mission_frame`), drawn in the mission frame and closed with Esc, Done or
+//! the key again (PLAN-FLEETOPS.md, FO-6, decision 86).
+//!
 //! The rows come from the settings hub (`settings::tables`); every change goes through
 //! `settings::set_row` and nowhere else, so the hub is the only writer of
 //! `RefitPlayer.ini` and tells the plugins. The words of the log lines and of the
@@ -44,6 +49,8 @@ struct Note {
 struct St {
     /// The Options dialog the modal is open over.
     open: Option<HWND>,
+    /// Open over a running mission, by its key (`mission_frame`).
+    mission: bool,
     /// The tab chosen last (kept for the session).
     tab: u8,
     advanced: bool,
@@ -63,6 +70,7 @@ struct St {
 
 static mut S: St = St {
     open: None,
+    mission: false,
     tab: TAB_GRAPHICS,
     advanced: false,
     confirm: Confirm::None,
@@ -82,7 +90,10 @@ fn st() -> &'static mut St {
 
 /// Whether a row has a place on the screen at all.
 fn shown(r: &Setting) -> bool {
-    r.flags & FLAG_NO_ROW == 0 && r.tab != TAB_NONE
+    r.flags & FLAG_NO_ROW == 0
+        && r.tab != TAB_NONE
+        // The forms row exists only where there are forms to draw.
+        && (!core::ptr::eq(r, crate::settings_table::MENUS_FORMS) || crate::engine::api::forms::available())
 }
 
 /// Whether the screen has a row to show at all (the entry in Options needs one).
@@ -91,7 +102,12 @@ pub fn available() -> bool {
 }
 
 pub fn is_open() -> bool {
-    st().open.is_some()
+    st().open.is_some() || st().mission
+}
+
+/// Whether the modal is open over a running mission by its key (`mission_frame`).
+pub fn in_mission() -> bool {
+    st().mission
 }
 
 /// Whether the modal is open over the dialog `h`.
@@ -109,8 +125,13 @@ fn tab_count(id: u8) -> usize {
 
 /// Opens the modal over the Options dialog `host`.
 pub fn open(host: HWND) {
+    st().open = Some(host);
+    opened(if crate::menus::backdrop::over_mission() { "a mission" } else { "the shell" });
+}
+
+/// What opening it does, wherever: `place` for the log.
+fn opened(place: &str) {
     let s = st();
-    s.open = Some(host);
     s.confirm = Confirm::None;
     s.done = false;
     s.notes_at = 0.0;
@@ -128,7 +149,7 @@ pub fn open(host: HWND) {
     if tab_count(s.tab) == 0 {
         s.tab = TABS.iter().map(|t| t.0).find(|&id| tab_count(id) > 0).unwrap_or(TAB_GRAPHICS);
     }
-    log!("refit: opened in {} ({})", if crate::menus::backdrop::over_mission() { "a mission" } else { "the shell" }, counts);
+    log!("refit: opened in {} ({})", place, counts);
     for n in s.notes.iter() {
         if n.row.is_null() {
             log!("refit: {}: {}", n.plugin, n.text);
@@ -164,7 +185,7 @@ fn row_note(r: &Setting) -> Option<String> {
 
 fn close(ui: Option<&mut Ui>, what: &str) {
     let s = st();
-    if s.open.take().is_some() {
+    if s.open.take().is_some() || core::mem::take(&mut s.mission) {
         s.confirm = Confirm::None;
         s.dd_open = false;
         s.dd_prev = false;
@@ -191,6 +212,31 @@ pub fn frame(ui: &mut Ui, stack: &[&'static Slot]) {
         Some(i) if i + 1 != stack.len() => return close(Some(ui), "closed (a dialog opened over Options)"),
         _ => {}
     }
+    draw(ui);
+}
+
+/// A frame of a mission (the mission frame, `app::run`, after everything else of ours):
+/// the modal opened, or closed, by its key (`[UI] RefitKey` with Ctrl, which
+/// `crate::input` keeps from the engine), and drawn while open. Roots' clean screenshot
+/// does not hide it (decision 72).
+pub fn mission_frame(ui: &mut Ui) {
+    if crate::input::take_refit_request() {
+        let s = st();
+        if s.mission {
+            return close(Some(ui), "closed (its key)");
+        }
+        if s.open.is_none() {
+            s.mission = true;
+            opened("a mission, by its key");
+        }
+    }
+    if st().mission {
+        draw(ui);
+    }
+}
+
+/// The modal itself, open over a dialog or a mission.
+fn draw(ui: &mut Ui) {
     refresh_notes(ui.time());
     let s = st();
     s.dd_prev = s.dd_open;

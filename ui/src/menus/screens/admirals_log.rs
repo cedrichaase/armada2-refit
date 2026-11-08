@@ -26,6 +26,7 @@ use crate::gfx::{fade, Weight, R};
 use crate::menus::model::{Class, Control, What};
 use crate::menus::screens::kit::{self, Memory};
 use crate::menus::Screen;
+use crate::rt::win::HWND;
 use crate::widgets::{theme, Align, Stack, Ui};
 use alloc::vec::Vec;
 
@@ -51,68 +52,23 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     if tabs.len() < 2 || done.is_none() {
         return false;
     }
-    let t = ui.theme;
     kit::backdrop(ui);
-    let win = kit::centred(ui, 1760.0, 980.0);
-    let inner = ui.window(win, "Admiral's Log");
-
     // Which tab shows: the visible pane's place, the panes being in the tabs' order
     // backwards; else the last one we clicked.
-    let mem = unsafe { &mut TAB }.of(s.slot.hwnd);
     let shown: Vec<usize> = panes.iter().enumerate().filter(|(_, c)| c.visible).map(|(i, _)| i).collect();
-    if shown.len() == 1 && panes.len() == tabs.len() {
-        mem.0 = panes.len() - 1 - shown[0];
-    }
-    let mut sel = mem.0.min(tabs.len() - 1);
-
-    let gap = ui.u(t.gap);
-    let foot_h = ui.u(t.button_h);
-    let mut st = Stack::new(inner, gap);
-    let tab_row = st.row(ui.u(46.0));
-    let body_h = (inner.h - ui.u(46.0) - foot_h - 2.0 * gap).max(0.0);
-    let body = st.row(body_h);
-    let foot = st.row(foot_h);
-
+    let showing = if shown.len() == 1 && panes.len() == tabs.len() { Some(panes.len() - 1 - shown[0]) } else { None };
     let names: Vec<&str> = tabs.iter().map(|c| c.text.as_str()).collect();
-    if s.top {
-        if ui.tabs(tab_row, "tabs", &names, &mut sel) {
-            s.click_control(tabs[sel]);
-            mem.0 = sel;
-        }
-    } else {
-        let mut keep = sel;
-        ui.tabs(tab_row, "tabs", &names, &mut keep);
+    let people: Vec<&str> = players.iter().map(|c| c.text.as_str()).collect();
+    let ids: Vec<i32> = players.iter().map(|c| c.id).collect();
+    let done_c = done.unwrap_or(tabs[0]);
+    let out = log_frame(ui, s.slot.hwnd, s.top, &names, showing, &people, &ids, (done_c.text.as_str(), done_c.enabled));
+    if let Some(i) = out.tab {
+        s.click_control(tabs[i]);
     }
-
-    // The players down the left, the page to their right.
-    let (left, page) = body.take_left(ui.u(300.0).min(body.w * 0.3));
-    let page = R::new(page.x + gap, page.y, page.w - gap, page.h);
-    let header_h = ui.u(44.0);
-    let rows = players.len().max(8);
-    let row_h = ((page.h - header_h) / rows as f32).min(ui.u(70.0));
-    for (i, c) in players.iter().enumerate() {
-        if c.text.trim().is_empty() {
-            continue;
-        }
-        let r = R::new(left.x, page.y + header_h + i as f32 * row_h, left.w, row_h - ui.u(4.0));
-        let id = ui.id(&crate::sfmt!("player{}", c.id));
-        let (hot, held, clicked) = if s.top { ui.interact(id, r) } else { (false, false, false) };
-        let state = theme::State::of(ui, id, hot, held);
-        theme::button_frame(ui, r, state);
-        let mut lines = c.text.split('\n');
-        let name = lines.next().unwrap_or("");
-        let team = lines.next().unwrap_or("");
-        let pad = ui.u(t.pad);
-        ui.text_in(R::new(r.x + pad, r.y, r.w - 2.0 * pad, r.h * 0.55), name, t.text_size, Align::Left, t.text, Weight::Bold);
-        ui.text_in(R::new(r.x + pad, r.y + r.h * 0.5, r.w - 2.0 * pad, r.h * 0.45), team, t.small_size, Align::Left, t.text_dim, Weight::Regular);
-        if clicked {
-            s.click_control(c);
-        }
+    if let Some(i) = out.player {
+        s.click_control(players[i]);
     }
-
-    // The page.
-    ui.draw.rect_round(page, ui.u(6.0), fade(t.track, 0.9));
-    ui.draw.frame(page, ui.u(t.edge).max(1.0), t.panel_edge);
+    let (page, header_h, row_h, sel) = (out.page, out.header_h, out.row_h, out.sel);
     if sel == 0 && score_table(ui, s, page, header_h, row_h, &panes) {
         // drawn from the model
     } else if sel > 0 && typeset(ui, s, page.inset(ui.u(10.0)), sel) {
@@ -123,13 +79,102 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
         s.mirror_part(ui, src, dst, 0xffffffff);
         kit::forward_part(ui, s, dst, src);
     }
-
-    // Done.
-    let bw = ui.u(260.0);
-    if let Some(c) = done {
-        kit::button(ui, s, R::new(foot.right() - bw, foot.y, bw, foot.h), c, &c.text);
+    if out.done {
+        s.click_control(done_c);
     }
     true
+}
+
+/// What the log's frame was told this frame (`log_frame`): a tab, a player or Done
+/// clicked; where the page is, its header's height and a player row's; the tab shown.
+pub struct LogOut {
+    pub tab: Option<usize>,
+    pub player: Option<usize>,
+    pub done: bool,
+    pub page: R,
+    pub header_h: f32,
+    pub row_h: f32,
+    pub sel: usize,
+}
+
+/// The log's frame, for any front end (Armada II's hosted log and Roots' adopted one,
+/// `menus::roots_dialogs`): a window, the tab strip (`tabs`; `showing` the tab the dialog
+/// shows, when it can be told, else the last one clicked, kept per `dlg`), the players
+/// down the left (each "name\nteam", by id), the page's frame, Done (label, enabled) at
+/// the foot, live only on the top dialog (`top`). The page's content is the caller's.
+#[allow(clippy::too_many_arguments)]
+pub fn log_frame(ui: &mut Ui, dlg: HWND, top: bool, tabs: &[&str], showing: Option<usize>, players: &[&str], ids: &[i32], done: (&str, bool)) -> LogOut {
+    let t = ui.theme;
+    let win = kit::centred(ui, 1760.0, 980.0);
+    let inner = ui.window(win, "Admiral's Log");
+    let mem = unsafe { &mut *core::ptr::addr_of_mut!(TAB) }.of(dlg);
+    if let Some(i) = showing {
+        mem.0 = i;
+    }
+    let mut sel = mem.0.min(tabs.len() - 1);
+    let mut out = LogOut { tab: None, player: None, done: false, page: inner, header_h: 0.0, row_h: 0.0, sel };
+
+    let gap = ui.u(t.gap);
+    let foot_h = ui.u(t.button_h);
+    let mut st = Stack::new(inner, gap);
+    let tab_row = st.row(ui.u(46.0));
+    let body_h = (inner.h - ui.u(46.0) - foot_h - 2.0 * gap).max(0.0);
+    let body = st.row(body_h);
+    let foot = st.row(foot_h);
+
+    if top {
+        if ui.tabs(tab_row, "tabs", tabs, &mut sel) {
+            out.tab = Some(sel);
+            mem.0 = sel;
+        }
+    } else {
+        let mut keep = sel;
+        ui.tabs(tab_row, "tabs", tabs, &mut keep);
+    }
+    out.sel = sel;
+
+    // The players down the left, the page to their right.
+    let (left, page) = body.take_left(ui.u(300.0).min(body.w * 0.3));
+    let page = R::new(page.x + gap, page.y, page.w - gap, page.h);
+    let header_h = ui.u(44.0);
+    let rows = players.len().max(8);
+    let row_h = ((page.h - header_h) / rows as f32).min(ui.u(70.0));
+    for (i, text) in players.iter().enumerate() {
+        if text.trim().is_empty() {
+            continue;
+        }
+        let r = R::new(left.x, page.y + header_h + i as f32 * row_h, left.w, row_h - ui.u(4.0));
+        let id = ui.id(&crate::sfmt!("player{}", ids[i]));
+        let (hot, held, clicked) = if top { ui.interact(id, r) } else { (false, false, false) };
+        let state = theme::State::of(ui, id, hot, held);
+        theme::button_frame(ui, r, state);
+        let mut lines = text.split('\n');
+        let name = lines.next().unwrap_or("");
+        let team = lines.next().unwrap_or("");
+        let pad = ui.u(t.pad);
+        ui.text_in(R::new(r.x + pad, r.y, r.w - 2.0 * pad, r.h * 0.55), name, t.text_size, Align::Left, t.text, Weight::Bold);
+        ui.text_in(R::new(r.x + pad, r.y + r.h * 0.5, r.w - 2.0 * pad, r.h * 0.45), team, t.small_size, Align::Left, t.text_dim, Weight::Regular);
+        if clicked {
+            out.player = Some(i);
+        }
+    }
+
+    // The page's frame.
+    ui.draw.rect_round(page, ui.u(6.0), fade(t.track, 0.9));
+    ui.draw.frame(page, ui.u(t.edge).max(1.0), t.panel_edge);
+
+    // Done, as `kit::button`.
+    let bw = ui.u(260.0);
+    let dr = R::new(foot.right() - bw, foot.y, bw, foot.h);
+    if top && done.1 {
+        out.done = ui.button(dr, done.0);
+    } else {
+        theme::button(ui, dr, done.0, theme::State { off: !done.1, ..theme::State::default() });
+    }
+    out.page = page;
+    out.header_h = header_h;
+    out.row_h = row_h;
+    out
 }
 
 /// The Score page from the pane's labels: false when it has none (not this page).

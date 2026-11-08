@@ -16,7 +16,7 @@
 use crate::engine::api::shellui::Kind;
 use crate::gfx::{Weight, R};
 use crate::menus::model::{Class, Control, What};
-use crate::menus::{actions, Screen};
+use crate::menus::Host;
 use crate::rt::win::{WM_CHAR, WM_KEYDOWN};
 use crate::widgets::{theme, Align, FieldEvent, ListEvent, State, Ui};
 use alloc::string::String;
@@ -39,19 +39,19 @@ pub fn is_list(c: &Control) -> bool {
 }
 
 /// The visible controls of the dialog that `f` accepts, in the order it made them.
-pub fn visible<'a>(s: &'a Screen, f: fn(&Control) -> bool) -> Vec<&'a Control> {
-    s.model.controls.iter().filter(|c| c.visible && c.rect[2] > 0 && c.rect[3] > 0 && f(c)).collect()
+pub fn visible<'a>(s: &'a dyn Host, f: impl Fn(&Control) -> bool) -> Vec<&'a Control> {
+    s.model().controls.iter().filter(|c| c.visible && c.rect[2] > 0 && c.rect[3] > 0 && f(c)).collect()
 }
 
 /// A labelled control that shows, by its label (any case).
-pub fn shown<'a>(s: &'a Screen, label: &str) -> Option<&'a Control> {
-    s.model.controls.iter().find(|c| c.visible && c.text.eq_ignore_ascii_case(label))
+pub fn shown<'a>(s: &'a dyn Host, label: &str) -> Option<&'a Control> {
+    s.model().controls.iter().find(|c| c.visible && c.text.eq_ignore_ascii_case(label))
 }
 
 /// The first visible control whose label starts with `prefix` (any case).
-pub fn starting<'a>(s: &'a Screen, prefix: &str) -> Option<&'a Control> {
+pub fn starting<'a>(s: &'a dyn Host, prefix: &str) -> Option<&'a Control> {
     let p = prefix.as_bytes();
-    s.model.controls.iter().find(|c| c.visible && c.text.len() >= p.len() && c.text.as_bytes()[..p.len()].eq_ignore_ascii_case(p))
+    s.model().controls.iter().find(|c| c.visible && c.text.len() >= p.len() && c.text.as_bytes()[..p.len()].eq_ignore_ascii_case(p))
 }
 
 /// The backdrop every full-screen spec draws: the menu plate, or the shell's gradient.
@@ -81,9 +81,9 @@ fn key(c: &Control, what: &str) -> alloc::string::String {
 
 /// A stock button as our push button, labelled `label` (the control's own when None).
 /// True on the frame it is clicked (the click is already queued).
-pub fn button(ui: &mut Ui, s: &Screen, c: &Control, r: R, label: Option<&str>) -> bool {
+pub fn button(ui: &mut Ui, s: &dyn Host, c: &Control, r: R, label: Option<&str>) -> bool {
     let text = label.unwrap_or(c.text.as_str());
-    let live = s.top && c.enabled;
+    let live = s.top() && c.enabled;
     if !live {
         theme::button(ui, r, text, State { off: !c.enabled, ..State::default() });
         return false;
@@ -105,7 +105,7 @@ pub fn button(ui: &mut Ui, s: &Screen, c: &Control, r: R, label: Option<&str>) -
 /// label is justified to: the left, or the right for a right-justified label (the
 /// Advanced panel's left column). A button with a centred label is clicked in its
 /// middle.
-pub fn press(s: &Screen, c: &Control) {
+pub fn press(s: &dyn Host, c: &Control) {
     let half = c.rect[3] / 2;
     match (&c.what, c.align) {
         (What::Shell(Kind::Toggle | Kind::Button | Kind::Cycle), -1) => s.click(c.rect[0] + half, c.rect[1] + half),
@@ -116,8 +116,8 @@ pub fn press(s: &Screen, c: &Control) {
 
 /// A plain button of ours that clicks a design point of the dialog (a hit area the
 /// screen's procedure tests itself).
-pub fn point_button(ui: &mut Ui, s: &Screen, r: R, label: &str, x: i32, y: i32, enabled: bool) -> bool {
-    if !(s.top && enabled) {
+pub fn point_button(ui: &mut Ui, s: &dyn Host, r: R, label: &str, x: i32, y: i32, enabled: bool) -> bool {
+    if !(s.top() && enabled) {
         theme::button(ui, r, label, State { off: !enabled, ..State::default() });
         return false;
     }
@@ -134,7 +134,7 @@ pub fn point_button(ui: &mut Ui, s: &Screen, r: R, label: &str, x: i32, y: i32, 
 /// A cycle (or toggle) button: a button labelled with the stock label, which says the
 /// current choice ("Resources: Lots", "Warp Disabled"). A click steps it, through the
 /// stock click. Not a drop-down: the stock button has no list, only a next choice.
-pub fn cycle(ui: &mut Ui, s: &Screen, c: &Control, r: R) -> bool {
+pub fn cycle(ui: &mut Ui, s: &dyn Host, c: &Control, r: R) -> bool {
     button(ui, s, c, r, None)
 }
 
@@ -146,17 +146,17 @@ pub fn caption(ui: &mut Ui, r: R, s: &str) {
 
 /// The characters typed into a field this frame, sent on to the stock edit `h`: back to
 /// where the old and the new text first differ, then the rest of the new text.
-fn send_text(h: crate::rt::win::HWND, old: &str, new: &str) {
+fn send_text(s: &dyn Host, h: crate::rt::win::HWND, old: &str, new: &str) {
     let o: Vec<char> = old.chars().collect();
     let n: Vec<char> = new.chars().collect();
     let common = o.iter().zip(n.iter()).take_while(|(a, b)| a == b).count();
-    actions::push(actions::Action::Key { h, msg: WM_KEYDOWN, wp: 0x23 }); // End
+    s.key(h, WM_KEYDOWN, 0x23); // End
     for _ in common..o.len() {
-        actions::push(actions::Action::Key { h, msg: WM_CHAR, wp: 8 });
+        s.key(h, WM_CHAR, 8);
     }
     for &ch in &n[common..] {
         if (ch as u32) < 256 && ch != '\r' && ch != '\n' {
-            actions::push(actions::Action::Key { h, msg: WM_CHAR, wp: ch as usize });
+            s.key(h, WM_CHAR, ch as usize);
         }
     }
 }
@@ -164,9 +164,9 @@ fn send_text(h: crate::rt::win::HWND, old: &str, new: &str) {
 /// A stock edit as our text field. The field shows the stock edit's text; typing goes
 /// to the stock edit. Returns what the field did (Submit on Enter: the stock dialog
 /// gets the Enter itself, as `IDOK`, as the stock edit would give it).
-pub fn edit(ui: &mut Ui, s: &Screen, c: &Control, r: R) -> FieldEvent {
+pub fn edit(ui: &mut Ui, s: &dyn Host, c: &Control, r: R) -> FieldEvent {
     let mut text = c.text.clone();
-    if !(s.top && c.enabled) {
+    if !(s.top() && c.enabled) {
         theme::field(ui, r, State { off: !c.enabled, ..State::default() });
         let t = ui.theme;
         ui.text_in(r.inset(ui.u(t.pad * 0.7)), &text, t.text_size, Align::Left, t.text_dim, Weight::Regular);
@@ -174,26 +174,26 @@ pub fn edit(ui: &mut Ui, s: &Screen, c: &Control, r: R) -> FieldEvent {
     }
     let ev = ui.text_field(r, &key(c, "e"), &mut text, 0);
     if ev == FieldEvent::Changed && text != c.text {
-        send_text(c.hwnd, &c.text, &text);
+        send_text(s, c.hwnd, &c.text, &text);
     }
     if ev == FieldEvent::Submit {
         // Enter in our field is the stock edit's Enter, given to its dialog as the modal
         // loop gives it (`IsDialogMessageA`): the default button, `IDOK`, which is how
         // the chat lines send and the small forms are confirmed.
-        actions::push(actions::Action::Enter { h: c.hwnd });
+        s.enter(c.hwnd);
     }
     ev
 }
 
 /// A stock list box (with string items) as our list. A click selects (and a double
 /// click, or Enter, activates) the stock way.
-pub fn list(ui: &mut Ui, s: &Screen, c: &Control, r: R) -> ListEvent {
+pub fn list(ui: &mut Ui, s: &dyn Host, c: &Control, r: R) -> ListEvent {
     let items: Vec<&str> = c.items.iter().map(|x| x.as_str()).collect();
     let mut sel = if c.selected >= 0 { Some(c.selected as usize) } else { None };
     let ev = ui.list_text(r, &key(c, "l"), &items, &mut sel);
-    if s.top && c.enabled && ev != ListEvent::None {
+    if s.top() && c.enabled && ev != ListEvent::None {
         if let Some(i) = sel {
-            actions::push(actions::Action::Select { h: c.hwnd, combo: false, index: i as i32, double: ev == ListEvent::Activated });
+            s.select(c.hwnd, false, i as i32, ev == ListEvent::Activated);
         }
     }
     ev
@@ -202,8 +202,8 @@ pub fn list(ui: &mut Ui, s: &Screen, c: &Control, r: R) -> ListEvent {
 /// A shell `ComboBox` (Game Setup's player rows, Map Select's filter) as our drop-down.
 /// A choice is what the player's two clicks would be: on the stock button, which opens
 /// its pull-down, and on the item in it (`engine::shellcombo::item_point`).
-pub fn combo(ui: &mut Ui, s: &Screen, c: &Control, r: R) -> bool {
-    if !(s.top && c.enabled) || c.items.is_empty() {
+pub fn combo(ui: &mut Ui, s: &dyn Host, c: &Control, r: R) -> bool {
+    if !(s.top() && c.enabled) || c.items.is_empty() {
         theme::field(ui, r, State { off: !c.enabled, ..State::default() });
         let t = ui.theme;
         let pad = ui.u(t.pad * 0.7);
@@ -219,10 +219,10 @@ pub fn combo(ui: &mut Ui, s: &Screen, c: &Control, r: R) -> bool {
 }
 
 /// Chooses item `i` of the shell `ComboBox` `c` with the stock clicks.
-pub fn choose(s: &Screen, c: &Control, i: i32) -> bool {
+pub fn choose(s: &dyn Host, c: &Control, i: i32) -> bool {
     let Some((x, y)) = crate::engine::api::shellcombo::item_point(c.key, i) else { return false };
     // `item_point` is in the dialog's client space; clicks are in design space.
-    let (ox, oy) = (s.model.rect[0], s.model.rect[1]);
+    let (ox, oy) = (s.model().rect[0], s.model().rect[1]);
     s.click_control(c);
     s.click(ox + x, oy + y);
     true
@@ -231,15 +231,15 @@ pub fn choose(s: &Screen, c: &Control, i: i32) -> bool {
 /// A shell toggle. Its label says its state ("Fixed Placement", "Warp Disabled"), and
 /// its on flag does not always mean the setting is on (Warp Enabled is a toggle that
 /// is off), so it is drawn as a button with that label, as `cycle`.
-pub fn check(ui: &mut Ui, s: &Screen, c: &Control, r: R) -> bool {
+pub fn check(ui: &mut Ui, s: &dyn Host, c: &Control, r: R) -> bool {
     button(ui, s, c, r, None)
 }
 
 /// A piece of the stock dialog's picture (a colour swatch, a map preview) drawn in `r`,
 /// passing a click on it to the stock dialog at the same place. True when clicked.
-pub fn picture(ui: &mut Ui, s: &Screen, design: [i32; 4], r: R, live: bool) -> bool {
+pub fn picture(ui: &mut Ui, s: &dyn Host, design: [i32; 4], r: R, live: bool) -> bool {
     s.mirror_part(ui, design, r, 0xffffffff);
-    if !(live && s.top) {
+    if !(live && s.top()) {
         return false;
     }
     let id = ui.id(&crate::sfmt!("pic{},{}", design[0], design[1]));
@@ -294,7 +294,7 @@ pub fn para(ui: &mut Ui, r: R, s: &str, size: f32, c: u32) -> f32 {
 /// IP, the game's name, a password, the GameSpy account screens, waiting for the
 /// network). `title` is the window's title when the dialog has no label to take it
 /// from. False when the dialog has none of these (the generic screen draws it).
-pub fn form(ui: &mut Ui, s: &Screen, title: &str) -> bool {
+pub fn form(ui: &mut Ui, s: &dyn Host, title: &str) -> bool {
     let mut labels = visible(s, |c| is_label(c) && !c.text.trim().is_empty());
     let mut edits = visible(s, is_edit);
     let mut lists = visible(s, |c| is_list(c));
@@ -308,7 +308,7 @@ pub fn form(ui: &mut Ui, s: &Screen, title: &str) -> bool {
     lists.sort_by(by_pos);
     buttons.sort_by(|a, b| (a.rect[0], a.rect[1]).cmp(&(b.rect[0], b.rect[1])));
     // A full-screen dialog gets the backdrop; a small one shows over what is under it.
-    if s.model.rect[2] >= crate::engine::api::dialogs::design_w() {
+    if s.full_screen() {
         backdrop(ui);
     } else {
         ui.draw.rect(ui.screen(), ui.theme.scrim);

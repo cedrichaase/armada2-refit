@@ -74,6 +74,21 @@ fn first(name: &str) -> Option<usize> {
     (lo < n() && name_at(lo) == key).then_some(lo)
 }
 
+/// Whether the game's own art goes before an icon of ours for a game sprite: Armada II, no (the
+/// flat icons are the UI's look, `[HUD] Icons`); Fleet Operations: Roots, yes (the user's wish:
+/// Roots' HUD icons are Roots' own, read from the player's install at run time; PLAN-FLEETOPS.md,
+/// decision 340). An icon of ours is then drawn only for a sprite with no art.
+pub fn game_art_first() -> bool {
+    crate::files::game().game_icons
+}
+
+/// Whether to draw the icon of ours for the game sprite `sp` (named `name`): `[HUD] Icons` on, and
+/// on a game whose art goes first, only where the sprite has no art of its own. The callers draw
+/// the art when this is false (`sprite::art`), and the name when there is neither.
+pub fn ours_for_sprite(icons_on: bool, sp: usize, has_art: impl FnOnce(usize) -> bool) -> bool {
+    icons_on && sp != 0 && !(game_art_first() && has_art(sp))
+}
+
 pub fn has(name: &str) -> bool {
     !name.is_empty() && first(name).is_some()
 }
@@ -138,4 +153,40 @@ pub fn theme_colour(theme: &crate::widgets::Theme, ink: Color) -> impl Fn(Role) 
         let c = if dark { crate::gfx::mix(c, ink | 0xff000000, 0.45) } else { c };
         (c & 0x00ffffff) | (ink & 0xff000000)
     }
+}
+
+/// Whether the sprite `sp` is drawn as a tile of its own, filling the button with no plate of
+/// ours behind it (FO-6, decision 344): on a game whose own art goes first, a sprite whose art
+/// carries its own tile (`sprite::own_tile`, measured on the art). A plate behind such art reads
+/// as a tile inside a tile.
+pub fn whole_tile(sp: usize) -> bool {
+    use crate::engine::api::sprite;
+    game_art_first() && sp != 0 && sprite::art(sp).is_some() && sprite::own_tile(sp)
+}
+
+/// Draws the sprite `sp` filling `r` as the button itself (`whole_tile`), with the button's state
+/// over it in the theme's colours: the hover light and an accent edge, the active edge, a dimmer
+/// tile while pressed or disabled. The plate, frame and text of `theme::button_frame` are not
+/// drawn. Returns the content colour a badge or label on it takes.
+pub fn tile_button(ui: &mut crate::widgets::Ui, r: R, sp: usize, st: crate::widgets::theme::State) -> Color {
+    use crate::engine::api::sprite;
+    use crate::gfx::{mix, Corners};
+    let t = ui.theme;
+    let Some((tex, uv)) = sprite::art(sp) else { return t.text };
+    let tint = if st.off { 0xff7a7a7a } else if st.down { 0xffc8c8c8 } else { mix(0xffe6e6e6, 0xffffffff, st.hot) };
+    ui.draw.image_uv(tex, r, uv, tint);
+    // The art's own tile is rounded about a seventh of its side.
+    let c = Corners::round(r.w.min(r.h) * 0.14);
+    let e = ui.u(1.5).max(1.0);
+    if !st.off && st.hot > 0.01 {
+        ui.draw.fill(r, c, fade(0xffffffff, 0.10 * st.hot));
+        ui.draw.stroke(r, c, e, fade(t.accent, 0.85 * st.hot));
+    }
+    if st.on && !st.down {
+        ui.draw.stroke(r.inset(-e), c.grown(e), e * 1.5, t.accent);
+    }
+    if st.down {
+        ui.draw.fill(r, c, fade(0xff000000, 0.18));
+    }
+    if st.off { t.text_off } else { 0xffffffff }
 }

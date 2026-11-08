@@ -27,6 +27,10 @@ pub struct Content {
     pub cocoon_sod: &'static str,
     /// `[Shields] RayFactions=` when the ini names none.
     pub ray_factions: &'static str,
+    /// `[Races]`: a race (an ODF's `race`, lower case) to the key of its faction. A set
+    /// with races keys a ship's faction by its race (Fleet Operations), one without by
+    /// its ODF name's initial (stock); a race it does not name is the last faction.
+    pub races: &'static [(&'static str, &'static str)],
 }
 
 /// A set's `effects.ini`.
@@ -51,11 +55,12 @@ pub fn parse(text: &'static str) -> Content {
         factions: factions.leak(),
         cocoon_sod: t.str("Effects", "CocoonSod"),
         ray_factions: t.str("Effects", "RayFactions"),
+        races: t.entries("Races").to_vec().leak(),
     }
 }
 
 /// A build with no content set for this module.
-pub static NONE: Content = Content { site_names: &[], factions: &[], cocoon_sod: "", ray_factions: "" };
+pub static NONE: Content = Content { site_names: &[], factions: &[], cocoon_sod: "", ray_factions: "", races: &[] };
 
 static CACHE: r3d_core::content::Cache<Content> = r3d_core::content::Cache::new();
 
@@ -76,5 +81,18 @@ impl Content {
         let c = odf.bytes().next().map(|c| c.to_ascii_lowercase());
         let last = self.factions.len().checked_sub(1)?;
         Some(c.and_then(|c| self.factions.iter().position(|f| f.initial != 0 && f.initial == c)).unwrap_or(last))
+    }
+
+    /// Whether factions go by race (the set has `[Races]`).
+    pub fn by_race(&self) -> bool {
+        !self.races.is_empty()
+    }
+
+    /// The faction of a race (lower case): the one `[Races]` names for it, else the last
+    /// (the "other" entry); None when the set has no factions.
+    pub fn faction_of_race(&self, race: &str) -> Option<usize> {
+        let last = self.factions.len().checked_sub(1)?;
+        let key = self.races.iter().find(|(r, _)| r.eq_ignore_ascii_case(race)).map(|(_, k)| *k);
+        Some(key.and_then(|k| self.factions.iter().position(|f| f.key.eq_ignore_ascii_case(k))).unwrap_or(last))
     }
 }

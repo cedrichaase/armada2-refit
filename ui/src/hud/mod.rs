@@ -4,7 +4,12 @@
 //! (`engine::hud`) stops it drawing and taking the mouse. Ours reads that state and
 //! acts through the component's own functions.
 pub mod bar;
+mod bargrid;
+mod barskin;
+mod hover;
 pub mod info;
+pub mod info_fo;
+pub mod row;
 pub mod layout;
 pub mod leftovers;
 pub mod minimap;
@@ -35,10 +40,18 @@ static mut MINIMAP: bool = false;
 static mut SELECTION: bool = false;
 static mut UNIT_VIEW: bool = false;
 static mut TOOLTIPS: bool = false;
+static mut HOVER: (bool, bool) = (false, false);
 /// What the start found possible, for the panels `apply_live` switches while playing:
 /// the minimap's click hook is in, the info panel's engine functions are stock.
 static mut MINIMAP_CAP: bool = false;
 static mut INFO_CAP: bool = false;
+/// The info panel is FleetOpsHook's (Roots): ours draws it in Roots' layout (`info_fo`).
+static mut INFO_FO: bool = false;
+
+/// Whether the info panel of ours is Roots' layout over its panel's unseen Render.
+pub fn info_fo_on() -> bool {
+    unsafe { INFO && INFO_FO }
+}
 
 /// Whether the selection overlay is ours (`[HUD] Selection=1`, its functions stock).
 pub fn selection_ours() -> bool {
@@ -57,12 +70,12 @@ pub fn install() -> bool {
         unsafe { STOOD_DOWN = 1 };
         return false;
     }
-    if !cfg.bar && !cfg.info && !cfg.minimap && !cfg.selection && !cfg.unit_view && !cfg.tooltips && !panels::any(cfg) && !comm::any(cfg) {
+    if !cfg.bar && !cfg.info && !cfg.minimap && !cfg.selection && !cfg.unit_view && !cfg.tooltips && !cfg.hover && !panels::any(cfg) && !comm::any(cfg) {
         crate::log!("hud: no panel switched on, the HUD is stock");
         unsafe { STOOD_DOWN = 2 };
         return false;
     }
-    if !hud::functions_stock() || !api::sound::functions_stock() || !api::msvc::available() {
+    if !hud::functions_stock() || !api::msvc::available() {
         crate::log!("hud: an engine function is not stock, the HUD stays stock");
         unsafe { STOOD_DOWN = 3 };
         return false;
@@ -76,12 +89,24 @@ pub fn install() -> bool {
         if bar::install() {
             hud::set_taken(hud::palette_ptr(), true, true);
             unsafe { BAR = true };
-            crate::log!("bar: ours, its keys are QOL's");
+            if api::palette::slots_indirect() {
+                hud::set_bar_skin(true);
+                if bargrid::install() {
+                    crate::log!("bar: ours as the grid, the stock buttons moved onto its cells (the stock bar keeps the pointer)");
+                } else {
+                    crate::log!("bar: ours as a skin over the stock buttons (the stock bar keeps the pointer)");
+                }
+            } else {
+                crate::log!("bar: ours, its keys are QOL's");
+            }
         } else {
             crate::log!("bar: stays stock");
         }
     }
-    unsafe { INFO_CAP = api::info::functions_stock() };
+    unsafe {
+        INFO_CAP = api::info::functions_stock();
+        INFO_FO = INFO_CAP && api::info_fo::available();
+    }
     panels::install(cfg);
     comm::install(cfg);
     apply_live(cfg);
@@ -105,9 +130,16 @@ pub fn apply_live(cfg: &crate::config::Hud) {
         MINIMAP_LOGGED = true;
         let want = cfg.info && INFO_CAP;
         if want != INFO {
-            hud::set_taken(hud::ship_display(), false, want);
-            INFO = want;
-            crate::log!("info: {}", if want { "ours" } else { "stock" });
+            if INFO_FO {
+                // Roots: the panel's Render runs unseen under ours (info_fo), never taken.
+                let ok = info_fo::set(want);
+                INFO = want && ok;
+                crate::log!("info: {}", if INFO { "ours, in Roots' layout over its panel's unseen Render" } else { "Roots' own" });
+            } else {
+                hud::set_taken(hud::INFO_PANEL_TAKEN, false, want);
+                INFO = want;
+                crate::log!("info: {}", if want { "ours" } else { "stock" });
+            }
         } else if cfg.info && !INFO_CAP && !INFO_LOGGED {
             crate::log!("info: an engine function is not stock, the info panel stays stock");
         }
@@ -116,6 +148,15 @@ pub fn apply_live(cfg: &crate::config::Hud) {
             hud::take_tooltips(cfg.tooltips);
             TOOLTIPS = cfg.tooltips;
             crate::log!("tooltips: {}", if cfg.tooltips { "ours" } else { "stock" });
+        }
+        // The status line about the craft under the pointer; with `LayoutLog=1` the
+        // engine's is logged while the key is off (the bench's reference).
+        if (cfg.hover, cfg.layout_log) != HOVER {
+            let installed = api::hover::set(cfg.hover, cfg.layout_log);
+            if cfg.hover != HOVER.0 {
+                crate::log!("hover: {}", if cfg.hover && installed { "ours" } else { "stock" });
+            }
+            HOVER = (cfg.hover, cfg.layout_log);
         }
     }
 }
@@ -246,6 +287,18 @@ fn apply_bar_pref() {
     }
 }
 
+static mut UNDER_BOX: bool = false;
+
+/// Logs once each time the HUD of ours stands aside for the engine's box and comes back.
+fn note_under_box(up: bool) {
+    unsafe {
+        if up != UNDER_BOX {
+            UNDER_BOX = up;
+            crate::log!("hud: {}", if up { "under the engine's box (objectives or message): the panels of ours stand aside" } else { "the engine's box closed: the panels of ours are back" });
+        }
+    }
+}
+
 /// A mission's frame: every panel of ours.
 pub fn run(ui: &mut Ui) {
     if !hud::installed() {
@@ -267,6 +320,21 @@ pub fn run(ui: &mut Ui) {
             ui.occlude(screen);
         }
         layout::begin();
+        // The engine's briefing or message box is up (not ours): stock's HUD sits under
+        // it and the box owns the mouse, so nothing of ours but the boxes and the
+        // multiplayer boxes draws or takes input (HUD.md, "Under the engine's boxes").
+        let aside = panels::stock_box_up();
+        api::hover::stand_aside(aside);
+        if aside {
+            api::hover::take();
+            note_under_box(true);
+            panels::run(ui);
+            layout::at("comm");
+            comm::run(ui);
+            layout::end(ui.w, ui.h);
+            return;
+        }
+        note_under_box(false);
         if SELECTION {
             let keep = if MINIMAP { let (o, _, _) = minimap::place(ui); alloc::vec![o] } else { alloc::vec::Vec::new() };
             overlay::run(ui, &keep);
@@ -279,10 +347,18 @@ pub fn run(ui: &mut Ui) {
             layout::at("minimap");
             minimap::run(ui);
         }
-        // The info panel first: the bar is placed against it.
-        if INFO {
+        // The info panel first: the bar is placed against it. On Roots the bottom row is planned
+        // first (`row`): where the info panel and the bar go this frame.
+        if INFO && INFO_FO {
+            row::plan(ui, BAR && bar::shows());
             layout::at("info");
-            info::run(ui);
+            info_fo::run(ui);
+        } else {
+            row::clear();
+            if INFO {
+                layout::at("info");
+                info::run(ui);
+            }
         }
         if BAR {
             layout::at("bar");
@@ -292,6 +368,9 @@ pub fn run(ui: &mut Ui) {
         layout::at("comm");
         comm::run(ui);
         layout::end(ui.w, ui.h);
+        if api::hover::ours() {
+            hover::run(ui);
+        }
         if TOOLTIPS {
             tooltips::run(ui);
         }

@@ -10,6 +10,9 @@ out = "render3d/mods/hulls/src/syms.rs"
 doc = "What the hulls module reads of the engine: its objects, lists, globals and calls"
 rows = ["Modules.hulls"]
 
+[hook."hulls.instance_draw"]
+doc = "The call of ST3D_Instance::RenderInternal in GameObjectInstance::RenderInternal: where Roots' hulls are claimed"
+rows = ["Modules.hulls"]
 
 [[sym]]
 id = "fn_scrap_render"
@@ -71,6 +74,15 @@ id = "vt_planet"
 symbol = "Planet"
 kind = "vtable"
 addr = 0x6b2b3c
+used_by = ["hulls.reads"]
+
+# A latinum nebula (Roots' asteroid sets) is drawn by the plain GameObject::Render, so it
+# looks like a hull to the claim; it is the particles module's, else the engine's.
+[[sym]]
+id = "vt_latinum"
+symbol = "LatinumNebula"
+kind = "vtable"
+addr = 0x6b132c
 used_by = ["hulls.reads"]
 
 [[sym]]
@@ -655,3 +667,80 @@ struct = "GameObjectClass vftable"
 offset = 0x1c
 type = "ptr"
 used_by = ["hulls.reads"]
+
+[[sym]]
+id = "fn_instance_ri"
+symbol = "ST3D_Instance::RenderInternal"
+kind = "fn"
+addr = 0x62e780
+check = "55 8b ec 51 53 56 8b f1 33 db 8b 0d 08 d5 7a 00"
+used_by = ["hulls.instance_draw"]
+
+[[sym]]
+id = "site_hull_draw"
+symbol = "GameObjectInstance::RenderInternal"
+kind = "call"
+addr = 0x4d5a11
+target = "fn_instance_ri"
+in = "GameObjectInstance::RenderInternal"
+used_by = ["hulls.instance_draw"]
+
+# Where the hulls module takes a hull: 0 at the object (in GameObject::Render's place, the
+# object step's registry::object), 1 at the instance's database draw (site_hull_draw, inside
+# the engine's own Render), for a build whose object loop is another module's (Roots:
+# FleetOpsHook draws each object, PLAN-FLEETOPS.md, "The rules of (c)", rule 3). Stock
+# claims at the object and installs nothing at site_hull_draw.
+[[sym]]
+id = "hl_claim_instance"
+symbol = "hull claim point"
+kind = "value"
+value = 0
+used_by = ["hulls.instance_draw"]
+
+# What the instance claim reads of the database just before the engine would draw it
+# (FO-5 step 5): the nodes' render flags and the meshes' textures, as stock's
+# GameObjectInstance::RenderInternal and Roots' CraftInstance::RenderInternal wrote them for
+# this instance (render3d/README.md, "Hulls", "The claim at the instance draw").
+[[sym]]
+id = "fn_find_element"
+symbol = "ST3D_Database::FindElement"
+kind = "fn"
+addr = 0x620750
+check = "55 8b ec 8b 45 08"
+used_by = ["hulls.instance_draw"]
+
+# FindElement's element list of the database's nodes (meshes and plain nodes).
+[[sym]]
+id = "hl_node_list"
+symbol = "ST3D_Database node element list"
+kind = "value"
+value = 4
+used_by = ["hulls.instance_draw"]
+
+# Bits 0 and 1: the node (and what hangs from it) is not drawn.
+[[sym]]
+id = "hl_node_render_flags"
+symbol = "ST3D_Node::render flags"
+kind = "field"
+struct = "ST3D_Node"
+offset = 0xbc
+type = "u32"
+used_by = ["hulls.instance_draw"]
+
+[[sym]]
+id = "hl_mesh_textures"
+symbol = "ST3D_Mesh::textures"
+kind = "field"
+struct = "ST3D_Mesh"
+offset = 0x114
+type = "ptr"
+used_by = ["hulls.instance_draw"]
+
+[[sym]]
+id = "hl_mesh_texture_count"
+symbol = "ST3D_Mesh::texture count"
+kind = "field"
+struct = "ST3D_Mesh"
+offset = 0x11c
+type = "i32"
+used_by = ["hulls.instance_draw"]

@@ -5,7 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use a2fmt::vfs::{Entry, Fpq, Io, Kind, Layered, Loose, Status, Vfs, Zfs, components};
+use a2fmt::vfs::{Entry, Io, Kind, Layered, Loose, Status, Vfs, Zfs, components};
 
 /// `std::fs`, case-sensitive (Linux), as the host has it.
 #[derive(Clone, Copy)]
@@ -164,27 +164,58 @@ fn a_mount_shadows_the_root() {
 }
 
 #[test]
-fn archives_are_declared_and_serve_nothing() {
+fn zfs_is_declared_and_serves_nothing() {
     let t = Tmp::new();
     t.put("game/odf/loose.odf", "loose");
     let mut v = Layered::new();
     // Mounted first, an archive still searches after the loose folders.
-    v.mount("odf", Box::new(Fpq::new("ODF.fpq")));
     v.mount("", Box::new(Zfs::new("data.zfs")));
     v.mount("odf", Box::new(Loose::new(StdIo, &t.path("game/odf"))));
     assert_eq!(text(&v, "odf/loose.odf").as_deref(), Some("loose"));
     assert!(v.open("odf/packed.odf").is_none());
     let m = v.mounts();
-    assert_eq!(m.len(), 3);
+    assert_eq!(m.len(), 2);
     assert_eq!(m[0].2, Status::Ready);
     assert!(m[0].1.starts_with("loose "));
-    assert_eq!(m[1].1, "fpq ODF.fpq");
-    assert_eq!(m[2].1, "zfs data.zfs");
-    for (_, _, s) in &m[1..] {
-        match s {
-            Status::Unsupported(why) => assert!(why.contains("no reader")),
-            Status::Ready => panic!("an archive kind reads nothing yet"),
-        }
+    assert_eq!(m[1].1, "zfs data.zfs");
+    match &m[1].2 {
+        Status::Unsupported(why) => assert!(why.contains("no reader")),
+        Status::Ready => panic!("Zfs reads nothing yet"),
     }
     assert!(Kind::Loose < Kind::Fpq && Kind::Fpq < Kind::Zfs);
+}
+
+#[test]
+fn levels_put_a_mod_over_the_game() {
+    // Fleet Operations' order: the active mod (level 2) over its parent (1) over the
+    // game's own folder (0), whatever the kind; loose over packed within a level.
+    let t = Tmp::new();
+    t.put("game/odf/a.odf", "game-a");
+    t.put("game/odf/ships/b.odf", "game-b");
+    t.put("game/Mods/P/odf/a.odf", "parent-a");
+    t.put("game/Mods/C/odf/weapons/a.odf", "child-a-elsewhere");
+    t.put("game/Mods/C/odf/c.odf", "child-c");
+    let mut v = Layered::new();
+    v.mount_level("odf", 0, Box::new(Loose::new(StdIo, &t.path("game/odf"))));
+    v.mount_level("odf", 2, Box::new(Loose::new(StdIo, &t.path("game/Mods/C/odf"))));
+    v.mount_level("odf", 1, Box::new(Loose::new(StdIo, &t.path("game/Mods/P/odf"))));
+    v.mount("odf", Box::new(Zfs::new("x.zfs")));
+    assert_eq!(text(&v, "odf/a.odf").as_deref(), Some("parent-a"));
+    assert_eq!(text(&v, "odf/c.odf").as_deref(), Some("child-c"));
+    assert_eq!(text(&v, "odf/ships/b.odf").as_deref(), Some("game-b"));
+    // The versions of a.odf, top first, and nothing past the last.
+    assert_eq!(v.open_nth("odf/a.odf", 0).as_deref(), Some(&b"parent-a"[..]));
+    assert_eq!(v.open_nth("odf/a.odf", 1).as_deref(), Some(&b"game-a"[..]));
+    assert!(v.open_nth("odf/a.odf", 2).is_none());
+    // The sources in search order, for a caller that indexes each apart: the child's
+    // a.odf in weapons/ is its top version by name.
+    let src = v.sources("odf");
+    let labels: Vec<String> = src.iter().map(|(s, _)| s.label()).collect();
+    assert_eq!(labels.len(), 4);
+    assert!(labels[0].ends_with("Mods/C/odf") && labels[1].ends_with("Mods/P/odf") && labels[2].ends_with("game/odf"));
+    assert!(labels[3].starts_with("zfs"));
+    assert_eq!(src[0].1, "");
+    assert_eq!(src[0].0.open("weapons/a.odf").as_deref(), Some(&b"child-a-elsewhere"[..]));
+    // The mounts are listed in that order too.
+    assert!(v.mounts()[0].1.ends_with("Mods/C/odf"));
 }

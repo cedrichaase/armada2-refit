@@ -40,4 +40,7 @@ if python3 "$here/moved.py"; then ok "moved.py"; else bad "moved.py"; fi
 # 6. the negative tests (the game-exe ones are skipped without a game)
 if bash "$here/negative.sh" >"$tmp/neg.log" 2>&1; then ok "negative.sh"; else bad "negative.sh"; cat "$tmp/neg.log"; fi
 
+# 7. fo-scan.py on synthetic images (no game file is read)
+if python3 "$here/fo_scan_test.py" >"$tmp/fo.log" 2>&1; then ok "fo_scan_test.py"; else bad "fo_scan_test.py"; cat "$tmp/fo.log"; fi
+
 [ "$fail" = 0 ] && echo "engine selftest: ok" || { echo "engine selftest: FAILED" >&2; exit 1; }

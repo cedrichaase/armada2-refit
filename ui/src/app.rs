@@ -43,6 +43,10 @@ pub fn run(ctx: Context, ui: &mut Ui) {
     if on {
         demo(ctx, ui);
     }
+    if ctx == Context::Mission {
+        // The Refit screen opened by its key over the mission: a modal, so drawn last.
+        crate::menus::refit::mission_frame(ui);
+    }
 }
 
 /// A panel showing what the runtime draws: text in both weights, every widget, the

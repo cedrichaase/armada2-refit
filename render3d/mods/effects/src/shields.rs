@@ -298,6 +298,7 @@ pub struct Shields {
     logged_hits: u32,
     logged_downs: u32,
     said_first: bool,
+    said_list: bool,
     /// The special weapons' recipes (`[Shell.<name>]`), read in `configure` by the
     /// shell type's index in the engine's table.
     recipes: Vec<Option<Recipe>>,
@@ -335,6 +336,7 @@ impl Shields {
             logged_hits: 0,
             logged_downs: 0,
             said_first: false,
+            said_list: false,
             recipes: Vec::new(),
         }
     }
@@ -414,10 +416,18 @@ impl Shields {
         if self.shells.is_empty() || self.shells_db != Self::db(2) {
             self.read_shells();
         }
-        if model == Self::db(0) {
+        // A build whose companion picks the models per ship class (Roots) has them noted
+        // by type; stock's are the shield database's.
+        let noted = hk::model_type(model);
+        if model == Self::db(0) || noted == Some(0) {
             return Some(0);
         }
-        (2..8).find(|&k| self.shells[k].on && self.shells[k].model == model)
+        (2..8).find(|&k| self.shells[k].on && (self.shells[k].model == model || noted == Some(k)))
+    }
+
+    /// Whether a hit's model is the shields-down ring's (type 1).
+    fn is_down(model: usize) -> bool {
+        model != 0 && (model == Self::db(1) || hk::model_type(model) == Some(1))
     }
 
     fn ours(&mut self, hit: usize) -> bool {
@@ -425,7 +435,7 @@ impl Shields {
         if self.hit_type(model).is_some() {
             return true;
         }
-        self.s.down && self.down_ok && model != 0 && model == Self::db(1)
+        self.s.down && self.down_ok && Self::is_down(model)
     }
 
     /// `ShieldEffect::Render` in the engine's place.
@@ -443,7 +453,6 @@ impl Shields {
 
     /// The engine's live hits into ours: new ones born now, gone ones dying now.
     fn gather(&mut self, now: f64) {
-        let model1 = Self::db(1);
         let s_fade = self.s.fade_out;
         let mut keep = (s_fade.max(self.s.ring_time)) as f64;
         keep = keep.max(self.s.glow_time as f64 * 3.0).max(self.s.duration as f64 * 3.0);
@@ -455,6 +464,16 @@ impl Shields {
         }
         let mut list = Vec::new();
         hk::walk(|id, sh| list.push((id, sh)));
+        if !self.said_list {
+            if let Some(&(_, sh)) = list.iter().find(|(_, sh)| *sh != 0) {
+                self.said_list = true;
+                log!(
+                    "effects: shields: first live hit in the engine's list: {} hit(s), model {:#x} (ordinary {:#x}, shields down {:#x}; noted as type {})",
+                    list.len(), hk::hit_model(sh), Self::db(0), Self::db(1),
+                    hk::model_type(hk::hit_model(sh)).map_or(-1, |t| t as i32)
+                );
+            }
+        }
         for (id, sh) in list {
             if sh == 0 {
                 continue;
@@ -465,7 +484,7 @@ impl Shields {
                 continue;
             }
             let model = hk::hit_model(sh);
-            if model1 != 0 && model == model1 {
+            if Self::is_down(model) {
                 let idx = self.downs.iter().position(|d| d.handle == handle);
                 let idx = match idx {
                     Some(i) => Some(i),
@@ -653,7 +672,7 @@ impl Shields {
             if o == 0 || !obj::can_user_see(o) {
                 continue;
             }
-            let Some((a, t, r)) = ship_xform(o) else { continue };
+            let Some((a, t, r)) = shell_xform(o) else { continue };
             let (col, bright) = self.look(o, h.ty, now);
             let mut br = hk::object_radius(o);
             if !(br > 0.01) {
@@ -694,7 +713,7 @@ impl Shields {
             if o == 0 || !obj::can_user_see(o) {
                 continue;
             }
-            let Some((a, t, r)) = ship_xform(o) else { continue };
+            let Some((a, t, r)) = shell_xform(o) else { continue };
             let mut best = 0.0;
             let mut kb = None;
             for k in 0..self.s.down_strikes {
@@ -810,12 +829,17 @@ impl Shields {
         // A set with no factions gives the faction mode nothing to key by: stock's colour.
         let by_faction = if s.colour_mode == ColMode::Faction { fac_of(o).and_then(|i| s.fac.get(i)) } else { None };
         let stock_col = s.colour_mode == ColMode::Stock || (s.colour_mode == ColMode::Faction && by_faction.is_none());
+        // A build whose RTS_CFG.h turns the damage colour off (Roots'
+        // SHIELD_EFFECT_DAMAGE_COLORED = 0) draws stock's hits white, and no colour of ours
+        // follows the shields' level either.
+        let coloured = hk::rts_keys().1;
         let mut col = match s.colour_mode {
+            _ if stock_col && !coloured => v3(1.0, 1.0, 1.0),
             _ if stock_col => v3(1.0 - lvl, lvl, 0.0),
             ColMode::Fixed => s.fixed,
             _ => *by_faction.unwrap_or(&V3::ZERO),
         };
-        if !stock_col {
+        if !stock_col && coloured {
             col = col + (s.low - col) * (s.low_shift * (1.0 - lvl));
         }
         let mut bright = s.brightness * (s.weak_level + (1.0 - s.weak_level) * lvl);
@@ -846,7 +870,7 @@ impl Shields {
     #[allow(clippy::too_many_arguments)]
     fn draw_ship(&self, cmd: &mut Cmd, c: &Cam, o: usize, pick: &[(usize, f32)], now: f64, ty: usize, whole: bool) {
         let s = &self.s;
-        let Some((a, t, r)) = ship_xform(o) else { return };
+        let Some((a, t, r)) = shell_xform(o) else { return };
         ship_vsconst(cmd, &a, t);
         let (col, bright) = self.look(o, ty, now);
         let lvl = Self::level(o, ty);
@@ -888,7 +912,7 @@ impl Shields {
 
     fn draw_down(&self, cmd: &mut Cmd, c: &Cam, o: usize, d: &mut Down, now: f64) {
         let s = &self.s;
-        let Some((a, t, r)) = ship_xform(o) else { return };
+        let Some((a, t, r)) = shell_xform(o) else { return };
         ship_vsconst(cmd, &a, t);
         let mut pc = [[0.0f32; 4]; 22];
         pc[0] = [c.eye.x, c.eye.y, c.eye.z, 1.0 / r];
@@ -1013,6 +1037,18 @@ pub fn ship_xform(o: usize) -> Option<([V3; 3], V3, f32)> {
     if r > 0.01 { Some((a, t, r)) } else { None }
 }
 
+/// The shell the shields draw: `ship_xform`, scaled about its centre by the factor this
+/// build's `RTS_CFG.h` gives (Roots' `SHIELD_EFFECT_RESCALE`, as its `DrawShield` scales
+/// the engine's shell; 1 on stock).
+fn shell_xform(o: usize) -> Option<([V3; 3], V3, f32)> {
+    let (a, t, r) = ship_xform(o)?;
+    let k = hk::rts_keys().0;
+    if k == 1.0 {
+        return Some((a, t, r));
+    }
+    Some(([a[0] * k, a[1] * k, a[2] * k], t, r * k))
+}
+
 /// The vertex shader's constants for one ellipsoid (c4..c9): the columns of the unit
 /// sphere -> world map, and the rows of its normal matrix.
 fn ship_vsconst(cmd: &mut Cmd, a: &[V3; 3], t: V3) {
@@ -1029,9 +1065,15 @@ fn ship_vsconst(cmd: &mut Cmd, a: &[V3; 3], t: V3) {
     cmd.vs_block(Block::new(4, vc.as_flattened()));
 }
 
-/// The faction of a ship, by its ODF name, in the content set's list.
+/// The faction of a ship in the content set's list: by its ODF's race where the set
+/// keys factions by race (Fleet Operations), else by its ODF name's initial.
 fn fac_of(o: usize) -> Option<usize> {
-    content::get().faction_of(&obj::odf_name(o))
+    let c = content::get();
+    let name = obj::odf_name(o);
+    if c.by_race() {
+        return c.faction_of_race(&r3d_core::assets::race(&name));
+    }
+    c.faction_of(&name)
 }
 
 /// The unit sphere, a triangle list: 18 rings by 36 meridians.

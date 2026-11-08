@@ -1,0 +1,28 @@
+# Fleet Operations: Roots 5.0Z11: FleetOpsHook.dll takes over these functions at their entry as it
+# loads (a jump to its own replacement, or a trampoline: push and ret, after which
+# the stock body runs from its callback). Our hooks only call them, and what Roots
+# puts there is what Roots means, so this build checks nothing at their entry
+# (PLAN-FLEETOPS.md, "FleetOpsHook.dll at run time"). Written by tools/engine/fo-scan.py.
+schema = 1
+plugin = "ui"
+
+# ST3D_Texture::DemandLoad
+[[sym]]
+id = "lo_demand_load"
+check = ""
+
+# cPrjID::GetName
+[[sym]]
+id = "palette_prj_get_name"
+check = ""
+
+# Written by hand, kept when fo-scan writes the file again. The button bar's array: FleetOpsHook turns the inline array at the field into a pointer
+# to a larger one of its own and the count in the bar's loops goes from 21 to 64
+# (PLAN-FLEETOPS.md, FO-6: "The hooks, by UI part", hud.reads_bar; decision 65).
+[[sym]]
+id = "palette_n_slots"
+value = 64
+
+[[sym]]
+id = "palette_slots_indirect"
+value = 1

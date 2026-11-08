@@ -29,12 +29,12 @@ def _load():
     return pe, profiles, resolve
 
 
-def report(exe_path, build=None, plugin=None, profile_dirs=None, test_ini=None):
+def report(exe_path, build=None, plugin=None, profile_dirs=None, test_ini=None, modules=None):
     """The check as data: exe, build, one entry per profile file (log, hooks, counts)."""
     pe, profiles, resolve = _load()
     with open(exe_path, 'rb') as f:
         data = f.read()
-    exe = pe.Exe(data, name=os.path.basename(exe_path))
+    exe = pe.Exe(data, name=os.path.basename(exe_path), path=str(exe_path), modules=modules)
     sha = hashlib.sha256(data).hexdigest()
     games = profiles.load_game_sets(profile_dirs)
     tables = []

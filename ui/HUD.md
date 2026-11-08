@@ -81,7 +81,7 @@ mission frame draws them itself after `RenderAll` (`ChatDisplay::Render`,
 | `ReplayPanel` (`g_replayPanel`) | replay controls: restart, pause, slow, normal, fast | the replay | its buttons | `StandardButton`s | done: `engine::popups`, `hud/replay.rs` (not seen: no replay on the bench) |
 | `OverlayText` (`overlayText`) | timed messages in the middle of the screen (`AddMessage`) | script and game events | none | the HUD font | done: `engine::overlay_text`, `hud/overlay_text.rs` |
 | `LoadPercentageBox` (`loadPercentageBox`) | multiplayer load progress of the other players | the transport | none | box and text | done: `engine::comm`, `hud/comm.rs` (after the load; the loading screen covers the load itself) |
-| `EditMenu` (`g_editMenu`) | the map editor's menu; hidden in a game | — | — | — | not taken |
+| `EditMenu` (`g_editMenu`) | the map editor's menu; hidden in a game | — | — | — | not taken; on Roots the menu is FleetOpsHook's, in the top-right corner, and in the editor our top-right buttons stand beside the resource strip instead (PLAN-FLEETOPS.md, decision 504) |
 | `cOverViewImp` (`g_pOverView`) — the 3D view itself | selection boxes, the order cursor | the selection, the pointer's target | everything not on a panel: the owner of last resort | — | not a panel: stays the engine's |
 | `CursorInterface` (`iCursor`) | the cursor shape and the tooltips (`DoTooltip`, `mDrawTooltip`) | the owner's cursor and `Tooltip` | owns the decision of who owns the mouse | the device's cursor; tooltip boxes in the HUD font | the cursor is ours (README.md, "The cursor"); tooltips are ours per panel, and the engine's at the pointer are drawn by us (`Tooltips`: "The tooltips at the pointer") |
 | `ScreenFade` (`g_screenFade`) | fades to and from black | scripts | none | a full-screen quad | not taken (not in a game's list) |
@@ -147,6 +147,41 @@ a video; the unit view's frame follows.
 
 **Taking a panel.** `engine::hud::set_taken(at, by_pointer, on)`: a component by its
 address, or (the bar) by the global that points to it, read when asked.
+
+**The info panel is found by name, not by `shipDisplay`.** On Roots, FleetOpsHook
+constructs a `ShipDisplay` of its own (larger, in place of the static instance), so the
+static global is not the panel there (PLAN-FLEETOPS.md, FO-6, decision 64). On every
+build `engine::hud::ship_display()` looks through the render lists of all views for the
+component whose `GetName` is "ShipDisplay" (on stock the very instance the global is, in
+the normal view's list; the cinematic view's list lacks it, as before), keeps it while a
+list still holds it, and the panel switch takes it by name (`INFO_PANEL_TAKEN`), learning
+it from the components the walks of `RenderAll` and `RefreshOwner` call. Outside a mission
+no list holds it, and the answer is 0. Whether Roots' panel answers to the same name is
+for the bench to say (step 3).
+
+**The bar's buttons** are `palette_n_slots` of them (21 inline at `+0x28` on stock; on
+Roots 64 behind a pointer held there, `palette_slots_indirect`), both values of the
+build's profile (`engine::palette::slot`).
+
+**On Fleet Operations: Roots, which panels the UI takes** (PLAN-FLEETOPS.md, FO-6 step 4,
+decisions 120 to 127). `RenderAll` is trampolined at its entry and the stock body, with the
+Render call `hud.panels` re-points, runs behind it, so the panel switch works as on stock; the
+resources, the top-right buttons (Roots' panel holds the stock buttons: the menu sits behind
+the "more" toggle, help and palette are unplaced), the pause box, the chat, the selection
+overlay, the frame-rate panel and the order ring, height posts and footprint are ours there.
+Roots' string table answers `GUI_POP_PAUSE_TEXT` and `GUI_POP_PAUSE_CONTINUE` with an empty
+string and its resource tooltips with a token, so the pause box has words of its own and a
+resource's name comes from the content set when the tooltip is not a word. **Button sounds
+are off** (`panels_sound_ours` = 0): every `operator new` and constructor call at the stock
+sound sites is FleetOpsHook's FMOD, of a size not measured, and the HUD part does not
+require the sound hook. **The message box and the briefing and objectives are ours on Roots
+too** (`Messages=1` in Roots' defaults since PLAN-FLEETOPS.md decision 322): Roots lays the
+engine's box out on its 16:9 canvas, so on a wider screen it was stretched, and ours is laid
+out in the UI's units. The tutorial's script raises the briefing by itself
+(`fo-ui-briefing-ours`). On Roots the objectives key (`objectives_toggle`, Alt+O) also closes
+the box, so `popups::objectives_keys` leaves the pass on which the box opened alone, as stock's
+owner choice does ("Messages and objectives"). The replay, overlay-text and fade panels stay
+Roots' until a scenario can raise them.
 
 ## The references the stock HUD is drawn against
 
@@ -365,6 +400,79 @@ info panel.
 **Log.** Each layout once per change ("bar: menu=2 mode=1 | Q=bbase ... T=cancel
 G=back", `(off)` for a disabled button), each click ("bar: click build"); QOL.log names each key ("bar: key S").
 
+**On Roots (measured only; nothing of the bar is drawn there).** On a build whose profile
+has `palette_slots_indirect`, `engine::palette::log_measure` logs the bar once per change
+from the engine's own objects (`bar: measure`, `bar:  slots`, `bar: hover` in UI.log).
+`hud.reads_bar` reads, besides the slots, the bar's mode columns and rows (`+0xb0`/`+0xb4`
+in use; the floating pair `+0x7c`/`+0x80`, the static pairs `+0xa0`/`+0xa4` and
+`+0xa8`/`+0xac`), its hidden flag (`+0x16`), and from a button its owner (`+0x04`), its
+rectangle (`+0x08`, local to the owner), its pressed (`+0x30`) and hover (`+0x38`) bytes:
+`StandardButton::Simulate` sets both from the pointer, whoever owns it. FleetOpsHook's range
+ring follows the hover state of a weapon's button, so a bar of ours keeps the rings only as
+a skin over the stock rectangles that leaves the stock bar the pointer; Roots' static mode
+is one row in slot order (`PLAN-FLEETOPS.md`, FO-6 decisions 94 and 95).
+
+With `[HUD] Bar=1` on such a build the bar is a **skin** (`hud/barskin.rs`, FO-6 step 6, decision
+128): each shown button is drawn in the theme at the palette's origin (its rectangle's top left)
+plus the button's local rectangle, in slot order, with hover and pressed read from the button's own
+bytes; nothing is claimed or pressed, `engine::hud::set_bar_skin` skips only `RenderAll`'s drawing of
+the palette and leaves `RefreshOwner`'s mouse call, so the stock bar owns the pointer and the range
+ring and tooltip stay (seen on the bench: the Tractor Beam's ring on that button only, its tooltip,
+the build list and back). Roots ships it off (`ui/defaults/fo-roots.ini`).
+
+### The grid on Fleet Operations: Roots
+
+`ui/src/hud/bargrid.rs` (PLAN-FLEETOPS.md, FO-6, "The bar as the grid", decisions 330 to 338).
+With `HUD.Bar=1` on Roots the bar of ours is this section's grid, as on Armada II: the same
+layout (`bar::layout_all`), the same keys (QOL's `BarKeys`, through `UI_BarCell` and
+`QOL_BarLabel`), the same place in the bottom row. What differs is who handles the pointer.
+FleetOpsHook draws a weapon's range ring while that weapon's button has the mouse-over flag that
+`StandardComponent::Simulate` sets from the pointer and the button's own rectangle, and only while
+the bar owns the pointer. A grid drawn elsewhere than the stock row would lose the ring, and with
+it the stock tooltip and click. So the grid **moves the stock buttons onto its cells**:
+
+- **After each layout.** The bar's `Update` lays the buttons out (FleetOpsHook's port of
+  `mUpdateButtonsAndPosition`, at every update) and then, on every path, calls
+  `IsGamePausedAtAll`. That call is wrapped (`hud.bar_grid`, installed only where the bar is
+  behind a pointer): after the stock call, each shown button's rectangle (`ControlButton+0x8`,
+  canvas units local to the bar's origin) is set to its cell's, from the place the last UI frame
+  drew the grid. The next layout writes the rectangles again, so nothing of ours outlives the
+  grid by more than one update.
+- **The pointer.** `cursor_over` gives the bar the pointer over the grid's frame and nowhere
+  else (`set_bar_area`), so the stock row's old place belongs to the map again.
+- **Everything else is the engine's.** The buttons simulate where they are drawn: hover,
+  pressed, the rollover and click sounds, the press, the tooltip and FleetOpsHook's ring.
+  Nothing is claimed (`theme::panel`, not `ui.panel`, which would take the pointer). The
+  cells are drawn from the buttons' bytes, as the skin draws them.
+- **More than fifteen buttons** (Roots' bar holds 64): the buttons the plan has no cell for
+  go in columns of three to the right of the keyed block, after a line, without keys; the
+  cells shrink when the grid would run off the screen.
+- **Keys.** All fifteen cells have their key on Roots too. Roots' key map gives plain W to
+  `select_next_ship`, which Roots reworked to select the damaged ships of the selection and which
+  the overview reads before the bar; while the grid's keys are on, QOL's rebind table moves it to
+  M in the engine's parsed key map (`[BarKeys] Rebind = select_next_ship:W>M`, `qol/README.md`,
+  "Key rebinds"; decision 349); while a row has not applied, its FROM key stays the game's and
+  its cell has no key and no button. `[Bar] GameKeys` of the content set (cells the grid leaves empty
+  for a game key, decision 347) is empty on Roots now. Roots' other
+  bindings on the fifteen letters are the bar's hotkey tables, which QOL empties around the
+  stock step as on Armada II. While the keys are on, the tooltips of ours (`HUD.Tooltips=1`)
+  drop Roots' `(Hotkey: X)` note over the grid; the cell's badge names the key.
+- **Icons.** Roots keeps most of its button art in DDS sheets (`all_interface_buttons03` to
+  `11`); a sprite's texture is read with the game's extensions in its order (`.tga`, then
+  `.dds`) and decoded by its bytes (`engine/sprite.rs`).
+
+Without `hud.bar_grid` (a Roots build whose `Update` differs) the bar of ours is the skin above.
+
+**On Roots the icons are Roots' own** (decisions 340 to 343): `icons::ours_for_sprite` draws the
+UI's flat icon for a game sprite only where the sprite has no art (`files::Game::game_icons`, on for
+Roots, off for Armada II), so the bar, the top-right buttons and the boxes' buttons show the art
+Roots' own HUD shows, found per race in the sprite database; a sprite the engine never drew (Roots'
+own HUD draws the top-right buttons with FleetOpsHook's art) takes its texture and rectangle from its
+line in Roots' `.spr` files (`engine/sprite.rs`, `spr_entry`). The minimap's filter strip would put the
+stock filter buttons' pictures before its words, but Roots blanks those sprites, so it keeps its
+words. The resource strip and the tooltips' symbols keep
+ours: Roots draws those as glyphs of its bitmap font, not as sprites.
+
 ### Seen on the bench
 
 2026-10-16, Instant Action as the Borg at 1280x720 (`ui/bench-asi.sh HUD.Bar=1`): the bar drew as a 5x3 grid of the game's icons above the info panel, the
@@ -538,6 +646,103 @@ is the unit's name and class. Stock's strings keep printf's `%%`: shown as `%`.
 **Log.** Each object once ("info: Single USS Argo | Galaxy Class | 500 | 10 | hull
 720/720 | shield 100% | ..."), each tooltip's text, each press ("info: cancel queue
 slot 2", "info: select 0x...", "info: camera to 0x...").
+
+## The info panel on Fleet Operations: Roots
+
+`hud/info_fo.rs` over `engine/info_fo.rs` (PLAN-FLEETOPS.md, FO-6, "The info panel on Roots",
+decisions 440 to 459): with `[HUD] Info=1` on Roots, the bottom panel is ours in **Roots' own
+layout**: the same places, the same pictures and icons, our fonts, bars and frame. Roots' panel is
+FleetOpsHook's `ShipDisplay`, a larger object in its image with members of its own; it does part of
+its gameplay work in its drawing (each weapon icon gets its place from the ODF's
+`weapon<N>IconPos` in its `Render`; the sensors' and the weapons' subsystem icons set the flags
+that draw their range rings from their `Render`; the buffs are worked out there). So:
+
+- **The panel's `Render` keeps running, unseen.** The panel switch calls it as the engine would,
+  with the device's drawing dropped while it runs: seven drawing slots of `ST3D_DeviceDirectX8`'s
+  vtable (the two triangle fans the sprites and text are made of, the rectangles, the clipped
+  rectangles, the line strips, `WriteText` and `RenderClippedSprite2D`), each checked to hold its
+  function, are wrapped and do nothing while the flag is up (`render_unseen`). Every other call
+  (state changes, textures) runs. Not `RenderParticle`: render3d's particles module holds that
+  slot, and no panel draws particles. Nothing is taken: the panel is never `set_taken`.
+- **Ours draws what the children say, where Roots' layout puts them.** The layout is data:
+  `[InfoPanel]` in the `fleetops` content set (`content::InfoLayout`), Roots' `gui_interface.cfg`
+  numbers in the units of Roots' layout files, local to the panel (1249 x 163), each element with an
+  anchor. UI.log's `info: Roots' panel ...` line logs the panel's own children's rectangles at the
+  first selection of a mission, which the table matches (on 5.0Z11 every one of them). The
+  pictures are Roots' sprites, found by name in the HUD's sprite database at run time: the ship image
+  `<class>_si` (stretched over its area, tinted by the cloak as Roots does), or the wireframe picture
+  `<class>w1` for a class without one; the weapon and buff icons are FleetOpsHook's own children,
+  drawn at the rectangle and with the sprite its `Render` gave them, in the look its `Render` decides,
+  read the same way: grey for a special weapon its team has not researched (FleetOpsHook's
+  technology tree, the item's available flag), else a backing copy at a quarter of the race's
+  `weaponIconColor` and the icon in that colour filled from the left to the reload (or brown behind
+  and filled to the special energy there is, when short of the cost); the race's colours are the
+  engine's own, loaded from the HUD race's `gui_<race>.cfg` (`WeaponTint.<race>` in the set only where
+  they cannot be read); the buff icons are the first of FleetOpsHook's ten its panel counts this
+  frame, by kind (a spy aboard, a gravity mine's slowing, a weapon), a buff in `weaponIconColor`, a
+  debuff red; the subsystem icons are the stock `RepairIcon`s' sprites,
+  in the race's `systemIconHealthyColor`, toward the theme's bad with the damage
+  and warn on the repair's flash, and grey for a system the craft does not have (a station's engines:
+  the craft's system record's first byte is 0); the race icon is the race's
+  `<race>_icon`; the rank is `select_rank_<n>` from FleetOpsHook's class record; the builder's queue
+  slots are drawn on the plate sprite FleetOpsHook gave each `BuildWireframe`, with the queued class's
+  `w1` picture. Name, crew and special energy are the panel's own texts in our font; the shield bar
+  (green to red, as Roots colours its shield bar) above the hull bar (blue, toward warn and bad) are
+  ours; the construction, research or store bar is the theme's bar, in the resource's colour.
+  A weapon icon past the weapons its class places is not drawn: the panel's icons keep the place and
+  sprite the last class gave them, so only the indices FleetOpsHook's record of the class's
+  `weapon<N>IconPos` marks present are (`weapon_has_icon`).
+- **The pointer stays Roots' panel's** over ours (`hud::set_info_area`) wherever ours is: while the
+  panel simulates, its `FocusSimulate` slot (wrapped) sees the HUD's mouse position
+  (`DisplayInterface::s_mousePos`, canvas units) mapped from ours into the panel's own rectangle, and
+  put back after the call (`info_fo::set_pointer_map`; decision 458). So the engine's `StandardComponent::Simulate` sets each child's mouse-over flag from the child's
+  own rectangle, so the tooltips, the clicks (a click on the panel takes the camera to the unit; a
+  queue slot cancels; a group icon selects, Shift takes it out) and FleetOpsHook's range rings are the
+  engine's and FleetOpsHook's own: a weapon icon under the pointer draws that weapon's red ring, the
+  sensors icon the green sensor ring, the weapons icon the cyan and red rings. Ours draws a hovered
+  icon lit, from the same flag. Nothing of ours is claimed there. When the panel is narrower or wider
+  than Roots' (`InfoWidth`, the bottom row), the right-anchored children (the queue's slots) are moved
+  with ours (`info_fo::move_rect`, an engine component's rectangle, put back when ours goes off);
+  FleetOpsHook's own children are never written.
+- **Ours keeps the panel's own proportions**: scaled by its height alone, so on a screen wider than
+  the layout Roots picks (21:9 and wider, which take its 16:9 layout stretched across) ours is
+  narrower than Roots' panel and its pictures are not widened. Without the pointer map (a build
+  whose `FocusSimulate` slot is not stock), ours takes the pointer wherever it is not Roots' panel's
+  own place and makes the clicks itself as on Armada II; the weapon icons' rings are not had there.
+- **The status line under the pointer** (the panel's `SDInfoBar`, which Roots draws at the top of the
+  screen) is drawn inside the panel's `Render` through one call, which `hud.hover` wraps ("The status
+  line under the pointer"): the gate is lifted around that call (`info_fo::ungated`), so the line stays
+  Roots' own, or the UI's with `[HUD] Hover=1`. The hook goes in with the gate.
+- **Faces** (all Roots'): one object (a craft: name, crew, energy, bars, image with its weapons, rank,
+  subsystems, race icon, and for a combat ship the long dark bar Roots shows; a moon or resource: the
+  image or picture, the hull strip and the store bar in the resource's colour), a builder (the same
+  and its ten slots, the first larger, and the construction bar), a group of up to 16 (one row of
+  82-unit tiles: picture, name, shields, hull) and of 17 to 30 (three rows of ten, filled down each
+  column). Roots' build yards show as one object (FleetOpsHook's choice in
+  `DetermineSelectedDisplayType`).
+
+**Not drawn by ours** (gaps): a special weapon's clock-wise fill (ours fills it from the left like
+the others) and the halving of the other icons while a bar button for one weapon is hovered. A planet's
+owner text is created by stock and never drawn, by Roots either. Not seen on the bench: the buff
+icons (no gravity mine or spy could be staged) and a planet's or another team's face (Scene.asi's
+select leaves the selection empty for them).
+
+### The bottom row on Fleet Operations: Roots
+
+`hud/row.rs`: on Roots with `Info=1`, `[HUD] BottomRow` arranges the bottom of the screen.
+
+| `BottomRow` | What |
+|---|---|
+| `stacked` (or empty) | the bar above the minimap, the info panel at Roots' own place (as before) |
+| `minimap, info, bar` (any order of the three) | along the bottom, left to right; the bar as high as the info panel (its three rows of cells fitted to it, or `BarCellSize`, units), in the bottom right corner when it comes after the info panel; the info panel in the room left, at most its own width (or `InfoWidth`, units) |
+| `auto` | in order (decision 459): **the corners**, the minimap bottom left, the info panel centred, the grid as tall as the minimap in the bottom right corner at the minimap's own margins (21:9 and wider); where they would overlap, **the row**, the info panel at Roots' place and the grid as tall as the panel in the bottom right corner (16:9, 16:10); else **stacked** (4:3, 5:4) |
+
+The info panel's own place is the panel's rectangle as the engine has it (learnt while it shows),
+else estimated from the layout table (its units square, 1200 high). Narrower than its own width, the
+right-anchored elements (the queue) move with the right edge and the flexible ones (the
+construction and store bars) shorten; when the queue would run into the systems it is scaled down
+about the right edge (`MinWidth` is the narrowest drawn). The grid keeps its cell drawing and its
+moving of the stock buttons onto its cells (decision 331) wherever the row puts it.
 
 ### The player's race
 
@@ -826,7 +1031,60 @@ that `Render` (`render_component`): with `Tooltips=1` it reads the stream's text
 fields for the call so the stock `Render` draws only the cursor, and puts them back,
 so `DoTooltip` still owns and frees the streams. Ours draws the text in the theme's
 tooltip below and right of the pointer. On the bench the tooltips are off until the
-help button is cycled once (the bench's profile).
+help button is cycled once (the bench's profile). The text is the game's code page,
+Windows-1252, and a game's own font codes (Roots' red figures, resource icons and unit
+classes) are written as the content set's words and digits (README.md, "The engine's
+text"); before that, Roots' tooltips read as symbols and question marks.
+
+## The status line under the pointer
+
+`hud/hover.rs` over `engine/hover.rs`, with `[HUD] Hover=1` (hook `ui.hud.hover`,
+`profiles/gog-1.1/ui.hover.toml`). While the pointer is over a ship or station in the 3D
+view, the engine draws a strip about it: its name (or its class), then its shields,
+hull and crew, each an icon and a figure, and its special energy while it has some.
+`ShipDisplay::AlwaysSimulate` puts the craft at `ShipDisplay+0x1ec`, and
+`ShipDisplay::Render` draws the strip with one call, `SDInfoBar::Render(craft, x, y)`
+at `+0x1fa`, at the strip's place for the panel's face (the pair at `+0x1b8` that `+0x1f4`
+picks, from the layout's `infoBarOffset_<face>`), then clears `+0x1ec`. Armada II's
+layout puts the place inside the info panel (ours shows the same craft as its hover card,
+"The info panel"); **Fleet Operations: Roots moves it to the top centre of the screen**
+(`infoBarOffset_1` and `_2` lift it out of the panel), where it reads as the status of
+whatever the pointer is over, and FleetOpsHook leaves both the call and `SDInfoBar::Render`
+stock (in the file and in memory; its own changes to `ShipDisplay::Render` are the
+one-unit and builder faces' calls and the group faces' edits before it).
+
+**Ours** takes that call: the strip is not drawn, and each of its children is asked for
+what it would draw, as `SDInfoBar::Render` hands them the craft. The children
+(`SDInfoBar` members): three `TextAndSprite`s, shields (`+0xc`), hull (`+0x10`) and crew
+(`+0x14`); the special energy (`+0x18`, an `EnergyText`, drawn only while the craft's
+`+0x168` is at least 1); and the craft's name (`NameText`, `+0x20`) when its class has the
+byte `+0x3c4` set, else its class (`ClassText`, `+0x1c`). Each answers its colour and
+string (`GetInformation`, vtable `+0x24`, after `SetCurrentObject`, `+0x20`) and its icon's
+tint (`GetCurrentColor`, `+0x2c`); a `TextAndSprite` has its icon at `+0x104`, the icon's
+rectangle at `+0x10c` and the text's at `+0x11c`, a `ClassText` or `NameText` its text's at
+`+0x104`, each relative to the place, plus the origin the parent answers (`DisplayInterface`'s
+vtable `+0x64`: the info panel's corner for the group faces, none for the one-unit face, so
+the sum is the same place for every face), all on the HUD's canvas (1600 by 1200 units,
+scaled per axis); the justification is `+0x68` (bit 0 right, bit 3 centred in height: the
+figures are 8, left; the name 9, right). The UI's frame then
+draws each part there: the engine's icon, tinted as the engine tints it, and the text in
+our font, in the engine's colour, justified as the engine justifies it, with a one-pixel
+shadow. **Sizes**: Roots picks its font tier by the screen's width and its text outgrows the
+strip's rectangles on a wide screen, so neither the rectangle nor the font's line height
+(`ST3D_Font::GetHeight`, logged: 23.8 at 1280x960, 33.0 at 2560x1080) is in proportion to
+what shows; the figures and capitals were measured at 10 px (1280x960) and 19 px
+(2560x1080), and ours are as tall on the line through both. The icons are square (the
+canvas is scaled per axis, so the engine's stretch on a wide screen), 0.78 of their
+rectangle's shorter side, as much of it as the engine's art covers. Nothing is laid out by
+us, so the line follows Roots' layout files at every aspect, and the UI's text is drawn
+over everything the engine draws.
+
+While the key is off the call goes to the strip as before; the hook goes in the first
+time the key is on (or with `LayoutLog=1`, which logs the engine's strip without taking
+it: the bench's reference), so Armada II with the key off is unchanged. Under the
+engine's box ("Under the engine's boxes") the strip goes back to the engine. `UI.log`:
+`hover: ours`, and each strip once while it changes, `hover: craft 0x... at 625,50 (ours):
+| Shields "100" 0.40,0.60,1.00 text ... icon ... | ...`.
 
 ## The cursor over a box of ours
 
@@ -961,7 +1219,19 @@ officers the team's `+0x160` over `Team::GetMaxOfficers()` ("12/30"); ours write
 same. The colour of each is `ResourceComponent::s_ResourceColor[r]` (a `ST3D_Colour *`
 each, from the GUI config), drawn as a mark beside it; its name and tooltip are the
 component's own `GetTooltip` (vtable `+0x00`, the verbose one `+0x04`), whose first
-line is the localised name. A strip at the top centre of the screen.
+line is the localised name. A strip at the top centre of the screen, or, where the content
+set says `[Resources] Placement = corner` (the `fleetops` set), flush in the top left corner
+of the screen (`component` puts it at the top left of the game's own `ResourcePanel`
+rectangle): Fleet Operations: Roots draws its command, message and build areas at the top
+centre. Its mark for each resource is the game's own icon where the set has one
+(`[ResourceIcons]`, `[Files] IconFont`: the glyph Roots' bitmap font draws for it, read by
+`engine/fontglyph.rs` from the install at run time; PLAN-FLEETOPS.md, decisions 520 and 521), else
+the bar in the stock panel's colour.
+
+On Roots the short tooltip is a single icon glyph (a control character), so the name is read
+from the long one (`+0x04`: "Tritanium: <glyph>" and a sentence, from the game's string table,
+per race: Supply or Biomatter for the biomatter by race, Connection Nodes for the Borg's
+latinum); the set's `Names` are only the fallback when neither tooltip holds a word.
 
 ### The top-right buttons (`ButtonPanel`)
 
@@ -1019,7 +1289,11 @@ its focus-step (`FocusSimulate`) when either of two command flags is set (pointe
 tutorial's lessons advance on the same key). A component that never owns the mouse
 never gets its focus-step, so with the box ours `popups::objectives_keys` calls
 `ObjectivesDisplay::FocusSimulate` itself at each simulate pass while the box shows
-(the presses' hook): the box closes on the engine's own bindings, as in stock.
+(the presses' hook): the box closes on the engine's own bindings, as in stock. It skips the
+pass on which the box opened, since stock's box becomes the owner only at the next
+`RefreshOwner`: on Roots the objectives key is also a closing command, and run on that pass
+the step closed the box the key had just opened (Alt+O opened the engine's box and never
+ours, on the bench).
 Measured on the bench: a first version that pressed OK on Enter itself and kept the
 key from the engine left the Starfleet Academy tutorial's lessons stuck and its
 zoom unanswered; closed by its own step, the tutorial runs as with the stock box. Its
@@ -1032,6 +1306,22 @@ bench in `ui-whole-game.md`). Ours: windows
 over a dimmed screen (`panels::boxed`; not `Ui::modal`, which keeps the keyboard),
 the message's title as the window's, the text wrapped; the objectives with a check
 box per line, ticked when complete.
+
+### Under the engine's boxes
+
+With `[HUD] Messages=0` (Roots' default, PLAN-FLEETOPS.md decision 125) the message box
+and the briefing are the engine's: drawn in `RenderAll`, which runs before the UI's frame,
+and modal (their `CursorOver` is always true). Every panel of ours used to be drawn after
+them, over the briefing and could take clicks there (the user's
+report on Roots' first allied tutorial, 2026-11-07). So while either box shows and is not
+ours (`panels::stock_box_up`), `hud::run` draws only the boxes of ours that pause the game
+and the multiplayer boxes; the rest (selection overlay, unit view, minimap, info panel,
+bar, resources, top-right buttons, chat lines, tooltips) stands aside and claims nothing,
+so the engine's box owns the pointer as in stock. UI.log says `hud: under the engine's
+box` and `the engine's box closed`. Stock's HUD sits under the box rather than going;
+ours goes whole, because the UI's frame cannot be put between two of the engine's
+components. With `Messages=1` (Armada II's shipped value, and Roots' since decision 322) the boxes are ours and nothing
+changes. `testbench/scenarios/fo-ui-briefing.md`.
 
 ### Pause and replay (`PauseBox`, `ReplayPanel`)
 
@@ -1057,7 +1347,16 @@ sentinel), keyed by a counter. Each message: its point at `+0x58` (1600 x 1200, 
 the panel's corner), justification `+0x68`, text `+0x84` (a `std::string`), colour
 `+0x94`, fade `+0xa0` (raised and lowered by the stock `AlwaysGameSimulate`, which also
 erases a faded one: it keeps running). Ours draws each in title type with a shadow,
-in its colour times its fade.
+in its colour times its fade. **Kept clear of the panels of ours**: stock places a message
+against stock's panels, and ours sit elsewhere. Roots' scripts add the mission's name at
+the start of a mission at (50,50) with justification 0, the top left corner, where the
+resource strip of ours is (the user's report, PLAN-FLEETOPS.md decision 326). Every panel
+frame drawn this mission frame is kept (`layout::occupied`, filled by `Ui::panel` whether or
+not the layout log is on); a message whose rows would touch one is centred across the screen
+at the same height, and if it still touches one, put just below it. UI.log says
+`overlay: #<n> moved clear of the panels of ours, to x,y`. On Armada II the resource strip
+is at the top centre and the intro's lines are centred lower down, so nothing there moves
+unless it would have overlapped. `fo-ui-overlay`. With `Hover=1` (Roots) the status line's band (canvas 600..1000 x 45..125) counts as taken too, so the mission timer (*Politics by Other Means*, at 50,85) sits below it and never under the line (decision 470; `fo-ui-timer-hover`).
 
 ### The trade status and the team message (not components)
 
@@ -1494,10 +1793,11 @@ down is explained on are named in the profile.
 |---|---|---|
 | `ui.hud.panels` (`HUD.Minimap`, `HUD.Info`, `HUD.Bar`, `HUD.UnitView`) | the call of a component's `Render` in `DisplayInterface::RenderAll` and of its `CursorOver` in `CursorInterface::RefreshOwner` (patched, 7 bytes each, "The panel switch"), `iCursor` and its owner / sprite fields | no panel of ours is taken over |
 | `ui.hud.tooltips` (`HUD.Tooltips`) | `iCursor+0x34` / `+0x38`, `CursorInterface::m_tooltipState` | the engine draws its tooltips at the pointer |
-| `ui.hud.reads_components` | `g_pPopupPalette`, `shipDisplay`, `mapRadar`, `DisplayInterface::s_pRenderList`, `View_Record`, the `DisplayInterface` rectangle / hidden fields and `GetName` slot | no component is found, hidden or placed |
+| `ui.hud.reads_components` | `g_pPopupPalette`, `mapRadar`, `DisplayInterface::s_pRenderList`, `View_Record`, the `DisplayInterface` rectangle / hidden fields and `GetName` slot | no component is found, hidden or placed |
 | `ui.hud.reads_calls` | `TextInput_IsActive` and `CinematicView::IsPlayingVideo` (`fn`, checked), `g_cinematicView` | keys are not held back for the chat line; a click sounds during a video |
 | `ui.hud.reads_popups` | the message, objectives, pause and replay boxes, their press functions, `IsGamePausedAtAll` and `ObjectivesDisplay::FocusSimulate` (`fn`, checked) | no box of ours ("Messages and objectives", "Pause and replay") |
 | `ui.hud.reads_bar` (`HUD.Bar`, `HUD.BarLabels`, `HUD.Icons`) | the bar's slots, mode and menu, the `ControlButton` / `CommandInfoClass` / `ModeInfo` fields, the `ButtonName` pair, `cPrjID::GetName`, `FindElement` and `ControlButton::mButtonPressFunction` (`fn`, checked), the sprite database | no button is described or drawn |
+| `ui.hud.bar_grid` (`HUD.Bar`) | the call of `IsGamePausedAtAll` in `PopupPaletteImp::Update` (patched, once the buttons are laid out; installed on Roots only) and the `ControlButton` rectangle written ("The grid on Fleet Operations: Roots") | the bar of ours on Roots is the skin over the stock row |
 | `ui.hud.reads_overlay` (`HUD.Selection`, `HUD.SelectionGauges`) | `GameObject::objectList`, the object / craft / `SelectionDisplay` fields, `ComputeContainerRect` and `__RTDynamicCast` (`fn`, checked), `currentCamera`, the virtual viewport, `SystemOrder` | no overlay of ours |
 | `ui.hud.bubbles` | `RenderSelectionEffects` (patched, its first byte) | the engine's 3D bubbles stay |
 | `ui.hud.reads_overlay_text` | `overlayText`, its map's `_Nil` and the message fields | no overlay messages of ours |
@@ -1508,6 +1808,7 @@ down is explained on are named in the profile.
 | `ui.hud.fade` | the two draws of `ScreenFade::Render` (patched, 5 and 7 bytes) | the engine draws the fade |
 | `ui.hud.video` | the two callers of `BinkThread::BlitToBlackBackground` and its three draws (patched), `GetTexture` (`fn`, checked), the video's size | the engine draws the unit view's and the comm videos |
 | `ui.hud.frame_rate` | the two prints in `Armada_RenderFrame` (patched, both or none), `FrameStats::GetSlotName` / `GetTimeAvg` (`fn`, checked), `FRAMERATE_DISPLAY` | the engine prints the frame rate |
+| `ui.hud.hover` (`HUD.Hover`; `ui.hover.toml`, `src/syms_hover.rs`) | the call of `SDInfoBar::Render` in `ShipDisplay::Render` (patched, its target checked; "The status line under the pointer"), `SDInfoBar::Render` (`fn`, checked), the strip's children, the text and icon fields and slots, the class's name byte and the special energy | the engine draws the strip |
 
 ### Hooks of the info panel, minimap, unit view and close-up (`ui.hud.*`)
 
@@ -1522,6 +1823,7 @@ is entered or called.
 | Hook | Entries | Without it |
 |---|---|---|
 | `ui.hud.info` (`HUD.Info`) | `shipDisplay`, `ShipDisplay::DetermineSelectedDisplayType`, `Craft::mComputeRepairLeft`, `Producer::GetBuildQueue`, `GameObject::GetSlowEffect` / `GetLineOfSightEffect`, `Localized_Strings::Localize` and `__RTDynamicCast` (`fn`, entry bytes checked), the type descriptors it casts with, `Entity::NO_ENTITY`, `gCameraManager`, `g_pCommandShift`, the panel's children and the objects' fields | the info panel stays stock |
+| `ui.hud.info_fo` (`HUD.Info`, Roots) | `info_fo_panel` (1 on Roots), `ST3D_DeviceDirectX8`'s vtable and seven of its drawing slots (each checked to hold its function), the panel's race icon, FleetOpsHook's members (the ship image, 32 weapon icons and 10 buff icons, each icon's sprite; `BuildWireframe`'s plate), FleetOpsHook's records of a craft and its class (rank, `weapon<N>IconPos`), a component's rectangle and mouse-over flag, the cloak's state | Roots' own info panel shows |
 | `ui.hud.unitview` (`HUD.UnitView`) | `g_cinematicView`, `CinematicView::Render` (checked) and `StandardBackground::Render`, held by their vtables' slots, the three rectangles and the frame pointer | the unit view keeps its stock place and frame |
 | `ui.hud.closeup` (`HUD.InfoCamera`) | `Armada_Camera`'s constructor, `ST3D_Camera::SetViewport` / `SetNearPlane` / `SetFarPlane`, `ST3D_GraphicsEngine::SetCurrentCamera` (checked), `SetTransform` in `Armada_Camera`'s vtable, `operator new`, the action camera's `Render_Stuff`, `DisplayInterface::currentCamera`, the entity and object lists, and the action camera's call of `Armada_RenderAllOurStuff` in `CinematicView::RenderView` (a `call`, `chain`: render3d re-points it, and the close-up goes through it) | the wireframe shows |
 | `ui.hud.radar` (`HUD.Minimap`) | `mapRadar` and the radar's sprites, filters and fog (`g_terrain`, `Scanner::m_fog`, `m_shroud`), `RadarComponent::ConvertWorldToSquareNormal` / `ConvertSquareNormalToWorld`, `Entity::GetTeamsVisibleToUser` and its call in `MapRadar::AlwaysGameSimulate` (patched: the clicks are made there), the team and filter functions, `ActionMode::GetAction`, `CameraManager::SnapToNearestVisible`, `ST3D_Camera::ProjectScreenPointToWorldRay`, `cOverViewImp`'s slots `+0xbc` / `+0xc8` and `PopupPaletteImp`'s `+0xa4` (checked to hold their functions), the object, class and camera fields | the minimap stays stock |

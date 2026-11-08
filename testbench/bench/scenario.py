@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import config, judge, slots, vision
+from . import objects as objs_mod
 from .log import Log
 from .session import GameError, Session
 
@@ -236,18 +237,34 @@ def s_quit(c, m):
         yes = vision.find_text(words, 'Yes')
         if yes and (vision.find_text(words, 'Are you sure') or vision.find_text(words, 'Warning')):
             return 'yes', yes
-        exit_btn = vision.find_text(words, 'Exit to Windows')
+        exit_btn = vision.find_text(words, 'Exit to Windows') or vision.find_text(words, 'Exit to Desktop')
         if exit_btn:
             return 'exit', exit_btn
         if c.screen_def('main') and c.screen_matches(c.screen_def('main'), words):
             return 'main', None
         return None, None
 
+    def press(x, y):
+        if config.GAME_ID != 'armada2':
+            # Roots' shell loses a click straight after a pointer jump: be over the
+            # spot first, for a moment
+            c.sess.move(x, y)
+            time.sleep(1.0)
+        c.sess.click(x, y)
+
     words = vision.ocr(c.fresh_shot('quit-0'))
     for attempt in range(5):
         what, box = ask(words)
         if box:
-            c.sess.click(box['x'] + box['w'] // 2, box['y'] + box['h'] // 2)
+            press(box['x'] + box['w'] // 2, box['y'] + box['h'] // 2)
+        elif what == 'main' and config.GAME_ID != 'armada2':
+            # another game's shell has its own layout: ui.json's design points are
+            # Armada II's, so the Exit button is found by its label
+            ex = vision.find_text(words, 'Exit')
+            if ex:
+                press(ex['x'] + ex['w'] // 2, ex['y'] + ex['h'] // 2)
+            else:
+                c.sess.key('Escape')
         elif what == 'main':
             c.sess.click(*c.target_point(c.target('exit')))
         else:
@@ -266,6 +283,11 @@ def s_quit(c, m):
                 break
         words = vision.ocr(c.fresh_shot(f'quit-{attempt + 1}'))
     c.sess.stop_game()
+    if config.GAME_ID != 'armada2':
+        # another game's shell loses clicks now and then; the quit is the last step and
+        # the checks before it have run, so the prefix being stopped is not a failure
+        # ("Expect the game to have exited" still holds)
+        return 'the menus did not end the game after 5 tries; the prefix was stopped instead'
     raise StepFailed('the game did not exit through its menus; the prefix was stopped instead')
 
 
@@ -367,10 +389,25 @@ def _space(c, m):
         return c.hud_to_screen(x, y)
     if sp == 'hud-right':
         return c.hud_right_to_screen(x, y)
+    if sp == 'shell':
+        ox, oy = _shell_origin(c)
+        return x + ox, y + oy
     return x, y
 
 
-SPACE = r'(?P<space>design |hud-right |hud )?'
+def _shell_origin(c):
+    """Where Fleet Operations: Roots' 1200x900 shell sits on the output, read off the
+    Instant Action setup screen: its LAUNCH button is at 600,875 when the shell is at the
+    top left (Display8) and 40,30 further in on the shipped DxWrapper chain, which centres
+    it.  The `shell` space of a step is that screen's own coordinates, so one fragment
+    serves both chains."""
+    box = vision.find_text(vision.ocr(c.fresh_shot('shell-origin')), 'LAUNCH')
+    if not box:
+        raise StepFailed('the `shell` space needs the Instant Action setup screen (LAUNCH is not on screen)')
+    return box['x'] + box['w'] // 2 - 600, box['y'] + box['h'] // 2 - 875
+
+
+SPACE = r'(?P<space>design |hud-right |hud |shell )?'
 
 
 @step(r'^' + BTN + r' at ' + SPACE + r'(?:\(?)(?P<x>\d+)\s*,\s*(?P<y>\d+)\)?$')
@@ -471,12 +508,50 @@ def s_bar(c, m):
         raise StepFailed(str(e))
 
 
+@step(r'^(?:put|make) the window ' + Q.format('title') + r' (?:to )?full ?screen$')
+def s_window_fullscreen(c, m):
+    """`put the window "TITLE" full screen`: the session's sway makes the X11 window of
+    that title full screen, as the desktop does for a game's window that covers the
+    screen. Sway puts a window the game makes later (Display8's `BenchWindow` popup)
+    behind the full-screen one, where nothing drawn on it shows and Xwayland holds its
+    presents back to a few a second; Hyprland, the user's desktop, need not."""
+    title = m.group('title')
+    pattern = '^' + re.escape(title) + '$'
+    out = c.sess.swaymsg(f'[title="{pattern}"] fullscreen enable')
+    if '"success": true' not in out:
+        raise StepFailed(f'sway could not make "{title}" full screen: {out.strip() or "no answer"}')
+    return f'"{title}" full screen'
+
+
 @step(r'^press (?:the )?(?P<key>[\w+-]+)(?: key)?(?: (?P<n>\d+) times)?$')
 def s_press(c, m):
     for _ in range(int(m.group('n') or 1)):
         c.sess.key(m.group('key'))
         time.sleep(0.15)
     return None
+
+
+@step(r'^right-click at ' + SPACE + r'(?P<x>\d+)\s*,\s*(?P<y>\d+) (?:while )?holding the (?P<btn>left|middle|right) (?:mouse )?button$')
+def s_click_holding(c, m):
+    """`Right-click at 560,330 holding the middle mouse button`: the pointer goes to the
+    point, the named button goes down, a right click is made there and the button comes up
+    again, all in one step. A held key is let go at once under Xwayland, a held mouse button
+    is not, so a game whose Input.map binds a key's action to a button (the Roots move queue
+    scenario binds `enter_waypoint` to the middle one, `testbench/bench/roots-waypoint.sh`)
+    can be driven with it. One step and not a hold and a release: the middle button's own
+    camera drag takes over when it is held for long or while the pointer moves."""
+    x, y = _space(c, m)
+    n = {'left': 1, 'middle': 2, 'right': 3}[m.group('btn')]
+    c.sess.glide(x, y)
+    time.sleep(0.3)
+    c.sess.input(f'down {n}')
+    time.sleep(0.2)
+    c.sess.input('down 3')
+    time.sleep(0.08)
+    c.sess.input('up 3')
+    time.sleep(0.2)
+    c.sess.input(f'up {n}')
+    return f'right-clicked at screen {x},{y} holding the {m.group("btn")} mouse button'
 
 
 @step(r'^overlay (?P<words>.+)$')
@@ -568,6 +643,82 @@ def s_shot(c, m):
     return f'{p.name}'
 
 
+@step(r'^take (?P<n>\d+) screenshots (?:called|named) ' + Q.format('name') +
+      r',? (?:one )?every (?P<s>[\d.]+) seconds?$')
+def s_shot_burst(c, m):
+    """`Take 12 screenshots called "end" every 0.25 seconds`: a series across a transition
+    (`end-01` ... `end-12`), as fast as the compositor's capture allows when the interval
+    is shorter than a capture, then a contact sheet of them in order (`end-sheet`, the
+    last shot, so a judged `Check that ...` right after it sees the whole series)."""
+    n, every, paths = int(m.group('n')), float(m.group('s')), []
+    t0 = time.time()
+    for i in range(n):
+        paths.append(c.shot(f"{m.group('name')}-{i + 1:02d}"))
+        wait = t0 + (i + 1) * every - time.time()
+        if wait > 0 and i + 1 < n:
+            time.sleep(wait)
+    took = time.time() - t0
+    c.sess.s['shots'] += 1
+    c.sess.save()
+    safe = re.sub(r'[^A-Za-z0-9_.-]+', '-', m.group('name')).strip('-') or 'shot'
+    sheet = c.dir / 'shots' / f"{c.sess.s['shots']:03d}-{safe}-sheet.png"
+    subprocess.run(['magick', 'montage', *map(str, paths), '-tile', '4x', '-geometry', '480x+4+4',
+                    '-background', '#808080', str(sheet)], capture_output=True)
+    if sheet.exists():
+        c.log.shot(sheet, f"{m.group('name')}-sheet")
+        c._series = getattr(c, '_series', {})
+        c._series[m.group('name')] = sheet
+    c._series_shots = getattr(c, '_series_shots', {})
+    c._series_shots[m.group('name')] = paths
+    return f'{n} shots in {took:.1f} s: {paths[0].name} .. {paths[-1].name}' + (f', sheet {sheet.name}' if sheet.exists() else '')
+
+
+@step(r'^expect no shot of the series ' + Q.format('name') + r' to be black$')
+def s_series_not_black(c, m):
+    """`Expect no shot of the series "end" to be black`: each shot of the last series of
+    that name is measured, the share of its pixels brighter than 3% (ImageMagick); a shot
+    with fewer than 0.2% of them is black, as a window just mapped or a frame cleared and
+    presented with nothing on it is. A held picture (the last frame kept on screen) is not."""
+    paths = getattr(c, '_series_shots', {}).get(m.group('name'))
+    if not paths:
+        return c.checked(None, f'no series "{m.group("name")}" was taken before this step')
+    shares, black = [], []
+    for p in paths:
+        r = subprocess.run(['magick', str(p), '-colorspace', 'gray', '-threshold', '3%', '-format', '%[fx:mean]', 'info:'],
+                           capture_output=True, text=True)
+        try:
+            v = float(r.stdout.strip())
+        except ValueError:
+            v = -1.0
+        shares.append(f'{v * 100:.2f}%')
+        if 0 <= v < 0.002:
+            black.append(p)
+    detail = (f"{len(black)} of {len(paths)} black ({', '.join(Path(p).name for p in black) or 'none'}); "
+              f"bright share per shot: {' '.join(shares)}")
+    return c.checked(not black, detail, black[:4], how='share of pixels above 3% grey (ImageMagick)')
+
+
+@step(r'^check that the series ' + Q.format('name') + r' (?P<what>.+)$')
+def s_check_series(c, m):
+    """`Check that the series "end" shows ...`: the judge reads the contact sheet the last
+    `Take N screenshots called "end" ...` made (the shots in order, left to right and top
+    to bottom), not a fresh shot."""
+    sheet = getattr(c, '_series', {}).get(m.group('name'))
+    if not sheet:
+        return c.checked(None, f'no series "{m.group("name")}" was taken before this step')
+    what = (f'This is a contact sheet of a series of screenshots taken in order, read left to right '
+            f'and top to bottom. The series {m.group("what")}')
+    if c.opts.get('no_claude') or not judge.available():
+        return c.checked_status('review', 'left for a person to judge from the sheet', [sheet],
+                                how='human review (no Claude)')
+    result, meta = judge.judge(what, [(f'the series "{m.group("name")}"', sheet)], c.context(), c.dir)
+    c.log.note('judge', detail=json.dumps(meta, indent=1))
+    if not result:
+        return c.checked_status('review', f'the judge did not answer: {meta}', [sheet], how='Claude vision judge (failed)')
+    status = {'pass': 'pass', 'fail': 'fail'}.get(result['verdict'], 'inconclusive')
+    return c.checked_status(status, result['reason'], [sheet], how=f'Claude vision judge (${meta.get("cost_usd") or 0:.3f})')
+
+
 @step(r'^dump the frame(?: (?:called|named|as) ' + Q.format('name') + r')?$')
 def s_dump(c, m):
     """`Dump the frame called "NAME"`: Render3D.asi's targets and UI.asi's presented
@@ -645,6 +796,126 @@ def s_expect_running(c, m):
                      how='process table, exception.txt')
 
 
+@step(r'^expect the window manager to (?:see|manage) (?:only )?(?P<n>one|\d+) windows?$')
+def s_expect_wm_windows(c, m):
+    """`Expect the window manager to see one window`: the X windows the session's
+    compositor manages (sway's tree: tiled and floating views, not override-redirect
+    ones), so a dialog the game shows as a window of its own fails it. A window wholly off
+    every output is not mapped and does not count."""
+    want = 1 if m['n'] == 'one' else int(m['n'])
+    views = []
+
+    def walk(n):
+        if n.get('type') in ('con', 'floating_con') and (n.get('window') or n.get('app_id') or n.get('shell')):
+            views.append(f"{n.get('shell')} {n.get('name')!r} {n.get('rect', {}).get('width')}x"
+                         f"{n.get('rect', {}).get('height')}")
+        for k in n.get('nodes', []) + n.get('floating_nodes', []):
+            walk(k)
+    try:
+        walk(json.loads(c.sess.swaymsg('-t', 'get_tree') or '{}'))
+    except ValueError:
+        return c.checked(False, 'no answer from the compositor', how='swaymsg get_tree')
+    return c.checked(len(views) == want, f"{len(views)}: {'; '.join(views) or 'none'}", how='swaymsg get_tree')
+
+
+@step(r'^watch the window manager$')
+def s_watch_wm(c, m):
+    """`Watch the window manager`: from here on every window event of the session's
+    compositor (sway's `subscribe` to `window`: new, focus, close, floating, urgent, ...) is
+    written to `wm-events.jsonl` in the case's directory, for `Expect the window manager to
+    have seen no other window`, which judges them. A window that comes and goes between two
+    shots (one `Expect the window manager to see one window` would miss it) shows here."""
+    from .session import _die_with_parent
+    old = getattr(c, '_wm_watch', None)
+    if old:
+        old[0].kill()
+    path = c.dir / 'wm-events.jsonl'
+    out = open(path, 'w')
+    sub = subprocess.Popen(['swaymsg', '-s', c.sess.s['env']['SWAYSOCK'], '-m', '-r', '-t', 'subscribe',
+                            '["window"]'], stdout=out, stderr=subprocess.DEVNULL,
+                           preexec_fn=_die_with_parent)
+    c._wm_watch = (sub, out, path, time.time())
+    time.sleep(0.3)
+    c.log.action(f'watching the window manager\'s window events into {path.name}')
+
+
+def _wm_events(path):
+    """The events `swaymsg -m -r subscribe` wrote: one JSON object each, pretty-printed and
+    concatenated, so they are split by a streaming decode, not by line."""
+    text, events, dec, i = path.read_text(), [], json.JSONDecoder(), 0
+    while True:
+        while i < len(text) and text[i].isspace():
+            i += 1
+        if i >= len(text):
+            return events
+        try:
+            ev, i = dec.raw_decode(text, i)
+        except ValueError:
+            return events
+        events.append(ev)
+
+
+@step(r'^expect the window manager to have seen (?:no other window|(?P<another>another window))'
+      r'(?P<kept>,? and the game\'s window kept)?$')
+def s_expect_wm_no_other(c, m):
+    """`Expect the window manager to have seen no other window` (after `Watch the window
+    manager`): fails on any window event since the watch began for a window that is not
+    one of the game's own (a pop-up's `new`, `floating` or `urgent`, a focus or the full
+    screen given to it). The game's own are its normal windows with the game's title:
+    Roots' FleetOpsHook replaces its device window at each switch between the shell and a
+    mission (PLAN-FLEETOPS.md, decision 311), so those come and go and are counted, not
+    failed; `..., and the game's window kept` fails on those too (Display8's one window,
+    `[Window] OneWindow`, decision 314: the game's window never closes and none opens).
+    `... to have seen another window` is its opposite, for a reference run of the game
+    drawing its own windows (`fo-ui-ingame-window-ref`). Stops the watch."""
+    w = getattr(c, '_wm_watch', None)
+    if not w:
+        return c.checked(None, 'no `Watch the window manager` step ran before this one')
+    sub, out, path, _t = w
+    time.sleep(0.5)
+    sub.kill()
+    out.close()
+    c._wm_watch = None
+    events = _wm_events(path)
+    title = None
+    try:
+        tree = json.loads(c.sess.swaymsg('-t', 'get_tree') or '{}')
+
+        def walk(n):
+            nonlocal title
+            if n.get('type') == 'con' and n.get('window') and not title:
+                title = n.get('name')
+            for k in n.get('nodes', []) + n.get('floating_nodes', []):
+                walk(k)
+        walk(tree)
+    except ValueError:
+        pass
+    props = {}
+    for ev in events:
+        con = ev.get('container') or {}
+        p = props.setdefault(con.get('id'), dict(names=set(), types=set()))
+        if con.get('name'):
+            p['names'].add(con['name'])
+        p['types'].add((con.get('window_properties') or {}).get('window_type') or 'normal')
+    game = {i for i, p in props.items() if p['names'] == {title} and p['types'] == {'normal'}}
+    others = []
+    for ev in events:
+        con = ev.get('container') or {}
+        if con.get('id') not in game:
+            others.append(f"{ev.get('change')} #{con.get('id')} {con.get('name')!r} "
+                          f"{(con.get('rect') or {}).get('width')}x{(con.get('rect') or {}).get('height')} "
+                          f"{(con.get('window_properties') or {}).get('window_type') or ''}".rstrip())
+    swaps = sum(1 for ev in events if ev.get('change') == 'new' and (ev.get('container') or {}).get('id') in game)
+    detail = (f"{len(events)} window events; the game's windows {sorted(game)} ({swaps} new: its device "
+              f"window replaced)" + (f"; others: {'; '.join(others)}" if others else '; no other window'))
+    closes = sum(1 for ev in events if ev.get('change') == 'close' and (ev.get('container') or {}).get('id') in game)
+    if m.group('kept'):
+        detail += f"; the game's window closed {closes} times"
+        return c.checked(not others and swaps == 0 and closes == 0, detail, how=f'swaymsg subscribe window -> {path.name}')
+    return c.checked(bool(others) if m.group('another') else not others, detail,
+                     how=f'swaymsg subscribe window -> {path.name}')
+
+
 @step(r'^expect the game (?:to have |has )?(?:exited|quit|closed)$')
 def s_expect_exited(c, m):
     for _ in range(40):
@@ -658,8 +929,8 @@ def s_expect_exited(c, m):
 @step(r'^expect no crash$|^expect the game not to (?:have )?crash(?:ed)?$')
 def s_no_crash(c, m):
     crashed = c.sess.crashed()
-    detail = 'exception.txt was written:\n' + (c.sess.game_log('exception.txt') or '')[-1500:] if crashed \
-        else 'exception.txt untouched'
+    detail = f'{Path(config.LOG_CRASH).name} was written:\n' + (c.sess.game_log(config.LOG_CRASH) or '')[-1500:] if crashed \
+        else f'{Path(config.LOG_CRASH).name} untouched'
     return c.checked(not crashed, detail, how="the game's crash handler writes exception.txt")
 
 
@@ -712,7 +983,7 @@ def s_display_mark(c, m):
     """`Mark the display context "mission"`: the calls Display8 counts from here on
     belong to that context. Written into `Display8.mark`, which d3d8.dll reads at its
     next `Present` (at most four times a second) and deletes."""
-    g = c.sess.game_dir
+    g = c.sess.exe_dir
     if not c.sess.log_path('Display8.log'):
         raise StepFailed('Display8 is not in this game (./install puts it in: --install .)')
     mark = g / 'Display8.mark'
@@ -729,7 +1000,7 @@ def s_display_mark(c, m):
 def display_inventory(c, since):
     """Display8's inventory, rewritten after `since` (it is every two seconds of
     presenting and at each mark), as rows of dicts."""
-    p = c.sess.game_dir / 'Display8.inventory.tsv'
+    p = c.sess.exe_dir / 'Display8.inventory.tsv'
     end = time.time() + 10
     while not p.exists() or p.stat().st_mtime < since:
         c.assert_alive()
@@ -808,6 +1079,117 @@ def s_scene_answer(c, m):
     hit = m.group('text').lower() in out.lower()
     ok = not hit if m.group('neg') else hit
     return c.checked(ok, out, how=f'Scene.asi\'s answer to "{m.group("cmd")}"')
+
+
+# -- the game's objects, through Scene.asi's `objects` (bench/objects.py; scenarios/README.md, "Objects")
+
+def _objects(c, noun, clauses):
+    flt = objs_mod.from_phrase(noun, clauses or '')
+    header, objs = c.sess.objects()
+    return flt, header, [o for o in objs if flt(o)]
+
+
+def _listing(objs, limit=12):
+    return objs_mod.table(objs[:limit]) + (f'\n... and {len(objs) - limit} more' if len(objs) > limit else '')
+
+
+@step(r'^(?:expect|check|verify)(?: that)? (?:there (?:is|are) )?' + objs_mod.QUANT + r' ' + objs_mod.PHRASE + r'$')
+def s_expect_objects(c, m):
+    """`Expect an object of class "Galaxy" owned by player 1`, `Expect no ship on team 2`,
+    `Expect 3 stations of the player's`, `Expect at least 2 ships within 300 of
+    3000,0,3000`: counted in the game's object list (Scene.asi's `objects`)."""
+    test, want = objs_mod.quantity(m.group('q'))
+    flt, header, hits = _objects(c, m.group('noun'), m.group('clauses'))
+    return c.checked(test(len(hits)), f'{len(hits)} of {header.get("count", "?")} objects are {flt.describe()} '
+                     f'(want {want})' + ('\n' + _listing(hits) if hits else ''),
+                     how="Scene.asi's object list (Scene.objects.jsonl)", measure=dict(count=len(hits)))
+
+
+@step(r'^wait ' + SECS + r'(?:for|until) (?:there (?:is|are) )?' + objs_mod.QUANT + r' ' + objs_mod.PHRASE
+      + r'(?: (?:to )?(?:exists?|appears?|to be there))?$')
+def s_wait_objects(c, m):
+    """`Wait up to 60 seconds until a ship named "mine" is within 100 of 3000,0,3000`,
+    `Wait until no ship is on team 2`: the object list read every second until the count
+    holds. At the limit it is a failed check and the run goes on."""
+    n = int(m.group('n') or 90)
+    test, want = objs_mod.quantity(m.group('q'))
+    end = time.time() + n
+    while True:
+        c.assert_alive()
+        flt, header, hits = _objects(c, m.group('noun'), m.group('clauses'))
+        if test(len(hits)):
+            return f'{len(hits)} {flt.describe()} after {n - max(0, end - time.time()):.0f} s' + \
+                ('\n' + _listing(hits, 6) if hits else '')
+        if time.time() > end:
+            return c.checked(False, f'{len(hits)} objects are {flt.describe()} after {n} s (want {want})'
+                             + ('\n' + _listing(hits, 6) if hits else ''), how="Scene.asi's object list, polled")
+        time.sleep(1)
+
+
+def _pick(c, q, noun, clauses, what):
+    flt, header, hits = _objects(c, noun, clauses)
+    if not hits:
+        raise StepFailed(f'{what}: no object is {flt.describe()} (of {header.get("count", "?")})')
+    if (q or 'the').lower() in ('a', 'an', 'one', 'the', 'any') and not noun.lower().endswith('s'):
+        hits = hits[:1]
+    return flt, hits
+
+
+@step(r'^select ' + objs_mod.QUANT + r' ' + objs_mod.PHRASE + r'$|^add ' + objs_mod.QUANT.replace('<q>', '<q2>')
+      + r' ' + objs_mod.PHRASE.replace('<noun>', '<noun2>').replace('<clauses>', '<clauses2>') + r' to the selection$')
+def s_select_objects(c, m):
+    """`Select the ships of class "Galaxy" on team 1`, `Select a station of the player's`,
+    `Add the ship named "s2" to the selection`: through the overview's own Select, as
+    clicks do (Scene.asi's `select` / `select+` by id). A singular noun takes the first
+    match; a plural takes every match, up to 30 (Roots' cap; FleetOpsHook's Select refuses
+    the rest)."""
+    add = m.group('noun2') is not None
+    q, noun, cl = (m.group('q2'), m.group('noun2'), m.group('clauses2')) if add else \
+        (m.group('q'), m.group('noun'), m.group('clauses'))
+    flt, hits = _pick(c, q, noun, cl, 'select')
+    refs = ' '.join(objs_mod.ref(o) for o in hits[:30])
+    out = c.sess.scene(('select+ ' if add else 'select ') + refs)
+    if '\n  !' in '\n' + out:
+        raise StepFailed('Scene.asi refused: ' + out)
+    return f'{len(hits[:30])} {flt.describe()}: {refs}\n{out}'
+
+
+@step(r'^(?:center|centre|point|put) the camera on ' + objs_mod.QUANT + r' ' + objs_mod.PHRASE + r'$')
+def s_camera_object(c, m):
+    """`Center the camera on the station named "yard1"`: the RTS camera, as the
+    script interface's CenterCamera (Scene.asi's `camera on #id`)."""
+    flt, hits = _pick(c, 'the', m.group('noun').rstrip('s'), m.group('clauses'), 'camera')
+    out = c.sess.scene('camera on ' + objs_mod.ref(hits[0]))
+    if '\n  !' in '\n' + out:
+        raise StepFailed('Scene.asi refused: ' + out)
+    return out
+
+
+@step(r'^order ' + objs_mod.QUANT + r' ' + objs_mod.PHRASE + r' to (?:move|go) to (?P<x>' + objs_mod.NUM
+      + r'),\s*(?P<y>' + objs_mod.NUM + r'),\s*(?P<z>' + objs_mod.NUM + r')(?P<warp> at warp)?$')
+def s_order_move(c, m):
+    """`Order the ships of the player's to move to 3000,0,3000`: a player's move order
+    (Scene.asi's `goto ... world x y z`), the group keeping its places."""
+    flt, hits = _pick(c, m.group('q'), m.group('noun'), m.group('clauses'), 'move')
+    out = c.sess.scene('goto ' + ','.join(objs_mod.ref(o) for o in hits[:30]) +
+                       f' world {m.group("x")} {m.group("y")} {m.group("z")}' + (' warp' if m.group('warp') else ''))
+    if '\n  !' in '\n' + out:
+        raise StepFailed('Scene.asi refused: ' + out)
+    return out
+
+
+@step(r'^order ' + objs_mod.QUANT + r' ' + objs_mod.PHRASE + r' to attack '
+      + objs_mod.QUANT.replace('<q>', '<q2>') + r' '
+      + objs_mod.PHRASE.replace('<noun>', '<noun2>').replace('<clauses>', '<clauses2>') + r'$')
+def s_order_attack(c, m):
+    """`Order the ship named "kli" to attack the station of class "Starbase" on team 2`:
+    each attacker ordered at the first target found (Scene.asi's `attack`)."""
+    _, attackers = _pick(c, m.group('q'), m.group('noun'), m.group('clauses'), 'attack')
+    _, targets = _pick(c, 'the', m.group('noun2').rstrip('s'), m.group('clauses2'), 'attack target')
+    out = '\n'.join(c.sess.scene(f'attack {objs_mod.ref(a)} {objs_mod.ref(targets[0])}') for a in attackers[:30])
+    if '\n  !' in '\n' + out:
+        raise StepFailed('Scene.asi refused: ' + out)
+    return out
 
 
 @step(r'^expect (?:to be on )?the (?P<screen>[\w\' -]+?) (?:screen|menu)(?: to be shown| is shown)?$')
@@ -1117,7 +1499,8 @@ def s_judge(c, m):
 
 # The steps that act on the game: a log wait reads what was written after the last one.
 ACTIONS = {s_launch, s_quit, s_stop, s_click_at, s_click_text, s_click_named, s_drag, s_move, s_press,
-           s_wheel, s_overlay, s_type, s_type_address, s_type_from_log, s_scene, s_scene_answer}
+           s_wheel, s_overlay, s_type, s_type_address, s_type_from_log, s_scene, s_scene_answer,
+           s_select_objects, s_camera_object, s_order_move, s_order_attack}
 
 
 # ---------------------------------------------------------------------- one case
@@ -1352,7 +1735,7 @@ class Case:
     def new_log_lines(self, name):
         """The lines of a game log written since the last action.  A log shorter than its
         mark was written afresh (each launch deletes the old ones) and is read whole."""
-        p = self.sess.log_path(name) or self.sess.game_dir / name
+        p = self.sess.log_path(name) or self.sess.exe_dir / name
         try:
             with open(p, 'rb') as f:
                 size = f.seek(0, 2)

@@ -66,12 +66,21 @@ typedef struct A2EEntry {
 
 typedef struct A2EBlock { A2E_U16 hook; const char *symbol, *why, *note; } A2EBlock;
 
+/* build.toml [pe] file_crc: a section's CRC-32 in the executable's FILE on disk. */
+typedef struct A2ECrc { const char *section; A2E_U32 crc; } A2ECrc;
+/* build.toml [[module]]: a companion module, named by the CRC-32 of its .text in its file. */
+typedef struct A2EModule { const char *name; A2E_U32 text_crc; } A2EModule;
+
 typedef struct A2EBuild {
     const char *name, *key, *exe;      /* exe: build.toml's first `exe`, for the log */
     A2E_U32 timestamp, image_size, sections, image_base;
     const A2EEntry *entries;
     const A2EBlock *blocked;
     A2E_U16 n_blocked, n_resolved;
+    const A2ECrc *file_crc;   A2E_U16 n_file_crc;    /* the build is also told by these */
+    const A2EModule *modules; A2E_U16 n_modules;
+    const A2EBlock *blocked_mod;                     /* hooks that stand down with another module */
+    A2E_U16 n_blocked_mod, n_resolved_mod;
 } A2EBuild;
 
 typedef struct A2ETable {
@@ -99,6 +108,63 @@ static inline int a2e_rd32(const A2E_U8 *img, A2E_U32 avail, A2E_U32 at, A2E_U32
     *v = (A2E_U32)img[at] | ((A2E_U32)img[at + 1] << 8) |
          ((A2E_U32)img[at + 2] << 16) | ((A2E_U32)img[at + 3] << 24);
     return 1;
+}
+
+/* CRC-32 (IEEE 802.3, zlib's): start at 0xffffffff, finish with ~. */
+static inline A2E_U32 a2e_crc32_update(A2E_U32 c, const A2E_U8 *p, A2E_U32 n)
+{
+    static const A2E_U32 nib[16] = {
+        0x00000000u, 0x1db71064u, 0x3b6e20c8u, 0x26d930acu, 0x76dc4190u, 0x6b6b51f4u, 0x4db26158u, 0x5005713cu,
+        0xedb88320u, 0xf00f9344u, 0xd6d6a3e8u, 0xcb61b38cu, 0x9b64c2b0u, 0x86d3d2d4u, 0xa00ae278u, 0xbdbdf21cu };
+    A2E_U32 i;
+    for (i = 0; i < n; i++) {
+        c ^= p[i];
+        c = (c >> 4) ^ nib[c & 15];
+        c = (c >> 4) ^ nib[c & 15];
+    }
+    return c;
+}
+
+/* Where the CRC of a section of a PE FILE comes from: read(ctx, offset, out, n) fills
+ * n bytes at a file offset, 1 if it could.  The raw data's first min(VirtualSize,
+ * SizeOfRawData) bytes at PointerToRawData, in 4 KiB steps (crates/a2engine pe.rs
+ * section_crc_file).  1 and *crc, or 0. */
+typedef int (*a2e_readat)(void *ctx, A2E_U32 at, A2E_U8 *out, A2E_U32 n);
+
+static inline int a2e_section_crc_file(a2e_readat rd, void *ctx, const char *name, A2E_U32 *crc)
+{
+    A2E_U8 b[40], buf[4096];
+    A2E_U32 nt, count, table, i, j;
+    if (rd(ctx, 0x3c, b, 4) == 0) return 0;
+    nt = (A2E_U32)b[0] | ((A2E_U32)b[1] << 8) | ((A2E_U32)b[2] << 16) | ((A2E_U32)b[3] << 24);
+    if (!rd(ctx, nt + 6, b, 2)) return 0;
+    count = (A2E_U32)b[0] | ((A2E_U32)b[1] << 8);
+    if (!rd(ctx, nt + 20, b, 2)) return 0;
+    table = nt + 24 + ((A2E_U32)b[0] | ((A2E_U32)b[1] << 8));
+    if (count > 96) return 0;
+    for (i = 0; i < count; i++) {
+        A2E_U32 vsize, raw, ptr, left, c = 0xffffffffu;
+        int n = 0, ok = 1;
+        if (!rd(ctx, table + i * 40, b, 40)) return 0;
+        while (n < 8 && b[n]) n++;
+        for (j = 0; ok && (int)j < n; j++) if (!name[j] || name[j] != (char)b[j]) ok = 0;
+        if (ok && name[n]) ok = 0;
+        if (!ok) continue;
+        vsize = (A2E_U32)b[8] | ((A2E_U32)b[9] << 8) | ((A2E_U32)b[10] << 16) | ((A2E_U32)b[11] << 24);
+        raw = (A2E_U32)b[16] | ((A2E_U32)b[17] << 8) | ((A2E_U32)b[18] << 16) | ((A2E_U32)b[19] << 24);
+        ptr = (A2E_U32)b[20] | ((A2E_U32)b[21] << 8) | ((A2E_U32)b[22] << 16) | ((A2E_U32)b[23] << 24);
+        left = vsize < raw ? vsize : raw;
+        while (left) {
+            A2E_U32 k = left < sizeof buf ? left : (A2E_U32)sizeof buf;
+            if (!rd(ctx, ptr, buf, k)) return 0;
+            c = a2e_crc32_update(c, buf, k);
+            ptr += k;
+            left -= k;
+        }
+        *crc = ~c;
+        return 1;
+    }
+    return 0;
 }
 
 static inline A2E_U32 a2e_fnv_bytes(A2E_U32 h, const A2E_U8 *p, int n)
@@ -205,7 +271,9 @@ static inline void a2e_line(char *out, const char *exe, const A2Identity *id)
 #define A2E_TEST_WHY    "test mismatch (A2EngineTest.ini)"
 
 enum { A2E_W_NOT_STOCK = 1, A2E_W_CALLS = 2, A2E_W_BLOCKED = 3, A2E_W_UNKNOWN = 5,
-       A2E_W_TEST = 6, A2E_W_ABSENT = 7, A2E_W_FOUND = 8 };
+       A2E_W_TEST = 6, A2E_W_ABSENT = 7, A2E_W_FOUND = 8, A2E_W_MODULE = 9 };
+/* What the process holds of a companion module (a2e_comp_fn). */
+enum { A2E_C_NOT_LOADED = 0, A2E_C_CRC = 1, A2E_C_UNREADABLE = 2 };
 enum { A2E_HS_READY = 1, A2E_HS_FAILED = 2 };    /* hook_state */
 enum { A2E_SF_READY = 1, A2E_SF_WARNED = 2 };    /* sym_flags */
 
@@ -221,6 +289,12 @@ static char            a2e_gl[512];              /* the test globs, NUL-separate
 static int             a2e_ng;
 static char            a2e_exe[64];              /* the executable's name, as logged */
 static char            a2e_pnote[A2E_NOTE_MAX + 1];   /* the plugin note */
+static int             a2e_comp_bad;             /* a companion module is not the profiled one */
+/* The two things the resolver cannot read from the mapped image (a2e_init sets the
+ * Win32 ones, the host test its own): the CRC-32 of a section of the executable's file
+ * (0: unreadable), and a companion module's (A2E_C_*). */
+static int (*a2e_file_crc_fn)(const char *section, A2E_U32 *crc);
+static int (*a2e_comp_fn)(const char *name, A2E_U32 *crc);
 
 static inline void a2e_ap(A2ELine *l, const char *s)
 {
@@ -516,21 +590,34 @@ static inline int a2e_start(const A2ETable *t, a2_logfn log, const A2E_U8 *mem, 
     A2Identity id;
     A2ELine l;
     A2E_U32 n, h, i;
-    int ok;
+    int ok, crc_line = -1;
     a2e_t = t; a2e_logf = log; a2e_mem = mem; a2e_base = base; a2e_size = size;
-    a2e_bi = -1; a2e_delta = 0; a2e_clo = a2e_chi = 0;
+    a2e_bi = -1; a2e_delta = 0; a2e_clo = a2e_chi = 0; a2e_comp_bad = 0;
     for (i = 0; i < t->n_syms; i++) { t->sym_flags[i] = 0; t->sym_addr[i] = 0; }
     for (i = 0; i < t->n_hooks; i++) { t->hook_state[i] = 0; t->notes[i][0] = 0; }
     l.n = 0; l.b[0] = 0;
     ok = a2e_parse(mem, size, base, &id);
     if (ok) {
         a2e_clo = id.code_lo; a2e_chi = id.code_hi;
+        /* the three numbers, and the on-disk section CRCs of a build that sets them (read
+         * only for such a candidate; it is preferred to one that does not) */
         for (i = 0; i < t->n_builds; i++) {
             const A2EBuild *b = &t->builds[i];
-            if (b->timestamp == id.timestamp && b->image_size == id.image_size && b->sections == id.sections) {
-                a2e_bi = (int)i;
-                break;
+            if (b->timestamp == id.timestamp && b->image_size == id.image_size && b->sections == id.sections
+                && b->n_file_crc) {
+                A2E_U32 j, c;
+                int same = 1;
+                if (crc_line < 0) crc_line = (int)i;
+                for (j = 0; same && j < b->n_file_crc; j++)
+                    if (!a2e_file_crc_fn || !a2e_file_crc_fn(b->file_crc[j].section, &c) || c != b->file_crc[j].crc)
+                        same = 0;
+                if (same) { a2e_bi = (int)i; break; }
             }
+        }
+        for (i = 0; a2e_bi < 0 && i < t->n_builds; i++) {
+            const A2EBuild *b = &t->builds[i];
+            if (b->timestamp == id.timestamp && b->image_size == id.image_size && b->sections == id.sections
+                && !b->n_file_crc) a2e_bi = (int)i;
         }
     }
     {   /* the executable's name: the build's, else the module's, else "exe" */
@@ -543,6 +630,21 @@ static inline int a2e_start(const A2ETable *t, a2_logfn log, const A2E_U8 *mem, 
     if (ok) a2e_line(l.b, a2e_exe, &id);
     else { a2e_ap(&l, "engine: "); a2e_ap(&l, a2e_exe); a2e_ap(&l, " identity unreadable"); }
     a2e_say(&l);
+    if (crc_line >= 0) {
+        const A2EBuild *b = &t->builds[crc_line];
+        A2E_U32 j, c;
+        l.n = 0; l.b[0] = 0;
+        a2e_ap(&l, "engine: "); a2e_ap(&l, a2e_exe); a2e_ap(&l, " file crc:");
+        for (j = 0; j < b->n_file_crc; j++) {
+            a2e_ap(&l, j ? ", " : " "); a2e_ap(&l, b->file_crc[j].section); a2e_ap(&l, " ");
+            if (a2e_file_crc_fn && a2e_file_crc_fn(b->file_crc[j].section, &c)) {
+                char hx[12];
+                a2e_hex(hx, c, 8);
+                a2e_ap(&l, hx);
+            } else a2e_ap(&l, "unreadable");
+        }
+        a2e_say(&l);
+    }
     l.n = 0; l.b[0] = 0;
     if (a2e_bi >= 0) {
         const A2EBuild *b = &t->builds[a2e_bi];
@@ -554,6 +656,36 @@ static inline int a2e_start(const A2ETable *t, a2_logfn log, const A2E_U8 *mem, 
         n = t->n_scan; h = 0;
     }
     a2e_say(&l);
+    if (a2e_bi >= 0) {   /* the companion modules the build's marks describe */
+        const A2EBuild *b = &t->builds[a2e_bi];
+        for (i = 0; i < b->n_modules; i++) {
+            const A2EModule *m = &b->modules[i];
+            A2E_U32 c = 0;
+            int st = a2e_comp_fn ? a2e_comp_fn(m->name, &c) : A2E_C_UNREADABLE;
+            char hx[12];
+            l.n = 0; l.b[0] = 0;
+            a2e_ap(&l, "engine: companion "); a2e_ap(&l, m->name);
+            if (st == A2E_C_CRC && c == m->text_crc) {
+                a2e_hex(hx, c, 8);
+                a2e_ap(&l, " .text crc "); a2e_ap(&l, hx); a2e_ap(&l, " matches the profile");
+            } else {
+                a2e_comp_bad = 1;
+                a2e_hex(hx, m->text_crc, 8);
+                if (st == A2E_C_CRC) {
+                    char hy[12];
+                    a2e_hex(hy, c, 8);
+                    a2e_ap(&l, " .text crc "); a2e_ap(&l, hy); a2e_ap(&l, " is not the profiled "); a2e_ap(&l, hx);
+                    a2e_ap(&l, ": the hooks that depend on it stand down");
+                } else {
+                    a2e_ap(&l, st == A2E_C_NOT_LOADED ? " is not loaded" : " cannot be read");
+                    a2e_ap(&l, " (profiled .text crc "); a2e_ap(&l, hx);
+                    a2e_ap(&l, "): the hooks that depend on it stand down");
+                }
+            }
+            a2e_say(&l);
+        }
+        if (a2e_comp_bad) { n = b->n_resolved_mod; h += b->n_blocked_mod; }
+    }
     a2e_fields();
     l.n = 0; l.b[0] = 0;
     a2e_ap(&l, "engine: symbols: "); a2e_apd(&l, n); a2e_ap(&l, "/"); a2e_apd(&l, t->n_syms);
@@ -600,6 +732,9 @@ static inline int a2e_ready(A2E_U32 hook)
         const A2EBuild *b = &a2e_t->builds[a2e_bi];
         for (j = 0; j < b->n_blocked; j++)
             if (b->blocked[j].hook == hook) { failed = 1; fail.why = A2E_W_BLOCKED; fail.aux = j; break; }
+        if (!failed && a2e_comp_bad)
+            for (j = 0; j < b->n_blocked_mod; j++)
+                if (b->blocked_mod[j].hook == hook) { failed = 1; fail.why = A2E_W_MODULE; fail.aux = j; break; }
     }
     if (!failed && a2e_ng) {
         const char *g = a2e_gl;
@@ -620,8 +755,9 @@ static inline int a2e_ready(A2E_U32 hook)
     if (failed) {
         l.n = 0; l.b[0] = 0;
         a2e_ap(&l, "engine: "); a2e_ap(&l, hd->id); a2e_ap(&l, " stands down: ");
-        if (fail.why == A2E_W_BLOCKED) {
-            const A2EBlock *bl = &a2e_t->builds[a2e_bi].blocked[fail.aux];
+        if (fail.why == A2E_W_BLOCKED || fail.why == A2E_W_MODULE) {
+            const A2EBuild *bb = &a2e_t->builds[a2e_bi];
+            const A2EBlock *bl = fail.why == A2E_W_MODULE ? &bb->blocked_mod[fail.aux] : &bb->blocked[fail.aux];
             a2e_ap(&l, bl->symbol); a2e_ap(&l, " "); a2e_ap(&l, bl->why);
             a2e_set_note(hook, bl->note, 0, 0, 0);
         } else {
@@ -752,6 +888,86 @@ static inline void a2e_log(void (*logline)(const char *))
 
 __declspec(dllimport) BOOL __stdcall ReadFile(HANDLE, void *, DWORD, DWORD *, void *);
 
+static inline int a2e_win_read(void *ctx, A2E_U32 at, A2E_U8 *out, A2E_U32 n)
+{
+    DWORD got = 0;
+    if (SetFilePointer((HANDLE)ctx, (LONG)at, NULLPTR, 0) == 0xffffffffu) return 0;
+    return ReadFile((HANDLE)ctx, out, n, &got, NULLPTR) && got == n;
+}
+
+/* The CRC-32 of a section of the file at path (a2e_section_crc_file), read in steps. */
+static inline int a2e_win_file_crc(const char *path, const char *section, A2E_U32 *crc)
+{
+    int ok;
+    HANDLE h = CreateFileA(path, 0x80000000u, FILE_SHARE_READ | 2, NULLPTR, 3, FILE_ATTRIBUTE_NORMAL, NULLPTR);
+    if (h == INVALID_HANDLE_VALUE) return 0;
+    ok = a2e_section_crc_file(a2e_win_read, (void *)h, section, crc);
+    CloseHandle(h);
+    return ok;
+}
+
+/* Several tables of one plugin ask the same questions: kept per section/module name. */
+static struct { char key[40]; A2E_U32 crc; int have; } a2e_win_cache[8];
+
+static inline int a2e_win_cached(const char *key, A2E_U32 *crc)
+{
+    int i;
+    for (i = 0; i < 8; i++) {
+        const char *a = a2e_win_cache[i].key, *b = key;
+        while (*a && *a == *b) { a++; b++; }
+        if (a2e_win_cache[i].have && *a == *b) { *crc = a2e_win_cache[i].crc; return 1; }
+    }
+    return 0;
+}
+
+static inline void a2e_win_keep(const char *key, A2E_U32 crc)
+{
+    int i, k;
+    for (i = 0; i < 8; i++) if (!a2e_win_cache[i].have) break;
+    if (i == 8) return;
+    for (k = 0; key[k] && k < 39; k++) a2e_win_cache[i].key[k] = key[k];
+    a2e_win_cache[i].key[k] = 0;
+    a2e_win_cache[i].crc = crc;
+    a2e_win_cache[i].have = 1;
+}
+
+/* key = prefix + name (no initialisers: a freestanding build has no memset). */
+static inline void a2e_win_key(char *key, const char *prefix, const char *name)
+{
+    int k = 0;
+    while (*prefix && k < 39) key[k++] = *prefix++;
+    while (*name && k < 39) key[k++] = *name++;
+    key[k] = 0;
+}
+
+static inline int a2e_win_exe_crc(const char *section, A2E_U32 *crc)
+{
+    char key[40], path[300];
+    int n;
+    a2e_win_key(key, "exe:", section);
+    if (a2e_win_cached(key, crc)) return 1;
+    n = (int)GetModuleFileNameA(NULLPTR, path, 260);
+    if (n <= 0 || n >= 260) return 0;
+    if (!a2e_win_file_crc(path, section, crc)) return 0;
+    a2e_win_keep(key, *crc);
+    return 1;
+}
+
+static inline int a2e_win_module_crc(const char *name, A2E_U32 *crc)
+{
+    char key[40], path[300];
+    int n;
+    HMODULE m = GetModuleHandleA(name);
+    if (!m) return A2E_C_NOT_LOADED;
+    a2e_win_key(key, "mod:", name);
+    if (a2e_win_cached(key, crc)) return A2E_C_CRC;
+    n = (int)GetModuleFileNameA(m, path, 260);
+    if (n <= 0 || n >= 260) return A2E_C_UNREADABLE;
+    if (!a2e_win_file_crc(path, ".text", crc)) return A2E_C_UNREADABLE;   /* its file, not its image */
+    a2e_win_keep(key, *crc);
+    return A2E_C_CRC;
+}
+
 /* Starts the resolver of t on this process's executable, reading A2EngineTest.ini
  * beside it if there is one (the bench's fault injection).  1 if a build matched. */
 static inline int a2e_init(const A2ETable *t, a2_logfn log)
@@ -763,6 +979,8 @@ static inline int a2e_init(const A2ETable *t, a2_logfn log)
     DWORD got = 0;
     int n, i, slash = -1;
     ini[0] = 0;
+    a2e_file_crc_fn = a2e_win_exe_crc;
+    a2e_comp_fn = a2e_win_module_crc;
     a2e_module_name(name, sizeof name);
     if (!base || !a2e_parse(base, 0x1000, (A2E_U32)base, &id)) {
         static const A2E_U8 none[1] = {0};

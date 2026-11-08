@@ -99,10 +99,19 @@ static int bar_active(void)
     return on;
 }
 
-/* QOL_BarLabel: the UI asks for each cell it draws. */
+/* Whether the cell has a key: on this build (bk_key_cells, all fifteen on stock and on Roots),
+ * and its key not still the game's because a rebind row moving the game's action off it did not
+ * apply (rebind_blocks: on Roots, W while select_next_ship is still on W).  The UI puts no
+ * button in a cell without a key. */
+static int bar_cell_keyed(UINT cell)
+{
+    return cell < BAR_CELLS && ((DWORD)QOL_V_BK_KEY_CELLS >> cell & 1) && !rebind_blocks(k_barScan[cell]);
+}
+
+/* QOL_BarLabel: the UI asks for each cell it draws.  NULL for a cell without a key. */
 __declspec(dllexport) const char *__cdecl QOL_BarLabel(UINT cell)
 {
-    if (!g_barOk || bar_why() || cell >= BAR_CELLS) return NULLPTR;
+    if (!g_barOk || bar_why() || !bar_cell_keyed(cell)) return NULLPTR;
     return k_barLabel[cell];
 }
 
@@ -162,7 +171,7 @@ static void bar_scan(void)
     UINT c;
     for (c = 0; c < BAR_CELLS; c++) {
         int d = bar_held(g_barVk[c]);
-        if (d && !g_barDown[c] && ok && hit < 0) hit = (int)c;
+        if (d && !g_barDown[c] && ok && hit < 0 && bar_cell_keyed(c)) hit = (int)c;
         g_barDown[c] = d;
     }
     if (hit >= 0) {
@@ -192,6 +201,8 @@ static void __thiscall bar_keys_hook(BYTE *p, int crafts)
     int on;
     bar_find_ui();
     on = bar_active();
+    rebind_follow(on);
+    if (on) rebind_note_blocked();
     if (on) {
         /* The build's offsets and toggle count (resolved at start-up); at most
          * BK_TOGGLES_MAX toggles are saved, the room on this stack. */

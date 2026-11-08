@@ -10,6 +10,10 @@ out = "ui/src/syms_shell.rs"
 doc = "The shell's Credits call and the display, pump and background functions a screen of ours runs between screens"
 rows = ["Menus.Credits"]
 
+[hook."shell.background"]
+doc = "The black shell background a screen of ours in the Credits' place leaves behind it, as the stock Credits do"
+rows = ["Menus.Credits"]
+
 [hook."shell.reads_device"]
 doc = "The Storm3D device behind the shell, the pump's exit code and the Alt+Tab flag, read and its Flip slot called"
 
@@ -97,7 +101,7 @@ symbol = "SetCurrentBackground"
 kind = "fn"
 addr = 0x6083f0
 check = "55 8b ec 51"
-used_by = ["shell.screens"]
+used_by = ["shell.background"]
 
 [[sym]]
 id = "shell_shell_bitmap"
@@ -105,7 +109,7 @@ symbol = "ShellBitmap::ShellBitmap"
 kind = "fn"
 addr = 0x5a3960
 check = "55 8b ec 6a ff"
-used_by = ["shell.screens"]
+used_by = ["shell.background"]
 
 [[sym]]
 id = "shell_new"
@@ -113,7 +117,7 @@ symbol = "operator new"
 kind = "fn"
 addr = 0x652710
 check = "55 8b ec"
-used_by = ["shell.screens"]
+used_by = ["shell.background"]
 
 [[sym]]
 id = "shell_colour_black"
@@ -127,7 +131,7 @@ id = "shell_all_black_background"
 symbol = "ALL_BLACK_8_BY_6_BACKGROUND"
 kind = "global"
 addr = 0x727fd0
-used_by = ["shell.screens"]
+used_by = ["shell.background"]
 
 [[sym]]
 id = "shell_mode"
@@ -163,7 +167,7 @@ symbol = "ShellBitmap::ShellBitmap"
 kind = "value"
 value = 48
 unit = "bytes"
-used_by = ["shell.screens"]
+used_by = ["shell.background"]
 
 # ---- shell.reads_device (shell.rs) -------------------------------------------
 

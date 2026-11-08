@@ -1,0 +1,51 @@
+# fo-scan.py's judgements (tools/engine/README.md, "fo-scan.py"): the two things a diff
+# cannot say. Names only; nothing here is read out of a game file.
+schema = 1
+
+# Functions our hooks only CALL, never patch or detour. When Roots takes one over at its
+# entry (a jump, or a push/ret trampoline: everything changed in it lies in its first eight
+# bytes), calling it still reaches the intended code, so the build drops the entry check
+# (`check = ""`) instead of standing the hooks down. A listed function changed anywhere else,
+# or with a call site, jump or patch of ours inside it, is marked changed after all.
+callees = [
+    "operator new",
+    "cPrjID::GetOdfName",
+    "cPrjID::GetName",
+    "GameObject::Render",
+    "Craft::RenderInternal",
+]
+
+# Functions our hooks only call, which Roots changes anywhere in the body (FO-6 step 1;
+# decision 74): what they return is what Roots means, so their entry checks go. When a hook
+# of ours also sits inside one (a call site, a patch), the function stays marked and only the
+# hooks that merely call it are verified beside it. `DemandLoad` is replaced whole and one
+# loading hook patches a call inside it; `GetAction` carries an observer fix past its entry.
+callees_whole = [
+    "ST3D_Texture::DemandLoad",
+    "ActionMode::GetAction",
+]
+
+# The content set the build reads: none until FO-5 writes Roots' own.
+content = "none"
+
+# The sections whose CRC-32 the build's [pe] file_crc holds, from the file on disk
+# (FleetOpsHook rewrites .text and .rdata in memory; .test it leaves alone).
+file_crc = [".text", ".test"]
+
+# Companion modules the run-time marks describe, named by the CRC-32 of their .text in
+# their file; looked for beside the executable and one directory up.
+companions = ["FleetOpsHook.dll"]
+
+# Marks verified beside Roots' change: hook globs per function, kept when the profile is
+# written again.
+[verified]
+"Armada_RenderAllOurStuff" = ["render3d.frame.*"]
+"RenderLoopAssetLoadStatusUpdate" = ["ui.loading.overlay", "ui.loading.own"]
+"Program::GameDoOne" = ["ui.loading.own"]
+"Armada_RenderFrame" = ["render3d.frame.*", "ui.core.mission"]
+"ChatDisplay::Render" = ["ui.core.mission"]
+
+# Hooks that stay off on Roots whatever the diff says.
+[[disable]]
+hooks = ["qolrules.*"]
+why = "Roots has its own rules"

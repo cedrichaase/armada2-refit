@@ -11,10 +11,16 @@
 # set of defaults switched on is switched on where theirs still holds the old default
 # (tools/ini-merge.py). The plugins the UI replaced (HUD.asi, GridLayout.asi, Menus.asi)
 # are gone; retire/retire.sh, which ./install runs first, takes out any an old install left.
+#
+# It installs into the executable's folder (dirname $A2_EXE): the game directory on Armada
+# II, Data/ on Fleet Operations: Roots. On Roots the shipped UI.ini has that game's own
+# defaults applied (ui/defaults/fo-roots.ini: the loading screen on, every other part off
+# until verified; PLAN-FLEETOPS.md, FO-6, decision 63), for a new file and for the keys an
+# existing one lacks.
 set -euo pipefail
 
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/a2env.sh"
-GAME="$A2_GAME"
+GAME="$(dirname "$A2_EXE")"
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 remove=0
@@ -37,10 +43,16 @@ fi
 bash "$here/build.sh" >/dev/null
 
 cp "$here/build/UI.asi" "$GAME/UI.asi"
+shipped="$here/UI.ini"
+if [ -f "$here/defaults/$A2_PROFILE.ini" ]; then
+    shipped="$(mktemp)"
+    trap 'rm -f "$shipped"' EXIT
+    python3 "$here/apply-defaults.py" "$here/UI.ini" "$here/defaults/$A2_PROFILE.ini" "$shipped"
+fi
 if [ -f "$GAME/UI.ini" ]; then
-    python3 "$here/../tools/ini-merge.py" "$here/UI.ini" "$GAME/UI.ini"
+    python3 "$here/../tools/ini-merge.py" "$shipped" "$GAME/UI.ini"
 else
-    cp "$here/UI.ini" "$GAME/UI.ini"
+    cp "$shipped" "$GAME/UI.ini"
 fi
 
 rm -f "$GAME/UI.log"
