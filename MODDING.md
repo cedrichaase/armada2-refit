@@ -342,6 +342,9 @@ and the rest of the UI reaches it only through the facade `ui/src/engine/api.rs`
 
 ## Building a plugin
 
+To set up the toolchain and build the whole release zip from a fresh machine (Windows
+through WSL2, or Linux), follow [`BUILDING.md`](BUILDING.md).
+
 ### The SDK in the release zip
 
 The zip's `sdk/` folder is what a C plugin needs:
