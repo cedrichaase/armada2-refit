@@ -27,6 +27,7 @@ a time, and every fix can be undone.
 
 - [`PLAYING.md`](PLAYING.md): for players: installing, the Refit screen, `RefitPlayer.ini`, multiplayer, the graphics backend, logs and troubleshooting, uninstalling.
 - [`MODDING.md`](MODDING.md): for modders: the plugin contracts, symbol and content profiles, building plugins, and what may be published.
+- [`BUILDING.md`](BUILDING.md): building the plugins and the release zip from source, step by step, on Windows (WSL2) or Linux.
 
 ## Features
 
@@ -183,7 +184,7 @@ The layers are grouped from "copy a file, works anywhere" to "needs a specific s
 `Render3D.asi`, `QOL.asi`, `Online.asi` and the Bink proxy with their `.ini` files, and Display8 with `Display8.ini`. It also has installers that do this
 section for you: `install.sh` on Linux and macOS, `install.bat` on Windows (`README.txt`
 in the zip), and the graphical installers for all three, which leave the Bink proxy out
-for now. `publish/package.sh` builds the same zip locally.
+for now. `publish/package.sh` builds the same zip locally ([`BUILDING.md`](BUILDING.md), step by step).
 
 **Every plugin needs** the game's `Armada2.exe` from GOG patch 1.1,
 plus the Ultimate ASI Loader (`winmm.dll`) that `STA2WidescreenPatch` puts in the game
