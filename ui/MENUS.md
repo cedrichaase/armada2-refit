@@ -1303,6 +1303,48 @@ posted presses (main menu, Options, Graphics, Back, Back, Instant Action), a com
 Graphics, and a log line of the pointer and focus every two seconds
 (`testbench/scenarios/fo-ui-forms-probe.md`).
 
+### The map editor's property dialogs (`TGameObjectDialogForm`, `TMapOptionsDialogForm`)
+
+PLAN-FLEETOPS.md, decisions 630 to 639; `menus/roots/objdlg.rs` and `menus/roots/mapopts.rs`.
+Two more forms of FleetOpsHook's in the editor, both of `TAKEN`. The **object inspector**
+(`TGameObjectDialogForm`, 300x960 at the left of the screen) opens on the property key with an
+object selected: a view box (`cbbViewMode`: basic or advanced settings, which decides each item's
+`Visible`), Restore Class (`btn1`), the class chain (`lblClassCast`), OK and Cancel (`Button1`,
+`Button2`) and a NextSuite property inspector (`ObjectInspector`, `TNextInspector`). The items
+are not controls of the form: `engine/forms.rs` reads them from the inspector's memory (read
+only; the offsets are the `forms_insp_*` and `forms_item_*` fields of the profile) into
+`Control.inspector`: the class of each item (heading, text, number, choice, check box, colour,
+button), caption, level, flags, value, and the row it stands on. Our dialog draws them as rows
+in a scroll area (a heading opens and closes its items; a caption and its value; a check box; a
+swatch) and acts only by the inspector's own mouse: a value is clicked at its cell (the
+in-place editor, a child window of the inspector, opens; the typing goes to it, and our field
+shows its text), a heading at its glyph, a check box at its button. OK applies. **Map
+settings** (`TMapOptionsDialogForm`, Ctrl+R) is a page control (`pgc1`) with four tabs of plain
+VCL fields: ours are tabs pressed on the control's own tabs (a page's controls have no
+windows until it is shown), the fields laid out by name, text fields over Roots' own, combos
+through their windows. Traps: the controls of a tab that is not shown have no window; a
+combo may report no index and then only its text says what is chosen; Enter in an editor
+commits and presses OK (the default button); a key to the editor needs the game window to have
+had a click first. Not covered: the colour picker (an inspector colour item, the ambient
+colour), the ODF item's Show (`TSodPreviewForm`) and the choice items' lists. Scenario:
+`fo-mapedit-props`.
+
+**Armada II (gog-1.1): a plan, not done.** Its editor has the same dialogs as plain Win32
+dialogs of `Armada2.exe`, which the dialog host shows as windows of their own (`menus: dialog
+... runs stock: not a shell screen`): `Map_Dialog::DlgProc` (Ctrl+R; fields for the map's type,
+size, title, rule and script files, tech tree, background, starfield, stardate, officers,
+the map-type parameters and a start-location panel with eight buttons), `AllObjDlgProc`
+(Ctrl+Shift+A; a list of every object with Show filters, Edit, Goto and Delete),
+`ObjDlgProc` (an object's properties), `PathDlgProc` and `WormholeDialog::DlgProc`. They are
+not comdlg32, so decision 627's obstacle (a modal loop of ours for the file dialogs) does not
+apply; what they lack is a spec each. The work: one `[[sym]]` per procedure in
+`profiles/gog-1.1/ui.shell.toml` (the dialog host tells a dialog by its procedure),
+a control reader by dialog item id (the host's model already lists a dialog's children), and
+a spec per procedure in `menus/screens/` that lays the same fields out as `mapopts.rs` and
+`objdlg.rs` do, every edit by the dialog's own controls. The object dialog's template was
+not opened on the bench (the key's pick was not reproduced; the list's Edit button did not
+answer a bench click), so its controls have to be read first.
+
 ### The nine dialogs, adopted
 
 PLAN-FLEETOPS.md, "Phase two, step one: the dialogs adopted", decisions 230–238;

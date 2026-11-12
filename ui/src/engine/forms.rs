@@ -63,6 +63,8 @@ const TAKEN: &[&str] = &[
     "TMapEditCreateForm",
     "TMapSaveForm",
     "TMessageForm",
+    "TGameObjectDialogForm",
+    "TMapOptionsDialogForm",
 ];
 
 const WH_CBT: i32 = 5;
@@ -186,6 +188,60 @@ pub struct Control {
     pub value: Option<(i32, i32, i32, i32)>,
     /// A grid's cells, read from its memory (Map Select's list, the Mods list).
     pub grid: Option<Grid>,
+    /// The object inspector's items (the map editor's object properties).
+    pub inspector: Option<Inspector>,
+    /// A page control's tabs, each one's rectangle in the control's own pixels (the chosen
+    /// tab is `selected`).
+    pub tabs: Vec<[i32; 4]>,
+}
+
+/// What a property item of the object inspector is, for drawing and editing it.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum InsKind {
+    /// A heading that opens and closes the items under it.
+    Category,
+    /// A text, number or other item edited as text.
+    #[default]
+    Text,
+    /// A number (spin) item.
+    Spin,
+    /// A choice from a list.
+    Combo,
+    /// A check box.
+    Check,
+    /// A colour.
+    Color,
+    /// A button item (a value and a button: Show, a handle).
+    Button,
+}
+
+/// One item of Roots' object inspector (a NextSuite property inspector), as read at the last
+/// tick: plain copies.
+#[derive(Clone, Default)]
+pub struct InsItem {
+    pub kind: InsKind,
+    pub caption: String,
+    pub level: i32,
+    /// Whether it is on the inspector now: visible in the view mode and every category
+    /// above it open.
+    pub shown: bool,
+    pub expanded: bool,
+    pub read_only: bool,
+    pub value: String,
+    pub checked: bool,
+    /// Its row's top and height in the inspector's own pixels.
+    pub y: i32,
+    pub h: i32,
+}
+
+/// Roots' object inspector as read at the last tick: its items in the order they are drawn,
+/// the width of the caption column, and the editor that is open on the item being edited
+/// (its window and the text it holds).
+#[derive(Clone, Default)]
+pub struct Inspector {
+    pub items: Vec<InsItem>,
+    pub split: i32,
+    pub editor: Option<(usize, String)>,
 }
 
 /// A NextSuite grid's rows as read at the last tick: plain copies of the cells that hold
@@ -715,10 +771,14 @@ fn activated(h: HWND) {
         // A window that activates over the forms and is not one of them (nor the device
         // window, `TMainWindowForm`, which a click on our frame activates) stands on the
         // screen as a window of its own: named once per class, for the next one to take.
-        if !tracked().is_empty() && class != "TMainWindowForm" {
+        if class != "TMainWindowForm" && class != "Display8Host" {
             let seen = unsafe { &mut *core::ptr::addr_of_mut!(UNTAKEN) };
             if !seen.contains(&class) {
-                crate::log!("forms: {} {:p} activated over the forms: not one the forms take", class, h);
+                if tracked().is_empty() {
+                    crate::log!("forms: {} {:p} activated with no form up: not one the forms take (title {:?})", class, h, window_text(h));
+                } else {
+                    crate::log!("forms: {} {:p} activated over the forms: not one the forms take", class, h);
+                }
                 seen.push(class);
             }
         }
@@ -1154,12 +1214,21 @@ fn controls(obj: usize) -> Vec<Control> {
                 Kind::Edit => text = window_text(hwnd as HWND),
                 // A windowed button keeps its caption in its window, not the VCL's field.
                 Kind::Other if text.is_empty() && derives(vmt, "TButtonControl") => text = window_text(hwnd as HWND),
-                Kind::Combo => (items, selected) = combo_items(hwnd as HWND),
+                Kind::Combo => {
+                    (items, selected) = combo_items(hwnd as HWND);
+                    // An editable combo (a script file) holds a text of its own.
+                    text = window_text(hwnd as HWND);
+                }
                 _ => {}
             }
         }
         let (checked, value) = state_of(c, vmt, &class);
         let grid = if class == "TNextGrid" { grid_of(c, vmt, &class) } else { None };
+        let inspector = if class == "TNextInspector" { inspector_of(c, hwnd) } else { None };
+        let mut tabs = Vec::new();
+        if class == "TPageControl" && hwnd != 0 {
+            (tabs, selected) = page_tabs(hwnd as HWND);
+        }
         out.push(Control {
             name: ansi_string(rd::<usize>(c + field::FORMS_COMP_NAME())),
             class,
@@ -1174,9 +1243,157 @@ fn controls(obj: usize) -> Vec<Control> {
             checked,
             value,
             grid,
+            inspector,
+            tabs,
         });
     }
     out
+}
+
+/// A page control's tabs: each one's rectangle and the chosen one, through the common
+/// control's own messages.
+fn page_tabs(h: HWND) -> (Vec<[i32; 4]>, i32) {
+    const TCM_GETITEMCOUNT: u32 = 0x1304;
+    const TCM_GETITEMRECT: u32 = 0x130a;
+    const TCM_GETCURSEL: u32 = 0x130b;
+    let n = unsafe { SendMessageA(h, TCM_GETITEMCOUNT, 0, 0) }.clamp(0, 16);
+    let mut v = Vec::new();
+    for i in 0..n {
+        let mut r = WinRect::default();
+        unsafe { SendMessageA(h, TCM_GETITEMRECT, i as usize, &mut r as *mut WinRect as isize) };
+        v.push([r.left, r.top, r.right - r.left, r.bottom - r.top]);
+    }
+    (v, unsafe { SendMessageA(h, TCM_GETCURSEL, 0, 0) } as i32)
+}
+
+/// A wide string held in a field of `o`.
+fn wide_at(o: usize, off: usize) -> String {
+    if !ptr_ok(o, off + 4) {
+        return String::new();
+    }
+    let p = rd::<usize>(o + off);
+    if p == 0 { String::new() } else { wide_string(p) }
+}
+
+/// The object inspector's items, read from its memory (read only): the items object's list
+/// holds every item in the order they are drawn, each with its caption, level, flags and, for
+/// the typed items, the value as the wide string it shows; a check box's state is that of
+/// its one button. Which rows stand on the inspector is worked out as the control does: an
+/// item hidden by the view mode, or under a category that is closed, has none.
+fn inspector_of(c: usize, hwnd: usize) -> Option<Inspector> {
+    let items = rd::<usize>(c + field::FORMS_INSP_ITEMS());
+    if !ptr_ok(items, field::FORMS_ITEMS_LIST() + 4) {
+        return None;
+    }
+    let list = rd::<usize>(items + field::FORMS_ITEMS_LIST());
+    if !ptr_ok(list, field::FORMS_LIST_COUNT() + 4) {
+        return None;
+    }
+    let (arr, n) = (rd::<usize>(list + field::FORMS_LIST_ITEMS()), rd::<i32>(list + field::FORMS_LIST_COUNT()));
+    if n <= 0 || n > 600 || !ptr_ok(arr, n as usize * 4) {
+        return None;
+    }
+    let row_h = rd::<i32>(c + field::FORMS_INSP_ROW()).clamp(8, 64);
+    let mut out = Vec::new();
+    let mut y = 0;
+    // The level of the closed category whose items are being skipped.
+    let mut closed: Option<i32> = None;
+    for k in 0..n as usize {
+        let it = rd::<usize>(arr + k * 4);
+        if !ptr_ok(it, field::FORMS_ITEM_VALUE() + 4) {
+            return None;
+        }
+        let class = class_name(rd::<usize>(it)).unwrap_or_default();
+        let kind = match class.as_str() {
+            "TNxToolbarItem" => InsKind::Category,
+            "TNxCheckBoxItem" => InsKind::Check,
+            "TNxSpinItem" => InsKind::Spin,
+            "TNxComboBoxItem" => InsKind::Combo,
+            "TNxColorItem" => InsKind::Color,
+            "TNxButtonItem" => InsKind::Button,
+            _ => InsKind::Text,
+        };
+        let level = rd::<i32>(it + field::FORMS_ITEM_LEVEL());
+        if closed.is_some_and(|l| level > l) {
+            out.push(InsItem { kind, level, y: -1, ..Default::default() });
+            continue;
+        }
+        closed = None;
+        let expanded = rd::<u8>(it + field::FORMS_ITEM_EXPANDED()) != 0;
+        let visible = rd::<u8>(it + field::FORMS_ITEM_VISIBLE()) != 0;
+        let mut item = InsItem {
+            kind,
+            caption: wide_at(it, field::FORMS_ITEM_CAPTION()),
+            level,
+            expanded,
+            read_only: rd::<u8>(it + field::FORMS_ITEM_READONLY()) != 0,
+            y: -1,
+            ..Default::default()
+        };
+        if !visible {
+            out.push(item);
+            continue;
+        }
+        if kind == InsKind::Category && !expanded {
+            closed = Some(level);
+        }
+        match kind {
+            InsKind::Category => {}
+            InsKind::Check => {
+                let col = rd::<usize>(it + field::FORMS_ITEM_BUTTONS());
+                if ptr_ok(col, field::FORMS_COLLECTION_LIST() + 4) {
+                    let l = rd::<usize>(col + field::FORMS_COLLECTION_LIST());
+                    if ptr_ok(l, field::FORMS_LIST_COUNT() + 4) && rd::<i32>(l + field::FORMS_LIST_COUNT()) > 0 {
+                        let b = rd::<usize>(rd::<usize>(l + field::FORMS_LIST_ITEMS()));
+                        if ptr_ok(b, field::FORMS_BUTTON_CHECKED() + 4) {
+                            item.checked = rd::<u8>(b + field::FORMS_BUTTON_CHECKED()) != 0;
+                        }
+                    }
+                }
+            }
+            _ => item.value = wide_at(it, field::FORMS_ITEM_VALUE()),
+        }
+        let ih = rd::<i32>(it + field::FORMS_ITEM_HEIGHT());
+        item.h = if ih > 0 { ih } else { row_h };
+        item.shown = true;
+        item.y = y;
+        y += item.h + 1;
+        out.push(item);
+    }
+    Some(Inspector { items: out, split: rd::<i32>(c + field::FORMS_INSP_SPLIT()), editor: inplace_editor(hwnd as HWND) })
+}
+
+/// The inspector's in-place editor: the visible child window that opens over an item being
+/// edited, and the text it holds.
+fn inplace_editor(insp: HWND) -> Option<(usize, String)> {
+    if insp.is_null() {
+        return None;
+    }
+    let mut w = unsafe { FindWindowExA(insp, core::ptr::null_mut(), core::ptr::null(), core::ptr::null()) };
+    while !w.is_null() {
+        if unsafe { IsWindowVisible(w) } != 0 {
+            static mut CLASSES: Vec<String> = Vec::new();
+            let cl = class_of(w);
+            let seen = unsafe { &mut *core::ptr::addr_of_mut!(CLASSES) };
+            if !seen.contains(&cl) {
+                crate::log!("forms: the inspector's editor window is a {}", cl);
+                seen.push(cl);
+            }
+            static mut LAST: usize = 0;
+            if unsafe { LAST } != w as usize {
+                unsafe { LAST = w as usize };
+                let (mut a, mut b) = (WinRect::default(), WinRect::default());
+                unsafe {
+                    GetWindowRect(w, &mut a);
+                    GetWindowRect(insp, &mut b);
+                }
+                crate::log!("forms: the inspector's editor {:p} stands at {},{} {}x{} in it", w, a.left - b.left, a.top - b.top, a.right - a.left, a.bottom - a.top);
+            }
+            return Some((w as usize, window_text(w)));
+        }
+        w = unsafe { FindWindowExA(insp, w, core::ptr::null(), core::ptr::null()) };
+    }
+    None
 }
 
 /// A grid's cells, read from its memory (read only, decision 260): the grid's cells
@@ -1333,6 +1550,19 @@ fn log_changes(t: &Tracked, now: &[Control]) {
         }
         if c.selected != o.selected {
             crate::log!("forms: {} of {} now chose {}", c.name, t.class, c.selected);
+        }
+        // A text field's text, and the object inspector's values: what a typed edit did.
+        if c.kind == Kind::Edit && c.hwnd != 0 && o.hwnd == c.hwnd && c.text != o.text {
+            crate::log!("forms: {} of {} now reads {:?}", c.name, t.class, c.text);
+        }
+        if let (Some(n), Some(p)) = (&c.inspector, &o.inspector) {
+            if n.items.len() == p.items.len() {
+                for (a, b) in n.items.iter().zip(&p.items) {
+                    if a.shown && b.shown && (a.value != b.value || a.checked != b.checked) && a.caption == b.caption {
+                        crate::log!("forms: inspector item {:?} of {} now {:?}{}", a.caption, t.class, a.value, if a.kind == InsKind::Check { if a.checked { " (checked)" } else { " (unchecked)" } } else { "" });
+                    }
+                }
+            }
         }
     }
 }
