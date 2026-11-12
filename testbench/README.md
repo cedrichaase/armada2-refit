@@ -475,6 +475,14 @@ stem held `Mfed300.wav`, the voice stem `a2_fed01_intro.wav`, and the effects st
   (relative motion) moves it exactly, so `Session.move` sends the difference from the
   last known position; only a session's first move is absolute. Wine's
   `MouseWarpOverride=disable` changes nothing, so the warp is not DirectInput's.
+- **A click in the in-mission menu can miss after a long mission.** Opening the menu turns the
+  engine's locked mission pointer into an arrow, and the compositor's pointer and the game's
+  may then stand apart: the drawn cursor stays where the last mission click was and a press
+  lands beside its button (`multiplayer-online-loss`, 2026-11-08: the exit confirmation's
+  Yes three times; about one run in two on main and fo-b, none on 2026-11-06). `Quit the
+  game` therefore pushes the pointer into the corner before each press (`Session.to_corner`),
+  after the menu is up; a push made before Esc, while the pointer is still locked, did not
+  help. Any step that clicks in a menu after a long mission may want the same.
 - **OCR boxes cannot measure shape.** The same word's box can come back 28 px tall in
   one pass and 36 in another: a phantom 30% stretch. Text is only *located* by OCR in
   the reference shot. Its shape is measured by the template match, like any patch.
