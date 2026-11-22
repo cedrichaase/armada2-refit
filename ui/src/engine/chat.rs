@@ -38,10 +38,14 @@ fn ok() -> bool {
     eng().ready(hook::PANELS_CHAT).is_ok()
 }
 
-const F_SHOWN: u32 = value::PANELS_REGION_SHOWN as u32;
-const F_ACTIVE: u32 = value::PANELS_REGION_ACTIVE as u32;
-const F_CHANGED: u32 = value::PANELS_REGION_CHANGED as u32;
-const R_BUF_MAX: usize = value::PANELS_REGION_BUF_MAX as usize;
+#[inline(always)]
+fn f_shown() -> u32 { value::PANELS_REGION_SHOWN() as u32 }
+#[inline(always)]
+fn f_active() -> u32 { value::PANELS_REGION_ACTIVE() as u32 }
+#[inline(always)]
+fn f_changed() -> u32 { value::PANELS_REGION_CHANGED() as u32 }
+#[inline(always)]
+fn r_buf_max() -> usize { value::PANELS_REGION_BUF_MAX() as usize }
 
 static mut TAKEN: bool = false;
 static mut PATCHED: bool = false;
@@ -74,7 +78,7 @@ unsafe extern "C" fn text_input_update() {
     if unsafe { TAKEN } {
         // What stock does besides printing: the regions' "changed" flag is cleared.
         for r in regions() {
-            unsafe { *((r + field::PANELS_REGION_FLAGS) as *mut u32) &= !F_CHANGED };
+            unsafe { *((r + field::PANELS_REGION_FLAGS()) as *mut u32) &= !f_changed() };
         }
         return;
     }
@@ -100,14 +104,14 @@ pub fn lines() -> Vec<(String, u32)> {
         return v;
     }
     let chat = unsafe { rd::<usize>(addr(sym::PANELS_CHAT)) };
-    let head = fld(chat, field::PANELS_CHAT_LINES);
+    let head = fld(chat, field::PANELS_CHAT_LINES());
     if head == 0 {
         return v;
     }
     let mut n = fld(head, 0);
     while n != 0 && n != head && v.len() < 16 {
-        let text = buttons::latin1(fld(n, field::PANELS_NODE_TEXT), 512);
-        let c = fld(n, field::PANELS_NODE_COLOUR);
+        let text = buttons::latin1(fld(n, field::PANELS_NODE_TEXT()), 512);
+        let c = fld(n, field::PANELS_NODE_COLOUR());
         let col = if c == 0 { 0xff00ff00 } else { buttons::colour(unsafe { rd(c) }) };
         v.push((text, col));
         n = fld(n, 0);
@@ -148,15 +152,15 @@ pub struct Entry {
 pub fn entries() -> Vec<Entry> {
     let mut v = Vec::new();
     for r in regions() {
-        let flags: u32 = unsafe { rd(r + field::PANELS_REGION_FLAGS) };
-        if flags & F_SHOWN == 0 {
+        let flags: u32 = unsafe { rd(r + field::PANELS_REGION_FLAGS()) };
+        if flags & f_shown() == 0 {
             continue;
         }
-        let (p, e, c): (usize, usize, usize) = unsafe { (rd(r + field::PANELS_REGION_PROMPT), rd(r + field::PANELS_REGION_END), rd(r + field::PANELS_REGION_CARET)) };
-        if p > R_BUF_MAX || e > R_BUF_MAX {
+        let (p, e, c): (usize, usize, usize) = unsafe { (rd(r + field::PANELS_REGION_PROMPT()), rd(r + field::PANELS_REGION_END()), rd(r + field::PANELS_REGION_CARET())) };
+        if p > r_buf_max() || e > r_buf_max() {
             continue;
         }
-        let buf = buttons::latin1(r + field::PANELS_REGION_BUF, R_BUF_MAX);
+        let buf = buttons::latin1(r + field::PANELS_REGION_BUF(), r_buf_max());
         let chars: Vec<char> = buf.chars().collect();
         let p = p.min(chars.len());
         let e = e.clamp(p, chars.len());
@@ -164,9 +168,9 @@ pub fn entries() -> Vec<Entry> {
             prompt: chars[..p].iter().collect(),
             text: chars[p..e].iter().collect(),
             caret: c.clamp(p, e) - p,
-            active: flags & F_ACTIVE != 0,
-            x: unsafe { rd(r + field::PANELS_REGION_X) },
-            y: unsafe { rd(r + field::PANELS_REGION_Y) },
+            active: flags & f_active() != 0,
+            x: unsafe { rd(r + field::PANELS_REGION_X()) },
+            y: unsafe { rd(r + field::PANELS_REGION_Y()) },
         });
     }
     v

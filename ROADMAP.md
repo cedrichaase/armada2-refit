@@ -33,6 +33,7 @@ and gate W. This file used to say that `main` stood at 13.51.3 with nothing afte
 | E | 9 owners and the package, 10 Direct3D 12 and the platform gates | On `main`; final check outstanding; gate W (native Windows) not yet run |
 | F | 11 remove Direct3D 9 and the legacy plugins, 12 docs | On `main` (from root 15.6.0); final check outstanding; phase 12 in progress |
 | — | 13 architecture follow-ups (`PLAN-ARCHITECTURE.md`) | Planned 2026-11-04; AR-1 to AR-3 in progress on their own branches |
+| — | 14 renderer performance follow-ups (`PLAN-PERFORMANCE.md`) | Planned 2026-11-05, from a read-only review; nothing measured yet |
 
 What is built, at 15.6.0:
 
@@ -472,6 +473,25 @@ of three. The plan is `PLAN-ARCHITECTURE.md`, from the architecture review of
 10. AR-10: the shipped inis as defaults only.
 
 FO-3 and every Armada 1 work package that reads engine structs wait on AR-3.
+
+### Phase 14 — Renderer performance follow-ups (planned)
+
+**Goal:** take the renderer's avoidable costs out of a battle frame, move every
+first-use hitch onto the loading screen, and give the player a nebula quality option.
+The plan is `PLAN-PERFORMANCE.md`, from the read-only performance review of
+2026-11-05. Nothing in it is measured yet, so it starts with a clean baseline. Its work
+packages, in order, are:
+
+1. PF-0: a measurement baseline (no tracer in timing runs; PERF.md re-measured).
+2. PF-1 to PF-3: Display8's quick fixes, gpu's fixed costs per `Cmd`, then render
+   passes, barriers and constants.
+3. PF-4: preparation on the loading screen (pipelines, textures, models, the fireball
+   volume, the debris, the nebula bake).
+4. PF-5: the per-frame CPU lookups.
+5. PF-6: nebula quality as a Refit-screen option, with a half-resolution march at its
+   lower levels and today's look as the default.
+6. PF-7 to PF-11: the clusters, batching across `Cmd`s, the post, shader items and the
+   passthrough (the last after AR-7 is decided).
 
 ### Phase 12 — Documentation (in progress)
 

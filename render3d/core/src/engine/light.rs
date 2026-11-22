@@ -3,7 +3,7 @@
 //! (`scene::lights::Pool`).
 use crate::math::M34;
 use crate::engine::at;
-use crate::syms::sym;
+use crate::syms::{field as off, sym, value};
 
 pub fn fn_new() -> usize { at(sym::FN_NEW) } // operator new, cdecl
 pub fn fn_point_light() -> usize { at(sym::FN_POINT_LIGHT) } // ST3D_Point_Light::ST3D_Point_Light(db, node, name), thiscall
@@ -14,7 +14,7 @@ pub fn fn_register_light() -> usize { at(sym::FN_REGISTER_LIGHT) } // ST3D_Graph
 pub fn new_point_light(name: &'static [u8]) -> usize {
     unsafe {
         let new: unsafe extern "C" fn(u32) -> usize = core::mem::transmute(fn_new());
-        let l = new(0x138);
+        let l = new(value::POINT_LIGHT_BYTES() as u32);
         if l == 0 {
             return 0;
         }
@@ -27,8 +27,8 @@ pub fn new_point_light(name: &'static [u8]) -> usize {
 /// Full colour out to `start`, gone `range` further on (`+0x100`, `+0x104`).
 pub fn set_reach(light: usize, start: f32, range: f32) {
     unsafe {
-        core::ptr::write_unaligned((light + 0x100) as *mut f32, start);
-        core::ptr::write_unaligned((light + 0x104) as *mut f32, range);
+        core::ptr::write_unaligned((light + off::LIGHT_START()) as *mut f32, start);
+        core::ptr::write_unaligned((light + off::LIGHT_RANGE()) as *mut f32, range);
     }
 }
 

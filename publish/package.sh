@@ -27,7 +27,7 @@
 #   manifest.json               what is in it, for the GUI installer (package schema 1)
 #   armada2-refit-installer.py  the GUI installer (gui-installer/), also written beside
 #                               the zip, so a release carries it as an asset of its own
-# <version> is the root CHANGELOG.md's newest entry. Only our own code goes in: no asset,
+# <version> is the root CHANGELOG.md's newest entry (with A2_PRERELEASE=N, see below). Only our own code goes in: no asset,
 # nothing from the game, none of the test tools (probe.exe,
 # binktest.exe). CI runs this
 # on every push; see publish/README.md, "Release packages".
@@ -46,6 +46,14 @@ ver="$(version "$root/CHANGELOG.md")"
 gui="$root/gui-installer/armada2-refit-installer.py"   # the GUI installer
 [ -n "$ver" ] || { echo "no version in CHANGELOG.md" >&2; exit 1; }
 commit="$(git -C "$root" rev-parse --short HEAD)"
+# A2_PRERELEASE=N: the package of a pre-release, a build of the latest main (CI, on every
+# push to main, N its run number): the version is the next one, as the pending changesets
+# make it, plus "-pre.N", e.g. 15.10.0-pre.4182, tagged vX.Y.Z-pre.N (publish/README.md,
+# "Pre-releases: the latest main").
+if [ -n "${A2_PRERELEASE:-}" ]; then
+    [[ "$A2_PRERELEASE" =~ ^[0-9]+$ ]] || { echo "A2_PRERELEASE is a number" >&2; exit 1; }
+    ver="$(python3 "$root/tools/changeset.py" status --game armada2 --next-root)-pre.$A2_PRERELEASE"
+fi
 
 name="armada2-refit-$ver"
 stage="$(mktemp -d)"
@@ -309,6 +317,11 @@ import json, subprocess, sys
 reg = {l['id']: l for l in json.loads(subprocess.run(
     ['python3', '$root/tools/layers.py', '--json'], check=True, stdout=subprocess.PIPE).stdout)['layers']}
 OF = {'prereqs': 'platform'}
+# Only games offered to players (games/<id>.toml `offered`): one that is merely `installable`
+# (Fleet Operations: Roots) is bash-only and never named in a release package (games/README.md).
+import glob, os, tomllib
+OFFERED = {os.path.basename(f)[:-5] for f in glob.glob('$root/games/*.toml')
+           if tomllib.load(open(f, 'rb')).get('offered')}
 DIR = {'display': 'layers/display', 'render3d': 'layers/render3d', 'ui': 'layers/ui',
        'qol': 'layers/qol', 'rules': 'layers/rules', 'online': 'layers/online',
        'cutscenes': 'layers/cutscenes', 'models': 'models', 'prereqs': 'vendor'}
@@ -316,7 +329,7 @@ def layer(id, name, version, files, summary, when='always'):
     r = reg[OF.get(id, id)]
     return dict(id=id, name=name, version=version, files=files, summary=summary, when=when,
                 dir=DIR[id], select=r['select'], requires=r['requires'], scope=r['scope'],
-                games=r['games'])
+                games=[g for g in r['games'] if g in OFFERED])
 moved = [dict(zip(('from_file', 'from_section', 'from_key', 'to_file', 'to_section', 'to_key', 'default'),
                   l.rstrip('\n').split('\t')))
          for l in open('$d/moved.txt') if l.strip()]

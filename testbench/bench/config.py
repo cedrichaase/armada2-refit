@@ -10,6 +10,20 @@ A2TEST = REPO / 'a2test'
 
 sys.path.insert(0, str(REPO))
 import a2env  # noqa: E402  (the repository root: where the game is, a2env.sh has the rules)
+# The game (games/<id>.toml: A2_PROFILE, or `a2test --game ID`), and what the bench
+# needs of its descriptor: the executable it launches and matches processes by (beside
+# the game's own files, EXE_DIR), the settings file its adapter writes, the shell's mode.
+GAME_ID = a2env.GAME_ID
+GAME_DESC = a2env.DESC
+EXE_NAME = a2env.EXE_NAME
+EXE_REL = os.path.relpath(a2env.EXE, a2env.GAME)      # Armada2.exe; Data/ArmadaL.exe
+DATA_DIR = GAME_DESC['exe'].get('data_dir', '')           # '' ; Data (Roots)
+LAYERS = tuple(GAME_DESC.get('layers', ()))               # none: nothing of ours is installed
+LOG_CRASH = GAME_DESC.get('logs', {}).get('crash', 'exception.txt')
+LOG_DIRS = tuple(GAME_DESC.get('logs', {}).get('dirs', ('Logs',)))
+SETTINGS_KIND = GAME_DESC.get('settings', {}).get('kind', '')
+SETTINGS_FILE = GAME_DESC.get('settings', {}).get('file', '')
+SHELL_RES = tuple(GAME_DESC.get('display', {}).get('shell', (800, 600)))
 GAME = Path(a2env.GAME)
 PREFIX = Path(a2env.PREFIX)
 PROTON = Path(a2env.PROTON)
@@ -30,7 +44,7 @@ RESULTS = Path(os.environ.get('A2TEST_RESULTS', HOME / '.local/share/a2test/resu
 INPUT_SRC = BENCH / 'input'
 INPUT_BIN = INPUT_SRC / 'a2input'
 
-# The overrides Heroic launches with (GamesConfig/1174788223.json).
+# The overrides Heroic launches with (GamesConfig/<the descriptor's heroic id>.json).
 DLL_OVERRIDES = 'winmm=n,b;d3d8=n,b'
 
 # "Every relevant aspect ratio".  21:9 is the resolution the project is played at.

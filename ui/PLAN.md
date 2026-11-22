@@ -142,6 +142,10 @@ A UI of our own reads much more of the engine's state than today's plugins patch
 
 - **Every address and offset lives in the engine profile** (`profiles/gog-1.1/ui.<part>.toml`),
   read through `src/engine/`, one file per area, each with the hook or panel that needs it. Removing a panel removes its findings.
+- **The rest of the UI reaches `src/engine/` through one facade**, `src/engine/api.rs`,
+  which names each item it uses; `ui/lint-layers.sh` refuses any other path, an address
+  literal outside `src/engine/`, and the HUD canvas outside `engine/canvas.rs`
+  (`README.md`, "The engine boundary").
 - **Fields are read by offset, never through a mirrored layout**: no `#[repr(C)]`
   struct that copies a class's shape.
 - **Behaviour is specified from the running game** (the test bench), not by

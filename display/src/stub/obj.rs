@@ -139,40 +139,11 @@ impl SObj {
     }
 }
 
-/// Bytes per block and the block's edge in texels, for a `D3DFORMAT` (None: one the
-/// stub does not know, which it refuses).
-pub fn format_block(fmt: u32) -> Option<(u32, u32)> {
-    Some(match fmt {
-        20 => (3, 1),
-        21 | 22 | 32 | 33 | 31 | 35 | 62 | 63 | 64 | 65 | 67 | 71 | 75 | 77 | 79 => (4, 1),
-        23 | 24 | 25 | 26 | 29 | 30 | 51 | 60 | 61 | 70 | 73 | 80 => (2, 1),
-        27 | 28 | 41 | 50 | 52 => (1, 1),
-        0x3154_5844 => (8, 4),                                            // DXT1
-        0x3254_5844 | 0x3354_5844 | 0x3454_5844 | 0x3554_5844 => (16, 4), // DXT2..5
-        _ => return None,
-    })
-}
+pub use super::blocks::{bc_kind, format_block, level_count};
 
 pub fn level(fmt: u32, w: u32, h: u32, d: u32) -> Option<Level> {
-    let (bytes, edge) = format_block(fmt)?;
-    let (bw, bh) = (w.max(1).div_ceil(edge), h.max(1).div_ceil(edge));
-    let pitch = bw * bytes;
-    let slice = pitch * bh;
+    let (pitch, slice) = super::blocks::level_size(fmt, w, h)?;
     Some(Level { w: w.max(1), h: h.max(1), d: d.max(1), pitch, slice, data: alloc::vec![0; (slice * d.max(1)) as usize], child: core::ptr::null_mut() })
-}
-
-/// The levels a texture of `levels` (0: a full chain) has.
-pub fn level_count(levels: u32, w: u32, h: u32, d: u32) -> u32 {
-    if levels != 0 {
-        return levels;
-    }
-    let mut n = 1;
-    let mut m = w.max(h).max(d);
-    while m > 1 {
-        m >>= 1;
-        n += 1;
-    }
-    n
 }
 
 pub fn add_ref(o: *mut SObj) -> u32 {

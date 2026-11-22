@@ -201,3 +201,273 @@ symbol = "(unnamed) ordnance list head node"
 kind = "global"
 addr = 0x771fac
 used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_vt_submit"
+symbol = "Ordnance::Submit slot"
+kind = "field"
+struct = "Ordnance vftable"
+offset = 0x5c
+type = "ptr"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_shot_class"
+symbol = "Ordnance::class"
+kind = "field"
+struct = "Ordnance"
+offset = 0x34
+type = "ptr"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_shot_left"
+symbol = "Ordnance::time left"
+kind = "field"
+struct = "Ordnance"
+offset = 0xac
+type = "f32"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_shot_owner"
+symbol = "Ordnance::owner handle"
+kind = "field"
+struct = "Ordnance"
+offset = 0x5c
+type = "i32"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_shot_target"
+symbol = "Ordnance::target handle"
+kind = "field"
+struct = "Ordnance"
+offset = 0x60
+type = "i32"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_shot_start"
+symbol = "Ordnance::start"
+kind = "field"
+struct = "Ordnance"
+offset = 0xbc
+type = "v3"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_shot_end"
+symbol = "Ordnance::end"
+kind = "field"
+struct = "Ordnance"
+offset = 0xc8
+type = "v3"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_shot_hue"
+symbol = "Ordnance::hue"
+kind = "field"
+struct = "Ordnance"
+offset = 0xd0
+type = "v3"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_shot_hue_b"
+symbol = "Ordnance::second hue"
+kind = "field"
+struct = "Ordnance"
+offset = 0xd4
+type = "v3"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_shot_tint"
+symbol = "Ordnance::tint"
+kind = "field"
+struct = "Ordnance"
+offset = 0xf0
+type = "v3"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_class_light"
+symbol = "OrdnanceClass::light"
+kind = "field"
+struct = "OrdnanceClass"
+offset = 0x10
+type = "ptr"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_class_life"
+symbol = "OrdnanceClass::life span"
+kind = "field"
+struct = "OrdnanceClass"
+offset = 0x1c
+type = "f32"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_class_sprite"
+symbol = "OrdnanceClass::sprite"
+kind = "field"
+struct = "OrdnanceClass"
+offset = 0x12c
+type = "ptr"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_class_length"
+symbol = "OrdnanceClass::length"
+kind = "field"
+struct = "OrdnanceClass"
+offset = 0x144
+type = "f32"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_class_width"
+symbol = "OrdnanceClass::width"
+kind = "field"
+struct = "OrdnanceClass"
+offset = 0x148
+type = "f32"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_class_prj"
+symbol = "OrdnanceClass::cPrjID"
+kind = "field"
+struct = "OrdnanceClass"
+offset = 0x150
+type = "ptr"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_light_colour"
+symbol = "ST3D_Point_Light::colour"
+kind = "field"
+struct = "ST3D_Point_Light"
+offset = 0xf4
+type = "v3"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_phaser_spent"
+symbol = "Phaser::spent"
+kind = "field"
+struct = "Phaser"
+offset = 0x27
+type = "u8"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_phaser_firing"
+symbol = "Phaser::firing"
+kind = "field"
+struct = "Phaser"
+offset = 0x24
+type = "u8"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_obj_gone"
+symbol = "GameObject::gone"
+kind = "field"
+struct = "GameObject"
+offset = 0x113
+type = "u8"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_obj_dead"
+symbol = "GameObject::dead"
+kind = "field"
+struct = "GameObject"
+offset = 0x112
+type = "u8"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_obj_forget"
+symbol = "GameObject::forget as target"
+kind = "field"
+struct = "GameObject"
+offset = 0x10f
+type = "u8"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_obj_pos"
+symbol = "GameObject::position"
+kind = "field"
+struct = "GameObject"
+offset = 0xac
+type = "v3"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_obj_vel"
+symbol = "GameObject::velocity"
+kind = "field"
+struct = "GameObject"
+offset = 0xdc
+type = "v3"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_inst_radius"
+symbol = "ST3D_Instance::radius"
+kind = "field"
+struct = "ST3D_Instance"
+offset = 0x40
+type = "f32"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_effect_distance"
+symbol = "WarpSpriteEffect::distance"
+kind = "field"
+struct = "WarpSpriteEffect"
+offset = 0x10
+type = "f32"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_wave_class"
+symbol = "ShockwaveExplosion::class"
+kind = "field"
+struct = "ShockwaveExplosion"
+offset = 0x30
+type = "ptr"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_wave_class_prj"
+symbol = "ShockwaveExplosionClass::cPrjID"
+kind = "field"
+struct = "ShockwaveExplosionClass"
+offset = 0x24
+type = "ptr"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_wave_class_fade"
+symbol = "ShockwaveExplosionClass::fade"
+kind = "field"
+struct = "ShockwaveExplosionClass"
+offset = 0xe0
+type = "f32"
+used_by = ["ordnance.reads"]
+
+[[sym]]
+id = "or_wave_end"
+symbol = "ShockwaveExplosion::end radius"
+kind = "field"
+struct = "ShockwaveExplosion"
+offset = 0x50
+type = "f32"
+used_by = ["ordnance.reads"]

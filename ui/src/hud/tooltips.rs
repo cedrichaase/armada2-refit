@@ -2,10 +2,10 @@
 //! tooltips at the pointer"): what `CursorInterface` would draw for the mouse's owner
 //! (in play, an object's name and description over the 3D view), in the theme's
 //! tooltip beside the pointer, at the screen's resolution. Stock's is drawn on the
-//! 1600 x 1200 canvas and so stretched on a wide screen. The text is the engine's own,
+//! HUD canvas (`api::CANVAS`) and so stretched on a wide screen. The text is the engine's own,
 //! read as the cursor renders (`engine::hud::tooltip`); our panels' tooltips are their
 //! own.
-use crate::engine::hud;
+use crate::engine::api::hud;
 use crate::gfx::R;
 use crate::widgets::{theme, Ui};
 use alloc::string::String;
@@ -14,7 +14,10 @@ static mut LAST: String = String::new();
 
 pub fn run(ui: &mut Ui) {
     let Some(raw) = hud::tooltip() else { return };
-    let text = clean(&raw);
+    let mut text = clean(&raw);
+    if super::bargrid::keys_under_pointer() {
+        text = without_hotkey(&text);
+    }
     if text.is_empty() {
         return;
     }
@@ -45,4 +48,19 @@ pub fn run(ui: &mut Ui) {
 fn clean(s: &str) -> String {
     let o: String = s.chars().filter(|&c| c != '^' && c != '\r' && c != '\0').collect();
     String::from(o.replace("%%", "%").trim())
+}
+
+/// Roots' button tooltips name the bar's own hotkey (`(Hotkey: B)`), which does nothing while the
+/// grid's position keys are on (QOL empties the bar's hotkey tables): the note goes, the cell's
+/// badge names the key.
+fn without_hotkey(s: &str) -> String {
+    let Some(i) = s.find("(Hotkey") else { return String::from(s) };
+    let end = s[i..].find(')').map_or(s.len(), |j| i + j + 1);
+    let mut o = String::from(s[..i].trim_end());
+    let rest = s[end..].trim_start_matches([' ', '\n']);
+    if !rest.is_empty() {
+        o.push('\n');
+        o.push_str(rest);
+    }
+    o
 }

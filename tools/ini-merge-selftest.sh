@@ -69,4 +69,42 @@ d3d9.clampNegativeLodBias = True" "ClampNegativeLodBias=1"
 d8 "defaults 3: a player's dxvk.conf not carried" $'[Display8]\nVSync=0' "${CONF#*$'\n'}" "LodBias=auto" "Anisotropy=auto"
 d8 "defaults 3: the player's own key kept" $'[Display8]\nVSync=0\n\n[Samplers]\nLodBias=-1' "$CONF" "LodBias=-1" "Anisotropy=16"
 d8 "defaults 3: already at 3, left alone" $'[Display8]\nDefaults=3\nMode=stub' "$CONF" "Mode=stub" "LodBias=auto"
+# UI.ini: a per-game default that moved (Roots' [Menus] Generic mirror -> widgets) reaches an
+# install that still holds the old default; a value the player set stays; with the shipped
+# value equal to the old one (Armada II) nothing changes.
+ui() {  # name, shipped Generic, installed Generic, wanted Generic
+    printf '[Menus]\nEnable=1\nGeneric=%s\nForms=0\n' "$2" > "$t/uiship.ini"
+    printf '[Menus]\nEnable=1\nGeneric=%s\n' "$3" > "$t/ui.ini"
+    python3 "$here/ini-merge.py" "$t/uiship.ini" "$t/ui.ini" >/dev/null
+    n=$((n+1))
+    if grep -qx "Generic=$4" "$t/ui.ini" && grep -qx 'Forms=0' "$t/ui.ini"; then echo "ok   $1"
+    else echo "FAIL $1"; cat "$t/ui.ini"; bad=$((bad+1)); fi
+}
+ui "ui: Roots default moved, old default updated" widgets mirror widgets
+ui "ui: the player's own value kept" widgets off off
+ui "ui: Armada II, mirror stays" mirror mirror mirror
+# UI.ini on Roots: [HUD] Messages moved 0 -> 1 in ui/defaults/fo-roots.ini (decision 324). With
+# A2_PROFILE=fo-roots an install still at 0 follows; on Armada II (shipped 1 already) a 0 is the
+# player's and stays.
+msg() {  # name, profile, installed Messages, wanted Messages
+    printf '[HUD]\nEnable=1\nMessages=1\nPause=1\n' > "$t/uiship.ini"
+    printf '[HUD]\nEnable=1\nMessages=%s\n' "$3" > "$t/ui.ini"
+    A2_PROFILE="$2" python3 "$here/ini-merge.py" "$t/uiship.ini" "$t/ui.ini" >/dev/null
+    n=$((n+1))
+    if grep -qx "Messages=$4" "$t/ui.ini" && grep -qx 'Pause=1' "$t/ui.ini"; then echo "ok   $1"
+    else echo "FAIL $1"; cat "$t/ui.ini"; bad=$((bad+1)); fi
+}
+msg "ui: Roots Messages 0 -> 1" fo-roots 0 1
+msg "ui: Roots Messages already 1" fo-roots 1 1
+msg "ui: Armada II, a 0 stays" armada2 0 0
+ovl() {  # name, profile, installed Overlay, wanted Overlay
+    printf '[HUD]\nEnable=1\nOverlay=1\n' > "$t/uiship.ini"
+    printf '[HUD]\nEnable=1\nOverlay=%s\n' "$3" > "$t/ui.ini"
+    A2_PROFILE="$2" python3 "$here/ini-merge.py" "$t/uiship.ini" "$t/ui.ini" >/dev/null
+    n=$((n+1))
+    if grep -qx "Overlay=$4" "$t/ui.ini"; then echo "ok   $1"
+    else echo "FAIL $1"; cat "$t/ui.ini"; bad=$((bad+1)); fi
+}
+ovl "ui: Roots Overlay 0 -> 1" fo-roots 0 1
+ovl "ui: Armada II Overlay 0 stays" armada2 0 0
 echo "$n cases, $bad failed"; [ "$bad" = 0 ]

@@ -18,8 +18,8 @@
 //!
 //! The craft under the pointer in the 3D view gets a small card above the panel, as
 //! stock's hover strip shows it. Every part has stock's tooltip.
-use crate::engine::info::{self, BarKind, Face, Single, Text};
-use crate::engine::{closeup, hud, sprite};
+use crate::engine::api::info::{self, BarKind, Face, Single, Text};
+use crate::engine::api::{closeup, hud, sprite};
 use crate::gfx::{fade, mix, Color, Corners, Weight, R};
 use crate::widgets::{theme, Align, State, Ui};
 use alloc::string::String;
@@ -56,7 +56,7 @@ fn hv() -> &'static mut Hover {
 
 /// What a frame's layout found under the pointer, for the tooltip.
 #[derive(Clone, Copy)]
-enum Tip {
+pub(super) enum Tip {
     None,
     /// A stock component (its tooltip).
     Comp(usize, R),
@@ -80,7 +80,7 @@ pub fn run(ui: &mut Ui) {
 
 fn run_scaled(ui: &mut Ui) {
     let hover_craft = info::take_hover();
-    if hud::hidden(hud::ship_display()) || crate::engine::ingame::hud_hidden() {
+    if hud::hidden(hud::ship_display()) || crate::engine::api::ingame::hud_hidden() {
         unsafe { RECT = None };
         return;
     }
@@ -175,7 +175,7 @@ fn line(ui: &mut Ui, r: R, s: &str, size: f32, c: Color, w: Weight, align: Align
 }
 
 /// The hull's colour: the theme's status colours by what is left.
-fn hull_colour(ui: &Ui, f: f32) -> Color {
+pub(super) fn hull_colour(ui: &Ui, f: f32) -> Color {
     let t = &ui.theme;
     if f > 0.6 {
         mix(t.warn, t.good, (f - 0.6) / 0.4)
@@ -189,7 +189,7 @@ fn hull_colour(ui: &Ui, f: f32) -> Color {
 /// A system's wireframe part or icon colour: the theme's text when intact, toward
 /// `bad` with the damage, `warn` on the flash while it is repaired (stock: white, red,
 /// yellow).
-fn system_colour(ui: &Ui, st: &info::SystemState, flash: bool) -> Color {
+pub(super) fn system_colour(ui: &Ui, st: &info::SystemState, flash: bool) -> Color {
     let t = &ui.theme;
     if st.repairing && flash {
         t.warn
@@ -293,7 +293,7 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
     let gap = ui.u(t.gap);
     // Heights, top to bottom, in pixels.
     let head = ui.u(t.heading_size + 4.0) + if s.class.is_some() { ui.u(t.small_size + 2.0) } else { 0.0 };
-    let queue = if builder { info::queue(s.obj) } else { [(0, 0); info::QUEUE_LEN] };
+    let queue = if builder { info::queue(s.obj) } else { alloc::vec![(0, 0); info::queue_len()] };
     // Only what is queued is drawn: an idle builder has no queue row, and no
     // construction bar standing at 0%.
     let queued = queue.iter().filter(|q| q.0 != 0).count();
@@ -314,7 +314,8 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
     let (_, ft, _, fb) = theme::frame_margins(ui);
     let h = pad * 2.0 + top_h + sys_h + queue_h + ft + fb;
     let outer = place(ui, w, h);
-    ui.panel(outer);
+    // Lamps in the frame (Starfleet): the info panel stands where Roots' has them.
+    ui.panel_lit(outer);
     let inner = theme::panel_inner(ui, outer);
 
     // The wireframe, at the left.
@@ -535,7 +536,7 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
                 *tip = Tip::Comp(comp, r);
             }
             if clicked {
-                crate::engine::sound::click();
+                crate::engine::api::sound::click();
                 info::cancel(s.obj, i);
             }
         }
@@ -554,7 +555,7 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
 fn info_wire_comp() -> usize {
     // The stock wireframe's tooltip names the unit's state; it was handed the object
     // by `info::single`'s reads (the one-object face's `WireframeIcon`).
-    crate::engine::info::wire_comp()
+    crate::engine::api::info::wire_comp()
 }
 
 // ---- a group ---------------------------------------------------------------------------
@@ -596,7 +597,7 @@ fn group(ui: &mut Ui, tip: &mut Tip) -> Option<R> {
     let w = cols as f32 * tw + (cols - 1) as f32 * gap + chrome_w;
     let h = rows as f32 * th + (rows - 1) as f32 * gap + 2.0 * pad + ft + fb;
     let outer = place(ui, w.max(ui.u(150.0)), h);
-    ui.panel(outer);
+    ui.panel_lit(outer);
     let inner = theme::panel_inner(ui, outer).inset(pad - ui.u(t.pad));
     let x0 = inner.x + (inner.w - (cols as f32 * tw + (cols - 1) as f32 * gap)) * 0.5;
     let shift = ui.input.shift || info::shift_held();
@@ -627,7 +628,7 @@ fn group(ui: &mut Ui, tip: &mut Tip) -> Option<R> {
         }
         if clicked {
             crate::log!("info: group click, shift: ui {} game {}", ui.input.shift, info::shift_held());
-            crate::engine::sound::click();
+            crate::engine::api::sound::click();
             info::select(u, shift);
         }
     }
@@ -638,7 +639,7 @@ fn group(ui: &mut Ui, tip: &mut Tip) -> Option<R> {
 
 /// The craft under the pointer in the 3D view: name, class, shields and hull, in a
 /// small card beside the panel (stock's hover strip).
-fn hover_card(ui: &mut Ui, obj: usize, panel: Option<R>) {
+pub(super) fn hover_card(ui: &mut Ui, obj: usize, panel: Option<R>) {
     let t = ui.theme;
     let (name, class) = info::name_and_class(obj);
     let (shield, hull) = info::hover_texts(obj);
@@ -686,7 +687,7 @@ fn hover_card(ui: &mut Ui, obj: usize, panel: Option<R>) {
     }
 }
 
-fn tooltip(ui: &mut Ui, tip: Tip, panel: Option<R>) {
+pub(super) fn tooltip(ui: &mut Ui, tip: Tip, panel: Option<R>) {
     let h = hv();
     let (key, at) = match tip {
         Tip::None => (0, R::default()),

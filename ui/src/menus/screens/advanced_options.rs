@@ -11,7 +11,7 @@
 //!   the other settings buttons ours, labelled as the game labels them.
 //! - **Close** and **Default** along the bottom.
 use super::setup_kit as kit;
-use crate::engine::shellui::Kind;
+use crate::engine::api::shellui::Kind;
 use crate::gfx::{fade, Weight, R};
 use crate::menus::model::{Control, What};
 use crate::menus::{generic, Screen};

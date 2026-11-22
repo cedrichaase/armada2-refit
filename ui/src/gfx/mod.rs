@@ -14,7 +14,7 @@ use gpu::{
 };
 
 mod fx;
-pub use fx::{load_bmp, Corners, Elbow, Shape};
+pub use fx::{load_bmp, Corners, Elbow, Metal, Shape};
 
 /// A rectangle in back-buffer pixels.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -163,12 +163,30 @@ pub fn tex_update(t: Tex, src: *const u8, pitch: usize, w: u32, rows: u32) {
     }
 }
 
-/// An image from the game's files (a TGA, by path under the game directory), or None
-/// if it is missing or not a TGA. The caller keeps the `Tex`: each call registers anew.
+/// An image from the game's files (a TGA, by its path in `files`: `textures\<file>`),
+/// or None if it is missing or not a TGA. The caller keeps the `Tex`: each call
+/// registers anew.
+///
+/// A 32-bit file whose alpha is 0 in every texel is drawn opaque, as the engine draws
+/// it: four of the Borg build icons (`gbbsensor`, `gbbturret`, `gbbturret2`,
+/// `gbbtechass`) are stored that way, and the stock bar shows them whole; taken at its
+/// word, the alpha made them invisible on our bar (issue #85, HUD.md "Icons").
 pub fn load_tga(rel: &str) -> Option<Tex> {
-    let data = crate::rt::read_file(&crate::rt::game_path(rel))?;
-    let img = a2fmt::tga::decode(&data).ok()?;
+    let data = crate::files::open(rel)?;
+    let mut img = a2fmt::tga::decode(&data).ok()?;
+    if opaque_if_no_alpha(&mut img.pixels) {
+        crate::log!("tga: {} has no alpha; drawn opaque", rel);
+    }
     Some(texture_bgra(img.width, img.height, img.pixels))
+}
+
+/// Sets alpha to 255 throughout when no texel has any (BGRA8); true if it did.
+fn opaque_if_no_alpha(px: &mut [u8]) -> bool {
+    if px.len() >= 4 && px.chunks_exact(4).all(|p| p[3] == 0) {
+        px.chunks_exact_mut(4).for_each(|p| p[3] = 255);
+        return true;
+    }
+    false
 }
 
 /// The texture's size in texels.
@@ -216,6 +234,7 @@ const KIND_TEX: f32 = 1.0;
 const KIND_SDF: f32 = 2.0;
 const KIND_BOX: f32 = 3.0;
 const KIND_SHAPE: f32 = 4.0;
+const KIND_METAL: f32 = 5.0;
 
 /// A run of indices drawn with one texture and one clip rectangle. Indices are 16-bit
 /// and relative to `vbase`, so a run never spans more than 65536 vertices.
@@ -518,6 +537,23 @@ impl Draw {
 
     /// Text broken into lines no wider than `max_width` (at newlines, and at spaces),
     /// the first line's box top at `y`; returns the height it took.
+    /// A soft halo round the glyphs of `s` (drawn where `text_w` would draw them), fading
+    /// from `c` at the glyph's edge to nothing `reach` pixels out: a label's bloom. The
+    /// reach is held inside the atlas's distance range.
+    pub fn text_glow(&mut self, s: &str, size: f32, x: f32, y: f32, c: Color, w: Weight, reach: f32) {
+        let font = font_of(w);
+        let Some(tex) = self.font_tex(w) else { return };
+        let scale = 2.0 * font.spread * size / font.em_texels;
+        // The atlas's distance runs 0.5 units each side of the edge: `scale / 2` pixels.
+        let reach = reach.clamp(1.0, scale * 0.45);
+        let k = [KIND_SDF, scale / reach, reach / (2.0 * scale), 0.0];
+        let mut quads = Vec::new();
+        crate::text::layout_with(font, s, size, x, y, &mut |q| quads.push(q));
+        for q in quads {
+            let [x0, y0, x1, y1] = q.rect;
+            self.aquad(Some(tex), R::new(x0, y0, x1 - x0, y1 - y0), [c; 4], q.uv, k);
+        }
+    }
     pub fn text_wrapped(&mut self, s: &str, size: f32, max_width: f32, x: f32, y: f32, c: Color, w: Weight) -> f32 {
         let font = font_of(w);
         let Some(tex) = self.font_tex(w) else { return 0.0 };
@@ -595,7 +631,7 @@ static mut EPOCH: Option<u32> = None;
 /// re-creates the device at every switch between the shell's display and the game's:
 /// the new one's `Reset` and `Present` are chained.
 pub fn attach() -> Option<gpu::Attached> {
-    let dev8 = crate::engine::d3d8_device();
+    let dev8 = crate::engine::api::d3d8_device();
     let a = gpu().attach_engine()?;
     // A new device or a `Reset` is Display8's epoch moving on; without it, the device.
     let fresh = match gpu().device_epoch() {
@@ -606,7 +642,7 @@ pub fn attach() -> Option<gpu::Attached> {
         None => a.new,
     };
     if fresh && !dev8.is_null() {
-        crate::engine::device::hook_reset(dev8);
+        crate::engine::api::device::hook_reset(dev8);
     }
     Some(a)
 }

@@ -179,7 +179,7 @@ pub struct Projector {
 
 impl Projector {
     fn of(cam: usize) -> Projector {
-        Projector { m: unsafe { rd(cam + field::LO_CAM_PROJECTION) }, vp: viewport(cam) }
+        Projector { m: unsafe { rd(cam + field::LO_CAM_PROJECTION()) }, vp: viewport(cam) }
     }
 
     /// A point in the world on the screen, in pixels; None behind the eye.
@@ -360,7 +360,7 @@ fn viewport(cam: usize) -> [f32; 4] {
     if cam == 0 {
         return [0.0, 0.0, 1.0e6, 1.0e6];
     }
-    unsafe { rd(cam + field::LO_CAM_VIEWPORT) }
+    unsafe { rd(cam + field::LO_CAM_VIEWPORT()) }
 }
 
 fn log_once(bit: u32, f: impl FnOnce()) {
@@ -375,7 +375,7 @@ fn log_once(bit: u32, f: impl FnOnce()) {
 // ---- the drag box -----------------------------------------------------------------
 
 unsafe extern "thiscall" fn drag_box(_dev: usize, x: f32, y: f32, w: f32, h: f32, _z: f32, col: usize) {
-    let cam = peek(storm3d(), field::LO_S3D_CAMERA);
+    let cam = peek(storm3d(), field::LO_S3D_CAMERA());
     let vp = viewport(cam);
     let rgb = colour(col);
     log_once(1, || crate::log!("leftovers: drag box {:.0},{:.0} {:.0}x{:.0} in the viewport {:.0},{:.0} {:.0}x{:.0}, colour {:.2} {:.2} {:.2}", x, y, w, h, vp[0], vp[1], vp[2], vp[3], rgb[0], rgb[1], rgb[2]));
@@ -391,7 +391,7 @@ unsafe extern "thiscall" fn height_post(cam: usize, a: *const [f32; 3], b: *cons
     let (pa, pb) = unsafe { (*a, *b) };
     let rgb = colour(col);
     let vp = viewport(cam);
-    let m: [f32; 16] = unsafe { rd(cam + field::LO_CAM_PROJECTION) };
+    let m: [f32; 16] = unsafe { rd(cam + field::LO_CAM_PROJECTION()) };
     let clip = |p: [f32; 3]| -> [f32; 4] {
         let mut o = [0f32; 4];
         for (k, v) in o.iter_mut().enumerate() {
@@ -500,12 +500,12 @@ fn art(sprite: usize) -> Option<Art> {
         return None;
     }
     let load: unsafe extern "thiscall" fn(usize, u32) -> u32 = unsafe { core::mem::transmute(a(sym::LO_DEMAND_LOAD)) };
-    if unsafe { load(tex, peek(storm3d(), field::LO_S3D_DEVICE) as u32) } != 0 {
+    if unsafe { load(tex, peek(storm3d(), field::LO_S3D_DEVICE()) as u32) } != 0 {
         return None;
     }
     let uv = super::sprite::uv(sprite);
     let uv = if uv.iter().all(|v| v.is_finite() && (-0.01..=1.01).contains(v)) { uv } else { [0.0, 0.0, 1.0, 1.0] };
-    Some(Art { texture: tex, uv, rgb: colour(sprite + field::LO_SPRITE_COLOUR) })
+    Some(Art { texture: tex, uv, rgb: colour(sprite + field::LO_SPRITE_COLOUR()) })
 }
 
 /// A sprite's quad on the map's plane, projected and recorded to be drawn by the UI.
@@ -524,7 +524,7 @@ unsafe fn quad(sprite: usize, cam: usize, corners: *const [[f32; 3]; 4], what: &
     }
     let get: unsafe extern "thiscall" fn(usize) -> usize = unsafe { core::mem::transmute(a(sym::LO_SPRITE_TEXTURE)) };
     let tex = unsafe { get(sprite) };
-    let rgb = colour(sprite + field::LO_SPRITE_COLOUR);
+    let rgb = colour(sprite + field::LO_SPRITE_COLOUR());
     log_once(bit, || crate::log!("leftovers: {} at {:.0},{:.0} {:.0},{:.0} {:.0},{:.0} {:.0},{:.0}, colour {:.2} {:.2} {:.2}", what, out[0].0, out[0].1, out[1].0, out[1].1, out[2].0, out[2].1, out[3].0, out[3].1, rgb[0], rgb[1], rgb[2]));
     if tex == 0 {
         return;
@@ -533,7 +533,7 @@ unsafe fn quad(sprite: usize, cam: usize, corners: *const [[f32; 3]; 4], what: &
     // (`SetTexture` calls `DemandLoad`); this one is no longer drawn by it, so it is
     // loaded here, as `SetTexture` would, for the device in use.
     let load: unsafe extern "thiscall" fn(usize, u32) -> u32 = unsafe { core::mem::transmute(a(sym::LO_DEMAND_LOAD)) };
-    if unsafe { load(tex, peek(storm3d(), field::LO_S3D_DEVICE) as u32) } != 0 {
+    if unsafe { load(tex, peek(storm3d(), field::LO_S3D_DEVICE()) as u32) } != 0 {
         return;
     }
     let f = unsafe { &mut *core::ptr::addr_of_mut!(FRAME) };
@@ -575,7 +575,7 @@ unsafe extern "thiscall" fn fade_draw(_dev: usize, rect: *const [f32; 4], _z: f3
         return;
     }
     let r = unsafe { *rect };
-    let alpha = if mat != 0 { unsafe { rd::<f32>(mat + field::LO_FADE_ALPHA) } } else { 1.0 };
+    let alpha = if mat != 0 { unsafe { rd::<f32>(mat + field::LO_FADE_ALPHA()) } } else { 1.0 };
     let rgb = colour(col);
     log_once(4, || crate::log!("leftovers: fade over {:.0},{:.0} {:.0}x{:.0}, colour {:.2} {:.2} {:.2}, alpha {:.2}", r[0], r[1], r[2], r[3], rgb[0], rgb[1], rgb[2], alpha));
     if !alpha.is_finite() || !r.iter().all(|v| v.is_finite()) {
@@ -628,9 +628,9 @@ unsafe extern "C" fn fps_display(_y: *mut i32, _line: i32) {
         return;
     }
     let f = unsafe { &mut *core::ptr::addr_of_mut!(FPS) };
-    let fps: f32 = unsafe { rd(s3d + field::LO_S3D_FPS) };
+    let fps: f32 = unsafe { rd(s3d + field::LO_S3D_FPS()) };
     f.fps = if fps == -1.0 || !fps.is_finite() { None } else { Some(fps) };
-    let total: f32 = unsafe { rd(s3d + field::LO_S3D_TOTAL_FPS) };
+    let total: f32 = unsafe { rd(s3d + field::LO_S3D_TOTAL_FPS()) };
     f.total_fps = if total.is_finite() { total } else { 0.0 };
     f.slots.clear();
     if f.fps.is_some() {

@@ -13,6 +13,12 @@
 //! 0x593840): while one of our views runs, the post is noted for the view and drawn at
 //! the flush as an anti-aliased line of a fixed pixel width (`shaders/overlays.hlsl`,
 //! `vs_line`/`ps_line`), depth-tested, not written; otherwise the engine's is called.
+//!
+//! On a build whose companion module owns the five calls (Roots: FleetOpsHook, which
+//! calls `DrawHeightPost` through a pointer of its own and skips posts during its clean
+//! screenshot), the profile (`ov_posts_at_callee`) takes them at `DrawHeightPost`'s entry
+//! instead: a post is ours only while that module is the caller, so it decides whether a
+//! post is drawn and render3d how.
 use gpu::{attr, AttrFormat, Blend, Block, Compare, Depth, Format, PipelineDesc, Semantic, Topology, VertexAttr};
 use super::hooks;
 use crate::log;
@@ -113,6 +119,16 @@ impl Posts {
             return;
         }
         self.hooked = true;
+        // A build whose companion module owns the five calls (Roots) takes the posts at
+        // DrawHeightPost's entry instead, and none of the calls.
+        if hooks::posts_at_callee() {
+            if hooks::install_posts_callee(h) {
+                crate::log!("overlays: height posts: DrawHeightPost hooked at its entry, ours only while the companion module calls it (it decides whether a post is drawn)");
+            } else {
+                crate::log!("overlays: height posts: DrawHeightPost's entry is not stock's here: the engine's posts");
+            }
+            return;
+        }
         let n = hooks::install_posts(h);
         crate::log!("overlays: height posts: {} of 5 calls ours", n);
     }

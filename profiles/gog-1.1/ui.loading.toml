@@ -15,11 +15,9 @@ rows = ["Loading.Enable"]
 
 [hook."loading.inner_db"]
 doc = "A frame of ours after each SOD (LoadDatabase) a loading step reads"
-rows = ["Loading.Enable"]
 
 [hook."loading.inner_pixels"]
 doc = "A frame of ours after each texture's pixels (LoadPixelData) a loading step reads"
-rows = ["Loading.Enable"]
 
 [hook."loading.reads_progress"]
 doc = "How far a load has got, read from the load bar's fraction and the loading-screen flag"

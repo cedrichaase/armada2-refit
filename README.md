@@ -27,6 +27,7 @@ a time, and every fix can be undone.
 
 - [`PLAYING.md`](PLAYING.md): for players: installing, the Refit screen, `RefitPlayer.ini`, multiplayer, the graphics backend, logs and troubleshooting, uninstalling.
 - [`MODDING.md`](MODDING.md): for modders: the plugin contracts, symbol and content profiles, building plugins, and what may be published.
+- [`BUILDING.md`](BUILDING.md): building the plugins and the release zip from source, step by step, on Windows (WSL2) or Linux.
 
 ## Features
 
@@ -129,6 +130,7 @@ Paths are taken from the environment, then `~/.config/armada2-refit.conf`
 | `A2_GAME` | Heroic's `~/Games/Heroic/Star Trek Armada II` |
 | `A2_PREFIX`, `A2_PROTON` | Heroic's prefix and Proton for it |
 | `A2_DATA` | `~/.local/share/armada2-refit` (`%LOCALAPPDATA%` on Windows): extracted stock art, paid AI layers, builds. **Back up its `ai/` folders**; everything else can be rebuilt with a command |
+| `A2_PROFILE` | `armada2`: which game, by its descriptor in [`games/`](games/README.md); `--game <id>` on `./install`, `./a2mod`, `./a2test` and `tools/layers.py` does the same for one run. The defaults above are the chosen game's |
 
 ## Antivirus false positives
 
@@ -182,7 +184,7 @@ The layers are grouped from "copy a file, works anywhere" to "needs a specific s
 `Render3D.asi`, `QOL.asi`, `Online.asi` and the Bink proxy with their `.ini` files, and Display8 with `Display8.ini`. It also has installers that do this
 section for you: `install.sh` on Linux and macOS, `install.bat` on Windows (`README.txt`
 in the zip), and the graphical installers for all three, which leave the Bink proxy out
-for now. `publish/package.sh` builds the same zip locally.
+for now. `publish/package.sh` builds the same zip locally ([`BUILDING.md`](BUILDING.md), step by step).
 
 **Every plugin needs** the game's `Armada2.exe` from GOG patch 1.1,
 plus the Ultimate ASI Loader (`winmm.dll`) that `STA2WidescreenPatch` puts in the game
@@ -269,7 +271,11 @@ a `--revert` flag on the Python tools. The layer's README has the details.
 
 Each layer folder has a `CHANGELOG.md` with its own semver version. The root
 [`CHANGELOG.md`](CHANGELOG.md) versions the mod as a whole and lists the layer
-versions it bundles.
+versions it bundles. Changes are recorded as changesets
+([`.changeset/README.md`](.changeset/README.md)), and a release, made by hand, turns
+them into versions and changelog entries
+([`publish/README.md`](publish/README.md#releasing)). Between releases, the GUI
+installer's *Pre-release (latest main)* entry installs the newest `main`, untested.
 
 `CLAUDE.md` is the working brief for Claude Code sessions in this repository.
 

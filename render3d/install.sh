@@ -11,12 +11,17 @@
 # Render3D replaced the plugins that drew parts of the 3D view one at a time (MSAA,
 # Lighting, Sky, Nebulae, Surfaces, Explosions, Shields, Repair, Venting, Specials, Fog,
 # and the models layer's Planets.asi); they are no longer in this repository. A module
-# stands down while its old plugin is loaded, so this runs retire/retire.sh, whose table
-# (retire/known.txt) lists them, to take out any an earlier install left.
+# stands down while its old plugin is loaded, so on Armada II this runs retire/retire.sh,
+# whose table (retire/known.txt) lists them, to take out any an earlier install left.
+#
+# It installs into the executable's folder (dirname $A2_EXE): the game directory on Armada
+# II, Data/ on Fleet Operations: Roots, where the asiloader layer puts the ASI loader.
 set -euo pipefail
 
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/a2env.sh"
-GAME="$A2_GAME"
+# The executable's folder: the install folder itself, or its Data/ on Fleet Operations:
+# Roots (games/<id>.toml, exe.data_dir), where the .asi loader looks.
+GAME="$(dirname "$A2_EXE")"
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 remove_recipes() {
@@ -57,7 +62,10 @@ else
     cp "$here/Render3D.ini" "$GAME/Render3D.ini"
 fi
 
-bash "$here/../retire/retire.sh" "$GAME" | sed "s/^/  /"
+# retire/ is Armada II's: the plugins and files it takes out never existed in another game.
+if [ "$A2_PROFILE" = armada2 ]; then
+    bash "$here/../retire/retire.sh" "$GAME" | sed "s/^/  /"
+fi
 
 remove_recipes
 mkdir -p "$GAME/Surfaces" "$GAME/Nebulae"

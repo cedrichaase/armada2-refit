@@ -1,0 +1,18 @@
+# Fleet Operations: Roots: the overlays module's values and checks (FO-5 step 5).
+schema = 1
+plugin = "render3d"
+
+# FleetOpsHook owns DrawHeightPost's five calls (it skips the posts during its clean
+# screenshot, and under RTS_CFG.h's DISABLE_HEIGHT_CHANGE) and calls DrawHeightPost through a
+# pointer of its own: the posts are taken at its entry, armed only while FleetOpsHook calls
+# it (PLAN-FLEETOPS.md, "The rules of (c)", rule 4).
+[[sym]]
+id = "ov_posts_at_callee"
+value = 1
+
+# Roots' file points DrawGrid's lines at colours of its own, and FleetOpsHook points the
+# major lines at its own grid colour as it loads: the push is checked, its operand is
+# Roots' and read at run time.
+[[sym]]
+id = "site_grid_colour"
+check = "68"

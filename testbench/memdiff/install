@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Put MemDiff.asi (memdiff.c: what other modules rewrite of the exe in memory) into a
+# test-bench clone, beside the game's executable, with the ASI loader if the clone has
+# none (a Roots clone, whose Data/ ships without one):
+#   ./a2test session start --game fo-roots --install testbench/memdiff
+#   ./a2test session start --install testbench/memdiff            # stock, the control
+#   MEMDIFF_DISPLAY8=1 ./a2test --game fo-roots session start ...  # and Display8 (FO-2)
+# MEMDIFF_DISPLAY8=1 also puts this checkout's built Display8 (display/build/d3d8.dll,
+# with display/Display8.ini; Trace=auto traces in a clone) beside the exe in place of the
+# d3d8.dll there, kept as d3d8.dll.a2display-backup: the measurement of FO-2, before
+# FO-4 gives Roots an installer of its own.
+# Refuses any game directory that is not an a2test clone: it is a test tool and never
+# goes into the player's install. MemDiff.log appears beside the exe.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$here/../../a2env.sh"
+
+case "$A2_GAME" in
+    "$HOME"/.cache/a2test/*) ;;
+    *) echo "refusing: $A2_GAME is not an a2test clone" >&2; exit 1 ;;
+esac
+
+dir="$(dirname "$A2_EXE")"
+[ -f "$A2_EXE" ] || { echo "no executable at $A2_EXE" >&2; exit 1; }
+
+bash "$here/build.sh"
+cp "$here/build/MemDiff.asi" "$dir/"
+# What loads it: Roots' DxWrapper loads every .asi beside it with [Plugins]
+# LoadPlugins=1; with the Ultimate ASI Loader as winmm.dll Roots (5.0Z11) dies at start
+# (c0000409), with nothing of ours loaded. Elsewhere (stock; Display8 in DxWrapper's
+# place, MEMDIFF_DISPLAY8=1) the ASI loader, put in where the clone has none.
+if [ -f "$dir/dxwrapper.ini" ] && [ "${MEMDIFF_DISPLAY8:-0}" != 1 ]; then
+    sed -i 's/^\(LoadPlugins *= *\)0/\11/' "$dir/dxwrapper.ini"
+    echo "DxWrapper loads the .asi files ([Plugins] LoadPlugins=1 in its clone's dxwrapper.ini)"
+elif [ ! -e "$dir/winmm.dll" ]; then
+    cp "$here/../../platform/vendor/STA2WidescreenPatch-1.0/winmm.dll" "$dir/winmm.dll"
+    echo "put the ASI loader into $dir (winmm.dll)"
+fi
+rm -f "$dir/MemDiff.log"
+if [ "${MEMDIFF_DISPLAY8:-0}" = 1 ]; then
+    dll="$here/../../display/build/d3d8.dll"
+    [ -f "$dll" ] || { echo "no $dll: run display/build.sh first" >&2; exit 1; }
+    if [ -f "$dir/d3d8.dll" ] && [ ! -f "$dir/d3d8.dll.a2display-backup" ]; then
+        mv "$dir/d3d8.dll" "$dir/d3d8.dll.a2display-backup"
+    fi
+    cp "$dll" "$dir/d3d8.dll"
+    cp "$here/../../display/Display8.ini" "$dir/Display8.ini"
+    echo "put Display8 into $dir (the d3d8.dll there kept as d3d8.dll.a2display-backup)"
+fi
+echo "installed MemDiff.asi into $dir"

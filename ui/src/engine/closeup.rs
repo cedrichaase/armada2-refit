@@ -54,25 +54,34 @@ fn at(s: a2engine::Sym) -> usize {
 }
 
 /// The vtable slot of `ST3D_Camera::SetTransform` is checked by the hook, never read
-/// here (the camera's own vtable is read, `VT_SET_TRANSFORM`).
+/// here (the camera's own vtable is read, `vt_set_transform()`).
 #[allow(dead_code)]
 const CHECKED: [a2engine::Sym; 1] = [sym::CLOSEUP_SLOT_SET_TRANSFORM];
 
 /// `Armada_Camera`: its size (the game's `operator new`, cdecl, the heap), the
 /// `Render_Stuff` pointer and the field of view.
-const CAMERA_SIZE: usize = value::CLOSEUP_CAMERA_SIZE as usize;
-const CAM_RENDER_STUFF: usize = field::CLOSEUP_CAM_RENDER_STUFF;
-const CAM_FOV: usize = field::CLOSEUP_CAM_FOV;
+#[inline(always)]
+fn camera_size() -> usize { value::CLOSEUP_CAMERA_SIZE() as usize }
+#[inline(always)]
+fn cam_render_stuff() -> usize { field::CLOSEUP_CAM_RENDER_STUFF() }
+#[inline(always)]
+fn cam_fov() -> usize { field::CLOSEUP_CAM_FOV() }
 /// `ST3D_Camera::SetTransform(const Matrix34&)`, its vtable slot (`+0x14`).
-const VT_SET_TRANSFORM: usize = field::CLOSEUP_VT_SET_TRANSFORM;
+#[inline(always)]
+fn vt_set_transform() -> usize { field::CLOSEUP_VT_SET_TRANSFORM() }
 /// `Entity`'s on-screen byte and `GameObject`'s distance cull.
-const ENTITY_DRAWN: usize = field::CLOSEUP_ENTITY_DRAWN;
-const OBJECT_CULLED: usize = field::CLOSEUP_OBJECT_CULLED;
+#[inline(always)]
+fn entity_drawn() -> usize { field::CLOSEUP_ENTITY_DRAWN() }
+#[inline(always)]
+fn object_culled() -> usize { field::CLOSEUP_OBJECT_CULLED() }
 /// The entity's instance: its bounding sphere and transform (rows right, up, front,
 /// position), as `Entity::GetBoundingSphere` and `GetTransform` return them.
-const ENTITY_INSTANCE: usize = field::CLOSEUP_ENTITY_INSTANCE;
-const INST_SPHERE: usize = field::CLOSEUP_INST_SPHERE;
-const INST_TRANSFORM: usize = field::CLOSEUP_INST_TRANSFORM;
+#[inline(always)]
+fn entity_instance() -> usize { field::CLOSEUP_ENTITY_INSTANCE() }
+#[inline(always)]
+fn inst_sphere() -> usize { field::CLOSEUP_INST_SPHERE() }
+#[inline(always)]
+fn inst_transform() -> usize { field::CLOSEUP_INST_TRANSFORM() }
 
 struct Pics {
     w: u32,
@@ -259,14 +268,14 @@ fn make_camera() -> bool {
             return false;
         }
         let new: unsafe extern "C" fn(usize) -> usize = core::mem::transmute(new_at);
-        let p = new(CAMERA_SIZE);
+        let p = new(camera_size());
         if p == 0 {
             st().failed = true;
             return false;
         }
         let ctor: unsafe extern "thiscall" fn(usize, usize, usize, *const u8) -> usize = core::mem::transmute(ctor_at);
         let cam = ctor(p, 0, 0, NAME.as_ptr());
-        *((cam + CAM_RENDER_STUFF) as *mut usize) = stuff;
+        *((cam + cam_render_stuff()) as *mut usize) = stuff;
         st().cam = cam;
         crate::log!("closeup: camera made at {:#x}", cam);
     }
@@ -300,12 +309,12 @@ fn cross(a: V3, b: V3) -> V3 {
 /// unit's with a lag. Rows right, up, forward, position, then near and far.
 fn pose(obj: usize) -> Option<([f32; 12], f32, f32)> {
     let s = st();
-    let inst = field(obj, ENTITY_INSTANCE);
+    let inst = field(obj, entity_instance());
     if inst == 0 {
         return None;
     }
-    let sph: [f32; 4] = unsafe { rd(inst + INST_SPHERE) };
-    let t: [f32; 12] = unsafe { rd(inst + INST_TRANSFORM) };
+    let sph: [f32; 4] = unsafe { rd(inst + inst_sphere()) };
+    let t: [f32; 12] = unsafe { rd(inst + inst_transform()) };
     let (right, up, front, pos) = ([t[0], t[1], t[2]], [t[3], t[4], t[5]], [t[6], t[7], t[8]], [t[9], t[10], t[11]]);
     let radius = sph[3];
     if !(radius > 0.01 && radius < 1.0e5) || !pos.iter().all(|v| v.is_finite()) {
@@ -348,7 +357,7 @@ fn pose(obj: usize) -> Option<([f32; 12], f32, f32)> {
     let tt = libm::fmod(now, 10000.0) as f32;
     let az = s.yaw + 0.70 + 0.32 * libm::sinf(tt * 0.11);
     let el = -0.10 + 0.04 * libm::sinf(tt * 0.07 + 1.0);
-    let fov = unsafe { rd::<f32>(s.cam + CAM_FOV) };
+    let fov = unsafe { rd::<f32>(s.cam + cam_fov()) };
     let fov = if fov > 0.1 && fov < 3.0 { fov } else { core::f32::consts::FRAC_PI_4 };
     let dist = radius / libm::sinf(fov * 0.5) * 0.92;
     let dir = [libm::cosf(el) * libm::sinf(az), libm::sinf(el), libm::cosf(el) * libm::cosf(az)];
@@ -391,8 +400,8 @@ unsafe fn draw_view(cam: usize, body: usize, r: [i32; 4], m: &([f32; 12], f32, f
     if entity_list == 0 || object_list == 0 || di_at == 0 || cur_at == 0 || vp_at == 0 || near_at == 0 || far_at == 0 {
         return;
     }
-    save_bytes(unsafe { rd::<usize>(entity_list) }, ENTITY_DRAWN, &mut kept);
-    save_bytes(field(unsafe { rd::<usize>(object_list) }, 4), OBJECT_CULLED, &mut kept);
+    save_bytes(unsafe { rd::<usize>(entity_list) }, entity_drawn(), &mut kept);
+    save_bytes(field(unsafe { rd::<usize>(object_list) }, 4), object_culled(), &mut kept);
     unsafe {
         let di_cam = rd::<usize>(di_at);
         let eng = storm3d();
@@ -405,10 +414,10 @@ unsafe fn draw_view(cam: usize, body: usize, r: [i32; 4], m: &([f32; 12], f32, f
         plane(cam, m.1);
         let plane: unsafe extern "thiscall" fn(usize, f32) = core::mem::transmute(far_at);
         plane(cam, m.2);
-        let set_tf: unsafe extern "thiscall" fn(usize, *const f32) = core::mem::transmute(rd::<usize>(rd::<usize>(cam) + VT_SET_TRANSFORM));
+        let set_tf: unsafe extern "thiscall" fn(usize, *const f32) = core::mem::transmute(rd::<usize>(rd::<usize>(cam) + vt_set_transform()));
         set_tf(cam, m.0.as_ptr());
         let f: unsafe extern "C" fn(usize, usize, u32) = core::mem::transmute(body);
-        f(cam, rd::<usize>(cam + CAM_RENDER_STUFF), 0);
+        f(cam, rd::<usize>(cam + cam_render_stuff()), 0);
         set_cur(eng, old);
         *(di_at as *mut usize) = di_cam;
         for (a, v) in kept {

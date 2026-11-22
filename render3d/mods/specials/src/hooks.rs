@@ -10,7 +10,7 @@ use r3d_core::engine::{self, field, field_f32, field_u8};
 use r3d_core::math::M34;
 use alloc::string::String;
 use alloc::vec::Vec;
-use crate::syms::sym;
+use crate::syms::{field as off, sym};
 
 /// An engine address of the profile: 0 unless the hook that uses it is ready.
 pub(crate) fn at(s: a2engine::Sym) -> usize { crate::syms::TABLE.engine().addr(s) }
@@ -29,14 +29,10 @@ pub fn vt_change_team() -> usize { at(sym::VT_CHANGE_TEAM) } // TimedChangeTeam 
 pub fn vt_crew_disruption() -> usize { at(sym::VT_CREW_DISRUPTION) } // TimedCrewDisruption (Psionic Disruption)
 pub fn vt_drain() -> usize { at(sym::VT_DRAIN) } // TimedDrain (Energy Dissipator, micro-organisms)
 
-/// Offsets in a timed effect.
-const E_OBJECT: usize = 0x8; // the object the effect is on
-const E_INSTANCE: usize = 0x2c;
-const E_DATABASE: usize = 0xac; // instance +0x80
-const E_TARGET: usize = 0xb0;
-const E_NODE: usize = 0xc8; // TimedChangeTeam: the target's node it sits on
-const E_TIME_LEFT: usize = 0x28;
-const E_DEAD: usize = 0xc;
+// A timed effect's offsets are the profile's `sp_effect_*`: the object it is on
+// (`+0x8`), its embedded instance (`+0x2c`) and that instance's database (`+0xac`,
+// the instance's `+0x80`), its visual target (`+0xb0`), a `TimedChangeTeam`'s node on
+// the target (`+0xc8`), the seconds left (`+0x28`) and the ended byte (`+0xc`).
 
 /// What an effect's `Render` is.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -53,7 +49,7 @@ pub enum RenderKind {
 
 /// The class of an effect's `Render` (vtable slot 0).
 pub fn render_kind(e: usize) -> RenderKind {
-    match field(engine::vtable(e), 0) {
+    match render_fn(e) {
         0 => RenderKind::Other,
         f if f == fn_render_base() => RenderKind::Base,
         f if f == fn_render_timed() => RenderKind::Timed,
@@ -64,26 +60,19 @@ pub fn render_kind(e: usize) -> RenderKind {
 
 /// The address of an effect's `Render`, for the survey's log.
 pub fn render_fn(e: usize) -> usize {
-    field(engine::vtable(e), 0)
+    field(engine::vtable(e), off::SP_VT_RENDER())
 }
 
 /// Every effect in `mAllEffects`, in the list's order.
 pub fn effects() -> Vec<usize> {
     let mut out = Vec::new();
-    let head = field(effect_head(), 0);
-    if head == 0 {
-        return out;
-    }
-    let mut n = field(head, 0);
-    let mut guard = 0;
-    while n != head && n != 0 && guard < 100_000 {
-        guard += 1;
-        let e = field(n, 8);
+    let head = unsafe { engine::rd::<usize>(effect_head()) };
+    engine::for_each_list_node(head, |n| {
+        let e = engine::list_node_value(n);
         if e != 0 {
             out.push(e);
         }
-        n = field(n, 0);
-    }
+    });
     out
 }
 
@@ -102,9 +91,9 @@ pub fn effect_name(e: usize) -> String {
 /// weapon class (`+0x4`, a `WeaponClass`) keeps its ordnance class at `+0x18`
 /// (`OrdnanceClass::Find` of its `ordName`), whose cPrjID (`+0x150`) names the ODF.
 pub fn ordnance_odf(e: usize) -> String {
-    let wc = field(e, 4);
-    let oc = if wc != 0 { field(wc, 0x18) } else { 0 };
-    let prj = if oc != 0 { field(oc, 0x150) } else { 0 };
+    let wc = field(e, off::SP_EFFECT_WEAPON_CLASS());
+    let oc = if wc != 0 { field(wc, off::SP_WEAPON_ORDNANCE()) } else { 0 };
+    let prj = if oc != 0 { field(oc, off::SP_ORDNANCE_PRJ()) } else { 0 };
     if prj == 0 {
         return String::new();
     }
@@ -130,53 +119,53 @@ pub fn world_of_node(target: usize, node: usize) -> M34 {
 /// The engine's own `Render(cam)` of one effect.
 pub fn engine_render(e: usize, cam: usize) {
     unsafe {
-        let r: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(engine::vtable(e), 0));
+        let r: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(render_fn(e));
         r(e, cam);
     }
 }
 
 /// The effect's embedded `ST3D_Instance` (`+0x2c`), the key its emitters are fed under.
 pub fn instance_key(e: usize) -> usize {
-    e + E_INSTANCE
+    e + off::SP_EFFECT_INSTANCE()
 }
 
 /// The database the weapon gave the instance (`+0xac`).
 pub fn database(e: usize) -> usize {
-    field(e, E_DATABASE)
+    field(e, off::SP_EFFECT_DATABASE())
 }
 
 /// The visual target the cloud is placed on (`+0xb0`).
 pub fn target(e: usize) -> usize {
-    field(e, E_TARGET)
+    field(e, off::SP_EFFECT_TARGET())
 }
 
 /// The target's node a `TimedChangeTeam` sits on (`+0xc8`).
 pub fn node(e: usize) -> usize {
-    field(e, E_NODE)
+    field(e, off::SP_EFFECT_NODE())
 }
 
 /// The object the effect is on (`+0x8`).
 pub fn object(e: usize) -> usize {
-    field(e, E_OBJECT)
+    field(e, off::SP_EFFECT_OBJECT())
 }
 
 /// Whether the effect has ended (`+0xc`).
 pub fn dead(e: usize) -> bool {
-    field_u8(e, E_DEAD) != 0
+    field_u8(e, off::SP_EFFECT_DEAD()) != 0
 }
 
 /// Seconds left (`+0x28`).
 pub fn time_left(e: usize) -> f32 {
-    field_f32(e, E_TIME_LEFT)
+    field_f32(e, off::SP_EFFECT_TIME_LEFT())
 }
 
 /// Whether a target can carry a node's cloud: not flagged (`+0x27`), and shown (`+0x14`
 /// bit 3), as `TimedChangeTeam::Render` tests.
 pub fn node_target_ok(target: usize) -> bool {
-    field_u8(target, 0x27) == 0 && field(target, 0x14) & 8 != 0
+    !engine::obj::expired(target) && engine::obj::flags(target) & 8 != 0
 }
 
 /// An instance's bounding radius (`+0x40`), 0 without an instance.
 pub fn bounding_radius(inst: usize) -> f32 {
-    if inst != 0 { field_f32(inst, 0x40) } else { 0.0 }
+    if inst != 0 { field_f32(inst, off::SP_INST_RADIUS()) } else { 0.0 }
 }

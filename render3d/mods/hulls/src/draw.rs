@@ -333,6 +333,11 @@ impl Drawer {
         if let Some(t) = self.nmaps.get(&key) {
             return t.clone();
         }
+        if super::content::get().bump_maps_normal {
+            let t = assets::image(&key).and_then(|img| normal_map_of_normals(img.width, img.height, img.pixels));
+            self.nmaps.insert(key, t.clone());
+            return t;
+        }
         let t = assets::image(&key).and_then(|img| {
             let (w, h) = (img.width as i32, img.height as i32);
             if w < 2 || h < 2 || !(w as u32).is_power_of_two() || !(h as u32).is_power_of_two() {
@@ -547,9 +552,10 @@ impl Drawer {
                 break;
             }
             let bump = part.bump.is_some();
-            let prof = if bump { &look.borg } else { &look.hull };
-            if shared.is_none_or(|s| s.0 != bump) {
-                shared = Some((bump, self.shared(v, look, prof, p.centre, p.radius)));
+            let borg = super::look::borg_profile(p.obj, look, bump);
+            let prof = if borg { &look.borg } else { &look.hull };
+            if shared.is_none_or(|s| s.0 != borg) {
+                shared = Some((borg, self.shared(v, look, prof, p.centre, p.radius)));
                 cmd.ps_block(Block::new(3, &shared.as_ref().unwrap().1[3 * 4..]));
             }
             // Bump-mapped meshes go through ps_bump with their normal map.
@@ -557,7 +563,7 @@ impl Drawer {
                 let n = self.normal_map(part.bump.as_deref().unwrap_or(""));
                 if !self.said_bump {
                     self.said_bump = true;
-                    log!("hulls: bump-mapped meshes (the Borg profile), normal map from {}", part.bump.as_deref().unwrap_or(""));
+                    log!("hulls: bump-mapped meshes, normal map from {} ({})", part.bump.as_deref().unwrap_or(""), if borg { "the Borg profile" } else { "the hull profile" });
                 }
                 n
             } else {
@@ -587,6 +593,9 @@ impl Drawer {
                 cmd.ps_block(Block::new(16, &pick_points(world.p, look.point_lights)));
             }
             let tex_name = if p.assimilated { second_texture(m, part.node).or(part.texture.as_deref()) } else { part.texture.as_deref() };
+            // The texture the engine's database held for this instance at a claim there
+            // (Roots: a ship's own logo), over the SOD's.
+            let tex_name = p.texture_of(part.node).or(tex_name);
             let tex = tex_name.and_then(assets::texture);
             cmd.bind_texture(0, tex.as_ref(), &WRAP);
             let uv = flipbook(m, part.node, p);
@@ -676,6 +685,39 @@ fn engine_order(m: &Model) -> Vec<usize> {
     let mut order: Vec<usize> = (0..m.parts.len()).collect();
     order.sort_by_key(|&pi| rank.get(m.parts[pi].node).copied().unwrap_or(usize::MAX));
     order
+}
+
+/// A bump texture that is already a tangent-space normal map (`BumpMaps = normal`, Fleet
+/// Operations' `*_bump`, BGRA8 with x in red, as `normal_map` writes its own), with its
+/// chain box-filtered (renormalised in the shader). None for a flat one (one colour
+/// throughout, such as Roots' shared `all_bump`): no height detail, so the plain hull
+/// shader, as for a mesh with no bump map at all.
+fn normal_map_of_normals(w: u32, h: u32, px: Vec<u8>) -> Option<Texture> {
+    if w == 0 || h == 0 || px.len() < (w * h * 4) as usize {
+        return None;
+    }
+    let first = [px[0], px[1], px[2]];
+    if px.chunks_exact(4).all(|t| t[0].abs_diff(first[0]) <= 1 && t[1].abs_diff(first[1]) <= 1 && t[2].abs_diff(first[2]) <= 1) {
+        return None;
+    }
+    // 32-bit: a chain that does not fit skips the texture (the caller's look stays flat).
+    let mut levels: Vec<Vec<u8>> = Vec::new();
+    levels.try_reserve_exact(32).ok()?;
+    levels.push(px);
+    let (mut lw, mut lh) = (w, h);
+    while lw > 1 || lh > 1 {
+        let next = assets::halve(levels.last().unwrap(), lw, lh)?;
+        levels.push(next);
+        lw = (lw / 2).max(1);
+        lh = (lh / 2).max(1);
+    }
+    let n = levels.len() as u32;
+    let px = assets::concat_levels(&levels)?;
+    drop(levels);
+    let g = gfx::gpu();
+    let d = TextureDesc::d2(w, h, Format::Bgra8, Usage::SAMPLED).with_levels(n);
+    let t = g.texture(d, Contents::Transient(px));
+    t.ready(g).then_some(t)
 }
 
 /// A mesh's second texture (the Borg's assimilated look, `CraftClass::

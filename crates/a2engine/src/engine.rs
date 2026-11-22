@@ -2,7 +2,7 @@
 //! entries hold in live memory before its plugin writes anything. The same algorithm
 //! as `csdk/a2engine.h` and `tools/engine/resolve.py`, proven on the same fixtures
 //! (README.md, "The resolver").
-use crate::pe::{self, Image, Identity};
+use crate::pe::{self, Companion, Identity, Image};
 use crate::table::*;
 use core::fmt::{self, Write};
 use core::sync::atomic::Ordering::{Acquire, Relaxed, Release};
@@ -21,6 +21,7 @@ const W_UNKNOWN: u64 = 5;
 const W_TEST: u64 = 6;
 const W_ABSENT: u64 = 7;
 const W_FOUND: u64 = 8;
+const W_MODULE: u64 = 9;
 
 /// Why a hook stands down.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -64,7 +65,22 @@ impl fmt::Display for StandDown {
     }
 }
 
-pub const PLUGIN_NOTE: &str = "This Armada2.exe is a build Refit does not know: it runs stock";
+/// The plugin note on an unknown build: `This <exe> is a build Refit does not know: it
+/// runs stock`, `<exe>` as in the identity line.
+pub const PLUGIN_NOTE: (&str, &str) = ("This ", " is a build Refit does not know: it runs stock");
+
+/// The name of an executable that names nothing else: an image with no module name.
+const NO_NAME: &str = "exe";
+
+/// Whether `s` is the identity line every resolver logs first (`engine: <exe> timestamp
+/// 0x.., image size 0x.., sections 0x..`, or `engine: <exe> identity unreadable`),
+/// whatever the executable's name: for plugins that log it once over several tables.
+pub fn is_identity_line(s: &str) -> bool {
+    let Some(rest) = s.strip_prefix("engine: ") else { return false };
+    let Some(sp) = rest.find(' ') else { return false };
+    let tail = &rest[sp + 1..];
+    sp > 0 && (tail.starts_with("timestamp 0x") || tail == "identity unreadable")
+}
 
 /// A line on the stack, cut at its capacity.
 pub(crate) struct Line {
@@ -168,24 +184,65 @@ pub fn init_with(t: &'static Table, log: fn(&str), mem: &'static dyn Image, test
         *rt.log.get() = Some(log);
     }
     let id = pe::identify(mem);
+    // A build is the one whose three numbers match and whose on-disk section CRCs
+    // (`[pe] file_crc`, read only for a candidate that sets them) match too; a candidate
+    // that sets them is preferred to one that does not.
+    let mut crc_line: Option<usize> = None; // the first candidate that sets CRCs
+    let mut found: Option<(usize, Identity)> = None;
+    if let Some(id) = id {
+        let cand = |b: &Build| b.timestamp == id.timestamp && b.image_size == id.image_size && b.sections == id.sections;
+        for (i, b) in t.builds.iter().enumerate().filter(|(_, b)| cand(b) && !b.file_crc.is_empty()) {
+            crc_line.get_or_insert(i);
+            if b.file_crc.iter().all(|f| mem.file_crc(f.section) == Some(f.crc)) {
+                found = Some((i, id));
+                break;
+            }
+        }
+        if found.is_none() {
+            found = t.builds.iter().position(|b| cand(b) && b.file_crc.is_empty()).map(|i| (i, id));
+        }
+    }
+    // The executable's name: the matched build's, else the module's, else NO_NAME.
+    let mut module = [0u8; 64];
+    let exe = match found.map(|(i, _)| t.builds[i].exe).filter(|e| !e.is_empty()) {
+        Some(e) => e,
+        None => {
+            let n = mem.name(&mut module).min(module.len());
+            core::str::from_utf8(&module[..n]).ok().filter(|s| !s.is_empty()).unwrap_or(NO_NAME)
+        }
+    };
+    rt.exe.set(exe);
+    let mut note = Line::new();
+    let _ = write!(note, "{}{}{}", PLUGIN_NOTE.0, exe, PLUGIN_NOTE.1);
+    rt.plugin_note.set(note.as_str());
     let mut line = Line::new();
     match id {
         Some(id) => {
-            let _ = write!(line, "engine: {}", id);
+            let _ = write!(line, "engine: {} {}", exe, id);
         }
         None => {
-            let _ = line.write_str("engine: Armada2.exe identity unreadable");
+            let _ = write!(line, "engine: {} identity unreadable", exe);
         }
     }
     log(line.as_str());
-    let found = id.and_then(|id: Identity| {
-        t.builds
-            .iter()
-            .position(|b| b.timestamp == id.timestamp && b.image_size == id.image_size && b.sections == id.sections)
-            .map(|i| (i, id))
-    });
+    if let Some(i) = crc_line {
+        let mut line = Line::new();
+        let _ = write!(line, "engine: {} file crc:", exe);
+        for (k, f) in t.builds[i].file_crc.iter().enumerate() {
+            let _ = line.write_str(if k == 0 { " " } else { ", " });
+            match mem.file_crc(f.section) {
+                Some(c) => {
+                    let _ = write!(line, "{} {:#010x}", f.section, c);
+                }
+                None => {
+                    let _ = write!(line, "{} unreadable", f.section);
+                }
+            }
+        }
+        log(line.as_str());
+    }
     let mut line = Line::new();
-    let (n, h) = match found {
+    let (mut n, mut h) = match found {
         Some((i, id)) => {
             let b = &t.builds[i];
             rt.delta.store((id.base as u32).wrapping_sub(b.image_base), Relaxed);
@@ -198,6 +255,50 @@ pub fn init_with(t: &'static Table, log: fn(&str), mem: &'static dyn Image, test
         }
     };
     log(line.as_str());
+    // The companion modules the build's marks describe: another one than profiled makes
+    // every hook that depends on its run-time patches stand down.
+    if let Some((i, _)) = found {
+        let b = &t.builds[i];
+        let mut bad = false;
+        for m in b.modules {
+            let mut line = Line::new();
+            match mem.companion(m.name) {
+                Companion::Crc(c) if c == m.text_crc => {
+                    let _ = write!(line, "engine: companion {} .text crc {:#010x} matches the profile", m.name, c);
+                }
+                Companion::Crc(c) => {
+                    bad = true;
+                    let _ = write!(
+                        line,
+                        "engine: companion {} .text crc {:#010x} is not the profiled {:#010x}: the hooks that depend on it stand down",
+                        m.name, c, m.text_crc
+                    );
+                }
+                Companion::NotLoaded => {
+                    bad = true;
+                    let _ = write!(
+                        line,
+                        "engine: companion {} is not loaded (profiled .text crc {:#010x}): the hooks that depend on it stand down",
+                        m.name, m.text_crc
+                    );
+                }
+                Companion::Unreadable => {
+                    bad = true;
+                    let _ = write!(
+                        line,
+                        "engine: companion {} cannot be read (profiled .text crc {:#010x}): the hooks that depend on it stand down",
+                        m.name, m.text_crc
+                    );
+                }
+            }
+            log(line.as_str());
+        }
+        if bad {
+            rt.companion_bad.store(1, Relaxed);
+            n = b.n_resolved_mod;
+            h += b.blocked_mod.len();
+        }
+    }
     if let Some(id) = id {
         rt.code.0.store(id.code.0, Relaxed);
         rt.code.1.store(id.code.1, Relaxed);
@@ -225,7 +326,7 @@ pub fn init_with(t: &'static Table, log: fn(&str), mem: &'static dyn Image, test
     t.engine()
 }
 
-/// Starts the resolver of `t` on this process's `Armada2.exe`, reading
+/// Starts the resolver of `t` on this process's executable, reading
 /// `A2EngineTest.ini` beside it if there is one (the bench's fault injection).
 #[cfg(windows)]
 pub fn init(t: &'static Table, log: fn(&str)) -> &'static Engine {
@@ -233,6 +334,19 @@ pub fn init(t: &'static Table, log: fn(&str)) -> &'static Engine {
     let n = win::read_test_ini(&mut buf);
     let text = if n > 0 { core::str::from_utf8(&buf[..n]).ok() } else { None };
     init_with(t, log, &win::PROCESS, text)
+}
+
+/// The CRC-32 of a loaded module's `.text` in its file (as `[[module]] text_crc` names a
+/// companion): None when it is not loaded or cannot be read. For a part keyed to a
+/// companion alone, across the builds of the executable that ship it (FleetOpsHook's
+/// forms in the UI, PLAN-FLEETOPS.md, decision 148).
+#[cfg(windows)]
+pub fn companion_crc(name: &str) -> Option<u32> {
+    use crate::pe::{Companion, Image};
+    match win::PROCESS.companion(name) {
+        Companion::Crc(c) => Some(c),
+        _ => None,
+    }
 }
 
 #[cfg(windows)]
@@ -246,6 +360,70 @@ mod win {
         fn CreateFileA(p: *const u8, access: u32, share: u32, sa: usize, disp: u32, flags: u32, t: usize) -> isize;
         fn ReadFile(h: isize, out: *mut u8, n: u32, got: *mut u32, ov: usize) -> i32;
         fn CloseHandle(h: isize) -> i32;
+        fn SetFilePointer(h: isize, lo: i32, hi: *mut i32, method: u32) -> u32;
+    }
+
+    /// The CRC-32 of section `name` of the file at `path` (NUL-terminated), read in 4 KiB
+    /// steps (`pe::section_crc_file`): the file is never held.
+    fn file_crc_of(path: &[u8], name: &str) -> Option<u32> {
+        // GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING
+        let h = unsafe { CreateFileA(path.as_ptr(), 0x8000_0000, 3, 0, 3, 0x80, 0) };
+        if h == -1 {
+            return None;
+        }
+        let mut read = |at: usize, out: &mut [u8]| {
+            if at > i32::MAX as usize || unsafe { SetFilePointer(h, at as i32, core::ptr::null_mut(), 0) } == u32::MAX {
+                return false;
+            }
+            let mut got = 0u32;
+            let ok = unsafe { ReadFile(h, out.as_mut_ptr(), out.len() as u32, &mut got, 0) };
+            ok != 0 && got as usize == out.len()
+        };
+        let c = crate::pe::section_crc_file(&mut read, name);
+        unsafe { CloseHandle(h) };
+        c
+    }
+
+    /// Several tables of a plugin ask the same questions: the answers (a CRC of a few
+    /// megabytes of file) are kept by the key's 64-bit FNV, in a few racy-but-idempotent
+    /// slots. A failure is not kept.
+    const SLOTS: usize = 8;
+    static KEYS: [core::sync::atomic::AtomicU64; SLOTS] = [const { core::sync::atomic::AtomicU64::new(0) }; SLOTS];
+    static VALS: [core::sync::atomic::AtomicU32; SLOTS] = [const { core::sync::atomic::AtomicU32::new(0) }; SLOTS];
+
+    fn cached(parts: &[&[u8]], f: impl FnOnce() -> Option<u32>) -> Option<u32> {
+        use core::sync::atomic::Ordering::{Acquire, Relaxed, Release};
+        let mut key: u64 = 0xcbf2_9ce4_8422_2325;
+        for p in parts {
+            for &b in p.iter().chain(&[0u8]) {
+                key = (key ^ b as u64).wrapping_mul(0x0000_0100_0000_01b3);
+            }
+        }
+        let key = key | 1;
+        for i in 0..SLOTS {
+            if KEYS[i].load(Acquire) == key {
+                return Some(VALS[i].load(Relaxed));
+            }
+        }
+        let v = f()?;
+        for i in 0..SLOTS {
+            if KEYS[i].load(Relaxed) == 0 {
+                VALS[i].store(v, Relaxed);
+                KEYS[i].store(key, Release);
+                break;
+            }
+        }
+        Some(v)
+    }
+
+    /// A NUL-terminated copy of `s` on the stack (names of a section or module are short).
+    fn cstr(s: &str, buf: &mut [u8; 32]) -> bool {
+        if s.len() >= buf.len() {
+            return false;
+        }
+        buf[..s.len()].copy_from_slice(s.as_bytes());
+        buf[s.len()] = 0;
+        true
     }
 
     /// The main module, mapped: reads at RVAs from its base.
@@ -265,6 +443,46 @@ mod win {
         }
         fn base(&self) -> usize {
             unsafe { GetModuleHandleA(core::ptr::null()) }
+        }
+        fn file_crc(&self, section: &str) -> Option<u32> {
+            cached(&[b"exe", section.as_bytes()], || {
+                let mut path = [0u8; 300];
+                let n = unsafe { GetModuleFileNameA(0, path.as_mut_ptr(), 260) } as usize;
+                if n == 0 || n >= 260 {
+                    return None;
+                }
+                file_crc_of(&path[..n + 1], section)
+            })
+        }
+        fn companion(&self, name: &str) -> crate::pe::Companion {
+            use crate::pe::Companion;
+            let mut c = [0u8; 32];
+            if !cstr(name, &mut c) {
+                return Companion::Unreadable;
+            }
+            let m = unsafe { GetModuleHandleA(c.as_ptr()) };
+            if m == 0 {
+                return Companion::NotLoaded;
+            }
+            // Its file, not its image: the image may be relocated or patched by then.
+            let crc = cached(&[b"mod", name.as_bytes()], || {
+                let mut path = [0u8; 300];
+                let n = unsafe { GetModuleFileNameA(m, path.as_mut_ptr(), 260) } as usize;
+                if n == 0 || n >= 260 {
+                    return None;
+                }
+                file_crc_of(&path[..n + 1], ".text")
+            });
+            crc.map_or(Companion::Unreadable, Companion::Crc)
+        }
+        fn name(&self, out: &mut [u8]) -> usize {
+            let mut path = [0u8; 300];
+            let n = unsafe { GetModuleFileNameA(0, path.as_mut_ptr(), 260) } as usize;
+            let n = n.min(path.len());
+            let from = path[..n].iter().rposition(|&c| c == b'\\' || c == b'/').map_or(0, |i| i + 1);
+            let k = (n - from).min(out.len());
+            out[..k].copy_from_slice(&path[from..from + k]);
+            k
         }
     }
 
@@ -312,6 +530,17 @@ impl Engine {
         }
     }
 
+    /// The executable's name as logged: the matched build's (`Armada2.exe`), else the
+    /// module's own file name; "" before `init`.
+    pub fn exe(&self) -> &'static str {
+        self.t().rt.exe.get().unwrap_or("")
+    }
+
+    /// The table's game (`armada2`), its profiles' `game`.
+    pub fn game(&self) -> &'static str {
+        self.t().game
+    }
+
     /// `armada2/gog-1.1`, or None on an unknown build (or before `init`).
     pub fn build(&self) -> Option<&'static str> {
         self.build_index().map(|i| self.t().builds[i].key)
@@ -323,6 +552,35 @@ impl Engine {
     /// the engine's own look.
     pub fn content(&self) -> Option<&'static str> {
         self.build_index().map(|i| self.t().builds[i].content).filter(|c| !c.is_empty())
+    }
+
+    /// The companion modules the matched build's marks describe (build.toml `[[module]]`),
+    /// by name; empty on a build with none, an unknown build, and before `init`. Whether
+    /// the loaded one is the profiled one is the identity's business (`init` logs it, and
+    /// the hooks that depend on it stand down when it is not).
+    pub fn companions(&self) -> &'static [crate::table::Module] {
+        match self.build_index() {
+            Some(i) => self.t().builds[i].modules,
+            None => &[],
+        }
+    }
+
+    /// Whether every companion module the matched build names is the one profiled (true on
+    /// a build that names none).
+    pub fn companions_ok(&self) -> bool {
+        self.t().rt.companion_bad.load(Relaxed) == 0
+    }
+
+    /// The `check` bytes of a `fn`, `label` or `patch` in the matched build: what `ready`
+    /// compared memory with (empty when the build checks nothing there, or unless a hook
+    /// that uses it is ready). For a hook that moves whole instructions from a function's
+    /// entry (render3d's callee hooks), which may move only bytes the profile vouches for.
+    pub fn check_bytes(&self, s: Sym) -> &'static [u8] {
+        let k = s.0 as usize;
+        if self.addr(s) == 0 {
+            return &[];
+        }
+        self.entries().get(k).map(|e| e.check).unwrap_or(&[])
     }
 
     /// The identity's first executable section, as mapped: replaces `EXE_CODE`.
@@ -469,6 +727,12 @@ impl Engine {
         None
     }
 
+    /// The build's block `i`: of `blocked` (W_BLOCKED) or of `blocked_mod` (W_MODULE).
+    fn block(&self, why: u64, i: usize) -> &'static Block {
+        let b = &self.t().builds[self.build_index().unwrap_or(0)];
+        if why == W_MODULE { &b.blocked_mod[i] } else { &b.blocked[i] }
+    }
+
     fn why_of(&self, st: u64) -> StandDown {
         let t = self.t();
         let why = (st >> 16) & 0xff;
@@ -479,9 +743,9 @@ impl Engine {
         let w = match why {
             W_NOT_STOCK => Why::NotStock,
             W_CALLS => Why::CallsElse,
-            W_BLOCKED => {
-                let b = &t.builds[self.build_index().unwrap_or(0)];
-                return StandDown { hook: "", symbol: b.blocked[aux].symbol, why: Why::Blocked(b.blocked[aux].why) };
+            W_BLOCKED | W_MODULE => {
+                let blk = self.block(why, aux);
+                return StandDown { hook: "", symbol: blk.symbol, why: Why::Blocked(blk.why) };
             }
             W_TEST => Why::Test,
             W_ABSENT => Why::Absent(bname),
@@ -515,6 +779,10 @@ impl Engine {
         } else if let Some(b) = bi.map(|i| &t.builds[i]) {
             if let Some(n) = b.blocked.iter().position(|x| x.hook as usize == hk) {
                 fail = Some((sym0, W_BLOCKED, n as u64));
+            } else if t.rt.companion_bad.load(Relaxed) != 0 {
+                if let Some(n) = b.blocked_mod.iter().position(|x| x.hook as usize == hk) {
+                    fail = Some((sym0, W_MODULE, n as u64));
+                }
             }
         }
         if fail.is_none() && st & ST_TEST != 0 {
@@ -545,17 +813,16 @@ impl Engine {
             let mut note = Line::new();
             match sd.why {
                 Why::Unknown => {
-                    let _ = note.write_str(PLUGIN_NOTE);
+                    let _ = note.write_str(self.note_plugin_text());
                 }
                 Why::Test => {
                     let _ = write!(note, "Stands down: {}: test mismatch (A2EngineTest.ini)", sd.symbol);
                 }
                 Why::Blocked(_) => {
-                    let b = &t.builds[bi.unwrap_or(0)];
-                    let _ = note.write_str(b.blocked[x as usize].note);
+                    let _ = note.write_str(self.block((packed >> 16) & 0xff, x as usize).note);
                 }
                 _ => {
-                    let _ = write!(note, "Stands down: {} is not stock in this Armada2.exe", sd.symbol);
+                    let _ = write!(note, "Stands down: {} is not stock in this {}", sd.symbol, self.exe());
                 }
             }
             t.rt.notes[hk].set(note.as_str());
@@ -576,6 +843,17 @@ impl Engine {
         }
         slot.store(ST_READY | (st & ST_TEST), Release);
         Ok(())
+    }
+
+    /// Whether every entry of hook `h` has an address in the matched build (none is
+    /// `absent`), asked without a check and without a log line: for a hook only a child
+    /// build has (a Roots site), which stock never asks `ready` about, so that its
+    /// stand-down (`has no address in <build>`) is not logged on every stock run. False
+    /// on an unknown build.
+    pub fn present(&self, h: HookId) -> bool {
+        let t = self.t();
+        let Some(hd) = t.hooks.get(h.0 as usize) else { return false };
+        self.build_index().is_some() && hd.syms.iter().all(|&k| self.entries().get(k as usize).is_some_and(|e| e.present))
     }
 
     /// Whether a hook that uses the symbol is ready, without the warning `addr` logs when
@@ -599,6 +877,30 @@ impl Engine {
             self.log(l.as_str());
         }
         0
+    }
+
+    /// A `field`'s offset in this build (README.md, "Fields and values"): what the
+    /// generated `field::X()` returns. On an unknown build, and before `init`, the root
+    /// build's (only scan hooks run there, so no hook of ours reads it); 0 when this build
+    /// has no such field (every hook that uses it stands down). Not tied to a hook's
+    /// readiness, so a read in a hot path costs one load and an index.
+    #[inline]
+    pub fn field(&self, s: Sym) -> usize {
+        self.value(s) as usize
+    }
+
+    /// A `value`'s value in this build, as `field` (the generated `value::X()`).
+    #[inline]
+    pub fn value(&self, s: Sym) -> i32 {
+        let t = self.t();
+        let b = match t.rt.build.load(Acquire) {
+            0 | 1 => 0,
+            b => b as usize - 2,
+        };
+        match t.builds.get(b).and_then(|b| b.entries.get(s.0 as usize)) {
+            Some(e) if e.present => e.value,
+            _ => 0,
+        }
     }
 
     /// A `fn` with an `end`: its range, relocated; (0, 0) unless ready.
@@ -658,9 +960,13 @@ impl Engine {
         self.note_plugin()
     }
 
-    /// `This Armada2.exe is a build Refit does not know: it runs stock` on an unknown
-    /// build, else None.
+    /// `This <exe> is a build Refit does not know: it runs stock` on an unknown build,
+    /// else None.
     pub fn note_plugin(&self) -> Option<&'static str> {
-        if self.t().rt.build.load(Acquire) == 1 { Some(PLUGIN_NOTE) } else { None }
+        if self.t().rt.build.load(Acquire) == 1 { Some(self.note_plugin_text()) } else { None }
+    }
+
+    fn note_plugin_text(&self) -> &'static str {
+        self.t().rt.plugin_note.get().unwrap_or("")
     }
 }

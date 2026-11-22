@@ -9,3 +9,7 @@ extern crate alloc;
 
 #[path = "../../src/passthrough/state.rs"]
 pub mod state;
+
+/// `stub::blocks` (the Roots readiness work): the level sizes of block-compressed textures.
+#[path = "../../src/stub/blocks.rs"]
+pub mod blocks;

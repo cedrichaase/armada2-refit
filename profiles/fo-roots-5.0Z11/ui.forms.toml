@@ -1,0 +1,18 @@
+# Fleet Operations: Roots 5.0Z11: its front end is FleetOpsHook.dll's VCL forms (PLAN-FLEETOPS.md,
+# FO-6 step 7, option C). The forms part runs here; which FleetOpsHook it accepts is its own
+# list (`FAMILY` in ui/src/engine/forms.rs, decision 148). Written by hand.
+schema = 1
+plugin = "ui"
+
+[[sym]]
+id = "forms_present"
+value = 1
+
+# Roots' shell, 1200x900: where FleetOpsHook places its full-screen forms.
+[[sym]]
+id = "forms_design_width"
+value = 1200
+
+[[sym]]
+id = "forms_design_height"
+value = 900

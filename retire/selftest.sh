@@ -29,6 +29,9 @@ done
 cp "$here/../render3d/content/sky/mbgred.ini" "$game/Sky/mbgred.ini"
 { cat "$here/../render3d/content/sky/mbgaqu.ini"; echo "; my tweak"; } > "$game/Sky/mbgaqu.ini"
 : > "$game/Menus/MainBk.bmp"; : > "$game/A2EngineTest.ini"
+# The logs older builds wrote beside the exe (the plugins' own .asi stay).
+for n in Display8 Render3D UI QOL QOLRules Online BinkProxy; do : > "$game/$n.log"; done
+: > "$game/Render3D.asi"
 # The hud scripts' edits and their backups.
 echo stock-cfg > "$game/misc/gui_fed.cfg.a2neb-backup"; echo wide-cfg > "$game/misc/gui_fed.cfg"
 echo stock-same > "$game/misc/gui_kli.cfg.a2neb-backup"; echo stock-same > "$game/misc/gui_kli.cfg"
@@ -56,6 +59,8 @@ for n in HUD GridLayout Menus MenuScale MSAA Lighting Sky Nebulae Surfaces Explo
     gone "$n.asi"; gone "$n.ini"; gone "$n.log"
 done
 gone MenuScale; gone Sky/mbgred.ini; is Sky/mbgaqu.ini; is Sky/Mine.ini; is Menus/MainBk.bmp; gone A2EngineTest.ini
+for n in Display8 Render3D UI QOL QOLRules Online BinkProxy; do gone "$n.log"; done
+is Render3D.asi
 content misc/gui_fed.cfg stock-cfg; gone misc/gui_fed.cfg.a2neb-backup
 content misc/gui_kli.cfg stock-same; gone misc/gui_kli.cfg.a2neb-backup
 content Textures/RGB/Curs_Arrow.tga stock-cur; gone Textures/RGB/Curs_Arrow.tga.a2neb-backup

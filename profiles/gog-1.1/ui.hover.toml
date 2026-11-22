@@ -1,0 +1,238 @@
+# UI.asi's symbols in Armada2.exe 1.1 (GOG): part "hover", the status line about the craft
+# under the pointer (hover.rs). Each entry is tied to the hook that uses it; the findings are in
+# ui/HUD.md, "The status line under the pointer".
+schema = 1
+plugin = "ui"
+readme = "ui/HUD.md"
+lang = "rust"
+out = "ui/src/syms_hover.rs"
+
+[hook."hud.hover"]
+doc = "ShipDisplay::Render's call of SDInfoBar::Render, recorded and drawn by the UI"
+rows = ["HUD.Hover"]
+
+# ShipDisplay::Render draws the strip about the craft under the pointer (`+0x1ec`, set by
+# its AlwaysSimulate) with one call, at the strip's place for the panel's face (`+0x1f4`
+# picks a pair of `+0x1b8`); the arguments are the craft and that place, in pixels.
+[[sym]]
+id = "hover_infobar_call"
+symbol = "ShipDisplay::Render"
+kind = "call"
+addr = 0x4f2daa
+target = "hover_infobar_render"
+in = "ShipDisplay::Render"
+used_by = ["hud.hover"]
+
+[[sym]]
+id = "hover_infobar_render"
+symbol = "SDInfoBar::Render"
+kind = "fn"
+addr = 0x4efc20
+check = "55 8b ec 53 56 8b f1 57"
+used_by = ["hud.hover"]
+
+# SDInfoBar's children, built in its PostLoad: three texts with an icon (shields, hull,
+# crew), the special energy (drawn only while the craft has some), and the class's or
+# the craft's name (the name when the craft's class has the flag below).
+[[sym]]
+id = "hover_ib_shield"
+symbol = "SDInfoBar::shield text"
+kind = "field"
+struct = "SDInfoBar"
+offset = 0xc
+type = "ptr"
+used_by = ["hud.hover"]
+
+[[sym]]
+id = "hover_ib_hull"
+symbol = "SDInfoBar::hull text"
+kind = "field"
+struct = "SDInfoBar"
+offset = 0x10
+type = "ptr"
+used_by = ["hud.hover"]
+
+[[sym]]
+id = "hover_ib_crew"
+symbol = "SDInfoBar::crew text"
+kind = "field"
+struct = "SDInfoBar"
+offset = 0x14
+type = "ptr"
+used_by = ["hud.hover"]
+
+[[sym]]
+id = "hover_ib_energy"
+symbol = "SDInfoBar::energy text"
+kind = "field"
+struct = "SDInfoBar"
+offset = 0x18
+type = "ptr"
+used_by = ["hud.hover"]
+
+[[sym]]
+id = "hover_ib_class"
+symbol = "SDInfoBar::class text"
+kind = "field"
+struct = "SDInfoBar"
+offset = 0x1c
+type = "ptr"
+used_by = ["hud.hover"]
+
+[[sym]]
+id = "hover_ib_name"
+symbol = "SDInfoBar::name text"
+kind = "field"
+struct = "SDInfoBar"
+offset = 0x20
+type = "ptr"
+used_by = ["hud.hover"]
+
+# GameObject+0x40: its class; the class's byte +0x3c4 says the strip names the craft
+# (NameText) rather than its class (ClassText). GameObject+0x168: the special energy,
+# shown while it is at least 1.
+[[sym]]
+id = "hover_obj_class"
+symbol = "GameObject::class"
+kind = "field"
+struct = "GameObject"
+offset = 0x40
+type = "ptr"
+used_by = ["hud.hover"]
+
+[[sym]]
+id = "hover_class_named"
+symbol = "GameObjectClass::named in the strip"
+kind = "field"
+struct = "GameObjectClass"
+offset = 0x3c4
+type = "u8"
+used_by = ["hud.hover"]
+
+[[sym]]
+id = "hover_obj_energy"
+symbol = "GameObject::special energy"
+kind = "field"
+struct = "GameObject"
+offset = 0x168
+type = "f32"
+used_by = ["hud.hover"]
+
+# A text component (StandardText and its subclasses): its DisplayInterface (+0x4), whose
+# vtable +0x64 answers the HUD's origin (a POINT); its font (+0x28, a pointer to the
+# ST3D_Font pointer); where it is printed this frame (+0x58, a RECT) and how (+0x68,
+# eJustify). TextAndSprite: its icon (+0x104), the icon's RECT (+0x10c) and the text's
+# (+0x11c), both relative to the place it is drawn at. ClassText and NameText: their RECT
+# (+0x104), relative the same way.
+[[sym]]
+id = "hover_st_display"
+symbol = "StandardComponent::display interface"
+kind = "field"
+struct = "StandardComponent"
+offset = 0x4
+type = "ptr"
+used_by = ["hud.hover"]
+
+[[sym]]
+id = "hover_di_origin"
+symbol = "DisplayInterface::vtable origin"
+kind = "field"
+struct = "DisplayInterface"
+offset = 0x64
+type = "ptr"
+used_by = ["hud.hover"]
+
+[[sym]]
+id = "hover_st_font"
+symbol = "StandardText::font"
+kind = "field"
+struct = "StandardText"
+offset = 0x28
+type = "ptr"
+used_by = ["hud.hover"]
+
+[[sym]]
+id = "hover_st_justify"
+symbol = "StandardText::justify"
+kind = "field"
+struct = "StandardText"
+offset = 0x68
+type = "i32"
+used_by = ["hud.hover"]
+
+[[sym]]
+id = "hover_ts_sprite"
+symbol = "TextAndSprite::icon sprite"
+kind = "field"
+struct = "TextAndSprite"
+offset = 0x104
+type = "ptr"
+used_by = ["hud.hover"]
+
+[[sym]]
+id = "hover_ts_sprite_rect"
+symbol = "TextAndSprite::icon rect"
+kind = "field"
+struct = "TextAndSprite"
+offset = 0x10c
+type = "ptr"
+used_by = ["hud.hover"]
+
+[[sym]]
+id = "hover_ts_text_rect"
+symbol = "TextAndSprite::text rect"
+kind = "field"
+struct = "TextAndSprite"
+offset = 0x11c
+type = "ptr"
+used_by = ["hud.hover"]
+
+[[sym]]
+id = "hover_ct_rect"
+symbol = "ClassText::rect"
+kind = "field"
+struct = "ClassText"
+offset = 0x104
+type = "ptr"
+used_by = ["hud.hover"]
+
+# StandardText's vtable: SetCurrentObject (+0x20), GetInformation (+0x24: the colour, three
+# floats, and the string it prints, through the pointer it is given), GetCurrentColor
+# (+0x2c: the icon's tint).
+[[sym]]
+id = "hover_vt_set_object"
+symbol = "StandardText::vtable SetCurrentObject"
+kind = "field"
+struct = "StandardText"
+offset = 0x20
+type = "ptr"
+used_by = ["hud.hover"]
+
+[[sym]]
+id = "hover_vt_information"
+symbol = "StandardText::vtable GetInformation"
+kind = "field"
+struct = "StandardText"
+offset = 0x24
+type = "ptr"
+used_by = ["hud.hover"]
+
+[[sym]]
+id = "hover_vt_current_color"
+symbol = "TextAndSprite::vtable GetCurrentColor"
+kind = "field"
+struct = "TextAndSprite"
+offset = 0x2c
+type = "ptr"
+used_by = ["hud.hover"]
+
+# ST3D_Font::GetHeight, thiscall, a float: the line height of the font a text prints in
+# (StandardText+0x28 points at the font's pointer). Roots picks its fonts by the screen's
+# width (FontNewScreenWidth), so the figures' size follows this, not the text's rectangle.
+[[sym]]
+id = "hover_font_height"
+symbol = "ST3D_Font::GetHeight"
+kind = "fn"
+addr = 0x629400
+check = "55 8b ec 83 ec 0c 56 57"
+used_by = ["hud.hover"]

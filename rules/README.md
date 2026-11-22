@@ -203,6 +203,13 @@ apart: three); the plugin, refusing for crew, spoke one line for three orders 0.
 apart and three for three 0.5 s apart -- the same, within the timing of the clicks. Each call writes an `advisor:` line in
 `QOLRules.log` naming the topic (-1 for officers) and whether the team is the local one.
 
-Not done: destruction, capture and save/load paths are built but not bench-tested; a
-refit save with paid items loaded in stock loses what was paid; construction ships and
+Losing the building and saving have a scenario, `qol-pay-on-queue-loss` (a yard destroyed by a
+hull hit, handed to another team, saved and loaded; the bank must come back once, never to
+3725). It was written against an earlier hook set that also hooked `DestroyShip`, where the
+first run found a double refund and `ClearTeam` was made to skip a destroyed producer. This
+layer hooks `ClearTeam` only, which stock zeroes the item in progress after, so a destroyed
+producer is refunded exactly there and a guard on the destroyed flag would lose that refund.
+The scenario has not been run against this layer yet.
+
+Not done: a refit save with paid items loaded in stock loses what was paid; construction ships and
 the AI's own orders (if it bypasses the command) are untested.

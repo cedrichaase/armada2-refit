@@ -14,8 +14,8 @@
 //! Labels come from the game, so they are its own (localised) strings. What the model
 //! cannot read (a picture button's art, an owner-drawn list, a map preview) is drawn
 //! from the dialog's mirror (`generic`), cropped to the control.
-use crate::engine::dialogs::{self, Slot};
-use crate::engine::shellui::{self, Kind};
+use crate::engine::api::dialogs::{self, Slot};
+use crate::engine::api::shellui::{self, Kind};
 use crate::rt::win::*;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -285,7 +285,7 @@ fn shell_controls(dlg: HWND, ox: i32, oy: i32, out: &mut Vec<Control>) {
         c.align = w.align;
         if w.kind == Kind::Combo {
             // Its choice is the hidden combo box's (engine::shellcombo).
-            (c.items, c.selected) = crate::engine::shellcombo::items(w.obj);
+            (c.items, c.selected) = crate::engine::api::shellcombo::items(w.obj);
             if let Some(t) = c.items.get(c.selected.max(0) as usize).filter(|_| c.selected >= 0) {
                 c.text = t.clone();
             }
@@ -319,6 +319,15 @@ pub fn read(s: &Slot) -> Model {
         rect: [ox, oy, s.w(), s.h()],
         controls,
     }
+}
+
+/// Reads a dialog FleetOpsHook opens on Roots, adopted (`engine::fodialogs`): the same
+/// walk as a hosted one's, its rectangles in Roots' design space (the dialog stands at
+/// `design`'s origin), named by its stock procedure (`roots_dialogs`).
+pub fn read_adopted(hwnd: HWND, design: [i32; 4], screen: &'static str) -> Model {
+    let mut controls = Vec::new();
+    walk(hwnd, design[0], design[1], &mut controls);
+    Model { hwnd, screen, template: 0, rect: design, controls }
 }
 
 /// UI.log: a dialog's controls, once per screen, for writing specs.

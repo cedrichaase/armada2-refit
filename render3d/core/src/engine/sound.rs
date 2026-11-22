@@ -4,12 +4,11 @@
 //! theirs. Used by the menu scene for its ships' decloak (`menu`).
 use super::rd;
 use crate::engine::at;
-use crate::syms::sym;
+use crate::syms::{sym, value};
 
 pub(crate) fn operator_new() -> usize { at(sym::FN_NEW) }
 /// `AudioSound2D::AudioSound2D(name, priority, volume, ...)`, thiscall.
 pub(crate) fn sound2d() -> usize { at(sym::SOUND2D) }
-const SOUND2D_BYTES: usize = 0x1c;
 
 static mut NAMES: alloc::vec::Vec<alloc::vec::Vec<u8>> = alloc::vec::Vec::new();
 
@@ -41,7 +40,7 @@ pub fn play_2d(name: &str) {
     unsafe {
         let new: unsafe extern "C" fn(usize) -> usize = core::mem::transmute(operator_new());
         let ctor: unsafe extern "thiscall" fn(usize, *const u8, i32, i32, i32, usize) -> usize = core::mem::transmute(sound2d());
-        let snd = new(SOUND2D_BYTES);
+        let snd = new(value::SOUND2D_BYTES() as usize);
         if snd != 0 {
             // As the shell's buttons: priority 8, volume 0, 0, no callback.
             ctor(snd, p, 8, 0, 0, 0);

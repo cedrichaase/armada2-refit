@@ -697,8 +697,8 @@ static void *patch_iat(HMODULE mod, const char *dll, const char *name, void *rep
     const DWORD *desc;
 
     if (!base || *(WORD *)base != 0x5a4d) return 0;
-    nt  = base + *(DWORD *)(base + 0x3c);
-    rva = *(DWORD *)(nt + 0x80);                /* DataDirectory[IMPORT] */
+    nt  = base + *(DWORD *)(base + 0x3c);  /* PE header */
+    rva = *(DWORD *)(nt + 0x80);                /* PE header: DataDirectory[IMPORT] */
     if (!rva) return 0;
 
     for (desc = (const DWORD *)(base + rva); desc[3]; desc += 5) {

@@ -22,7 +22,8 @@ fn eng() -> &'static a2engine::Engine {
 // object) and `g_transport` (`Transport*`: the game's connection, local or network) are
 // in `syms_shell`, by name: `SETUP_*`.
 /// Slots in a game setup.
-pub const SLOTS: usize = value::SETUP_SLOTS as usize;
+#[inline(always)]
+pub fn slots() -> usize { value::SETUP_SLOTS() as usize }
 
 /// Whether the engine lets the getters run: every function is checked by its first
 /// bytes before the first call; with one not stock, nothing here is called and every
@@ -105,13 +106,13 @@ pub fn map_title() -> Option<String> {
 
 /// Instant Action (against the computer, from the main menu).
 pub fn is_instant_action() -> bool {
-    transport_flag(field::SETUP_VT_IS_INSTANT_ACTION).unwrap_or(false)
+    transport_flag(field::SETUP_VT_IS_INSTANT_ACTION()).unwrap_or(false)
 }
 
 /// A campaign mission (or a replay). Not Instant Action: `TransportLocalInstantAction`
 /// answers false, as a network transport does; ask `is_instant_action` first.
 pub fn is_single_player() -> bool {
-    transport_flag(field::SETUP_VT_IS_SINGLE_PLAYER).unwrap_or(true)
+    transport_flag(field::SETUP_VT_IS_SINGLE_PLAYER()).unwrap_or(true)
 }
 
 /// Whether the game being played (or set up) is a network game: false for a campaign
@@ -124,10 +125,10 @@ pub fn network_game() -> Option<bool> {
     if transport() == 0 || !ok() {
         return None;
     }
-    if transport_flag(field::SETUP_VT_IS_INSTANT_ACTION)? {
+    if transport_flag(field::SETUP_VT_IS_INSTANT_ACTION())? {
         return Some(false);
     }
-    Some(!transport_flag(field::SETUP_VT_IS_SINGLE_PLAYER)?)
+    Some(!transport_flag(field::SETUP_VT_IS_SINGLE_PLAYER())?)
 }
 
 /// An instant-action race index's race name (`federation`), None for "random" (not
@@ -141,7 +142,7 @@ fn race_name_of(index: usize) -> Option<&'static str> {
         if r == 0 {
             return None;
         }
-        Some(super::hud::cstr_static((r + field::SETUP_RACE_NAME) as *const u8))
+        Some(super::hud::cstr_static((r + field::SETUP_RACE_NAME()) as *const u8))
     }
 }
 
@@ -184,7 +185,7 @@ pub fn players() -> Vec<Player> {
         return out;
     }
     let local = unsafe { this0(eng().addr(sym::SETUP_GET_LOCAL_SLOT), gs) };
-    for slot in 0..SLOTS {
+    for slot in 0..slots() {
         unsafe {
             if this1(eng().addr(sym::SETUP_IS_VACANT), gs, slot) as u8 != 0 || this1(eng().addr(sym::SETUP_IS_GAME_PLAYER), gs, slot) as u8 == 0 {
                 continue;
@@ -205,20 +206,20 @@ pub fn players() -> Vec<Player> {
 /// what the stock `LoadPercentageBox` asks): how far each slot's load has got, 0..1,
 /// for the slots the transport sends to (`IsSendWorthy`). None in a game on this
 /// machine, and once every player has finished.
-pub fn load_fractions() -> Option<[Option<f32>; SLOTS]> {
+pub fn load_fractions() -> Option<Vec<Option<f32>>> {
     let t = transport();
     if t == 0 || !ok() || is_single_player() {
         return None;
     }
     let vt = field(t, 0);
     unsafe {
-        if this0(field(vt, field::SETUP_VT_SHOW_LOAD_PERCENTAGES), t) as u8 == 0 {
+        if this0(field(vt, field::SETUP_VT_SHOW_LOAD_PERCENTAGES()), t) as u8 == 0 {
             return None;
         }
-        let mut out = [None; SLOTS];
-        let get: unsafe extern "thiscall" fn(usize, usize) -> f32 = core::mem::transmute(field(vt, field::SETUP_VT_GET_LOAD_PERCENTAGE));
+        let mut out = alloc::vec![None; slots()];
+        let get: unsafe extern "thiscall" fn(usize, usize) -> f32 = core::mem::transmute(field(vt, field::SETUP_VT_GET_LOAD_PERCENTAGE()));
         for (slot, o) in out.iter_mut().enumerate() {
-            if this1(field(vt, field::SETUP_VT_IS_SEND_WORTHY), t, slot) as u8 != 0 {
+            if this1(field(vt, field::SETUP_VT_IS_SEND_WORTHY()), t, slot) as u8 != 0 {
                 *o = Some(get(t, slot).clamp(0.0, 1.0));
             }
         }

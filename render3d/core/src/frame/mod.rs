@@ -120,6 +120,8 @@ pub fn install() -> bool {
     // The steps call the engine's own sub-functions through their sites: without the
     // profile's say-so every frame is the stock body.
     steps::set_ready(Hooks::core().ready(&TABLE, hook::FRAME_STEPS));
+    // Roots: the object loop's draw is another module's call (steps::probe_obj_draw).
+    steps::probe_obj_draw();
     if install_destroy() {
         log!("frame: DestroyRenderSurfaces chained: render3d lets go of the device with the engine");
     }

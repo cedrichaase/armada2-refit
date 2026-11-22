@@ -219,6 +219,14 @@ impl<'a> Ui<'a> {
         crate::hud::layout::note(r);
     }
 
+    /// A panel as `panel`, with lamps in its frame where the theme draws them
+    /// (`theme::Lamps`: Starfleet's, on the panels that stand where Roots' HUD has them).
+    pub fn panel_lit(&mut self, r: R) {
+        theme::panel_as(self, r, theme::Lamps::On);
+        self.claim(r);
+        crate::hud::layout::note(r);
+    }
+
     /// A panel with a title; returns the room left inside it, padded. Its title
     /// underline sweeps in when it first shows (anim.rs).
     pub fn window(&mut self, r: R, title: &str) -> R {

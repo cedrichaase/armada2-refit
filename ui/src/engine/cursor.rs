@@ -44,7 +44,7 @@ static mut SPRITE: usize = 0;
 
 /// The engine's current device (`Storm3D+0xcc`), 0 before there is one.
 fn device() -> usize {
-    field(storm3d(), field::CORE_STORM3D_DEVICES)
+    field(storm3d(), field::CORE_STORM3D_DEVICES())
 }
 
 /// Wraps `RefreshDisplay`. False, with nothing written, when its slot is not stock.
@@ -64,7 +64,7 @@ unsafe extern "thiscall" fn refresh(dev: usize) {
     if dev == 0 {
         return unsafe { stock(dev) };
     }
-    let p = (dev + field::CORE_DX8_CURSOR) as *mut usize;
+    let p = (dev + field::CORE_DX8_CURSOR()) as *mut usize;
     unsafe { HIDING = hide };
     unsafe {
         let sprite = *p;
@@ -75,7 +75,7 @@ unsafe extern "thiscall" fn refresh(dev: usize) {
             SUPPRESS = hide;
             stock(dev);
             SUPPRESS = false;
-            let sync = rd::<u8>(dev + field::CORE_DX8_SYNCHRONOUS) != 0;
+            let sync = rd::<u8>(dev + field::CORE_DX8_SYNCHRONOUS()) != 0;
             let shown = sync && sprite != 0 && REACHED;
             if sync && sprite != 0 && shown != SHOWN {
                 crate::log!("cursor: the engine's cursor is {}", if shown { "shown" } else { "held back (something before ours skips its draw)" });
@@ -114,7 +114,7 @@ pub fn hide_this_frame() {
 /// Direct3D hardware cursor, which `hide_this_frame` does not reach.
 pub fn synchronous() -> bool {
     let d = device();
-    d != 0 && unsafe { rd::<u8>(d + field::CORE_DX8_SYNCHRONOUS) } != 0
+    d != 0 && unsafe { rd::<u8>(d + field::CORE_DX8_SYNCHRONOUS()) } != 0
 }
 
 /// The name of the cursor the engine shows now, as `cursor.spr` names it (the move,
@@ -122,12 +122,12 @@ pub fn synchronous() -> bool {
 /// hook): that is when this frame's choice has reached the device. None when no cursor
 /// is shown.
 pub fn shape() -> Option<&'static str> {
-    element_name(field(device(), field::CORE_DX8_CURSOR))
+    element_name(field(device(), field::CORE_DX8_CURSOR()))
 }
 
 /// A cursor sprite's `cursor.spr` name; None for no sprite.
 pub fn element_name(sprite: usize) -> Option<&'static str> {
-    let name = field(sprite, field::CORE_ELEMENT_NAME);
+    let name = field(sprite, field::CORE_ELEMENT_NAME());
     if name == 0 {
         return None;
     }
@@ -229,7 +229,7 @@ unsafe extern "thiscall" fn cursor_draw(sprite: usize, pos: *mut f32, w: f32, h:
         let (sx, sy) = (*scale, *scale.add(1));
         if SQUARE && sx > 0.0 && sy > 0.0 && sx != sy && !pos.is_null() {
             // The engine passes pointer / scale - hotspot: the same point at the y scale.
-            let ox: f32 = rd(sprite + field::CORE_SPRITE_ORIGIN_X);
+            let ox: f32 = rd(sprite + field::CORE_SPRITE_ORIGIN_X());
             *pos = (*pos + ox) * sx / sy - ox;
             *scale = sy;
             draw(sprite, pos, w, h);

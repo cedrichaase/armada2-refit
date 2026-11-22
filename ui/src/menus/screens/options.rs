@@ -39,7 +39,7 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
             let er = R::new(body.x + ui.u(40.0), y, body.w - ui.u(80.0), ui.u(bh));
             let clicked = ui.scope("refit entry", |ui| ui.button(er, "Refit settings"));
             if clicked && s.top && !refit::is_open() {
-                crate::engine::sound::shell_click();
+                crate::engine::api::sound::shell_click();
                 refit::open(s.slot.hwnd);
             }
             if ui.input.mouse.is_some_and(|p| er.contains(p)) {

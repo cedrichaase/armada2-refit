@@ -18,6 +18,7 @@
 //!   view's Bink frame; `vk/mirror.rs`, `dx12/mirror.rs`): made once with every level,
 //!   and brought up to date when the engine unlocks a level (on the device's thread) or
 //!   at the next `BeginScene` or `Present` (a lock from another thread: `BinkThread`).
+pub mod blocks;
 pub mod d3d;
 pub mod device;
 pub mod modes;
@@ -35,6 +36,10 @@ use obj::SObj;
 unsafe extern "system" {
     fn SetWindowLongA(hwnd: *mut c_void, index: i32, v: i32) -> i32;
     fn SetWindowPos(hwnd: *mut c_void, after: *mut c_void, x: i32, y: i32, cx: i32, cy: i32, flags: u32) -> i32;
+    fn GetClassNameA(hwnd: *mut c_void, name: *mut u8, n: i32) -> i32;
+    fn IsWindowVisible(hwnd: *mut c_void) -> i32;
+    fn IsWindow(hwnd: *mut c_void) -> i32;
+    fn GetWindowThreadProcessId(hwnd: *mut c_void, pid: *mut u32) -> u32;
     fn GetSystemMetrics(index: i32) -> i32;
     fn MonitorFromPoint(x: i32, y: i32, flags: u32) -> usize;
 }
@@ -171,6 +176,17 @@ fn device_exists(s: &Stub) -> bool {
     }
 }
 
+/// Whether the device made can sample BC1, BC2 and BC3 natively, so `CheckDeviceFormat`
+/// says yes to DXT1, DXT3 and DXT5. Direct3D 12 always can; Vulkan when the physical
+/// device has `textureCompressionBC` (every desktop GPU and lavapipe; not a phone's).
+pub fn compressed_textures() -> bool {
+    match made() {
+        Some(Backend::Vulkan) => crate::vk::get().is_some_and(|v| v.bc),
+        Some(Backend::D3d12) => true,
+        None => false,
+    }
+}
+
 pub fn vulkan() -> bool {
     made() == Some(Backend::Vulkan)
 }
@@ -186,16 +202,27 @@ pub fn d3d12() -> bool {
 pub fn ensure_device(hwnd: *mut c_void, _flags: u32, _depth: u32, interval: u32) -> bool {
     let s = stub();
     if s.decided {
+        if device_exists(s) && !hwnd.is_null() && hwnd != s.hwnd {
+            follow_window(s, hwnd);
+        }
         return device_exists(s);
     }
     let (w, h) = (s.mode.width, s.mode.height);
-    unsafe {
-        // WS_POPUP | WS_VISIBLE: no frame, and the client area is the whole window.
-        SetWindowLongA(hwnd, -16, 0x9000_0000u32 as i32);
-        SetWindowPos(hwnd, core::ptr::null_mut(), 0, 0, w as i32, h as i32, 0x0020 | 0x0040); // FRAMECHANGED | SHOWWINDOW
-    }
+    // `OneWindow` from the start (host.rs): the device window goes inside Display8's host
+    // and the backend presents to the host.
+    let present_to = match crate::host::from_start().then(|| crate::host::adopt(hwnd, w, h)).flatten() {
+        Some((host, _)) => host,
+        None => {
+            unsafe {
+                // WS_POPUP | WS_VISIBLE: no frame, and the client area is the whole window.
+                SetWindowLongA(hwnd, -16, 0x9000_0000u32 as i32);
+                SetWindowPos(hwnd, core::ptr::null_mut(), 0, 0, w as i32, h as i32, 0x0020 | 0x0040); // FRAMECHANGED | SHOWWINDOW
+            }
+            hwnd
+        }
+    };
     s.hwnd = hwnd;
-    crate::window::device_opened(hwnd, w, h);
+    crate::window::device_opened(present_to, w, h);
     s.main_thread = unsafe { GetCurrentThreadId() };
     crate::trace::MAIN_THREAD.store(s.main_thread, Ordering::Relaxed);
     let mut failed: Vec<Backend> = Vec::new();
@@ -205,8 +232,8 @@ pub fn ensure_device(hwnd: *mut c_void, _flags: u32, _depth: u32, interval: u32)
         s.backend = b;
         log!("stub: trying {} ({} of {})", b.name(), s.next, s.order.len());
         let r = match b {
-            Backend::Vulkan => crate::vk::Vk::start(hwnd, w, h, interval, s.validate),
-            Backend::D3d12 => crate::dx12::Dx::start(hwnd, w, h, interval, s.validate),
+            Backend::Vulkan => crate::vk::Vk::start(present_to, w, h, interval, s.validate),
+            Backend::D3d12 => crate::dx12::Dx::start(present_to, w, h, interval, s.validate),
         };
         match r {
             Ok(()) => {
@@ -230,6 +257,76 @@ pub fn ensure_device(hwnd: *mut c_void, _flags: u32, _depth: u32, interval: u32)
     s.decided = true;
     log!("stub: no backend could start ({})", names(&s.order));
     false
+}
+
+/// A later `CreateDevice` names another window than the one the backend presents to (Fleet
+/// Operations: Roots makes a windowed device on its 1200x900 shell window, then one for the
+/// game, and a skirmish was a white screen while the engine kept drawing into the first).
+/// The new window gets the first one's treatment (a popup over the desktop) and the
+/// backend's swap chain moves to it; the device, its targets and its mirrors are the same.
+/// Armada II's engine keeps its one window until it makes its display again (a change of the
+/// fullscreen flag, the device type or the display device; in a retail game its assert and
+/// exception handlers' flip to windowed): the old device is deleted with its window and the
+/// new one made on a new window of the engine's class, shown by the engine only once the
+/// device exists. Following it is right there too: the old window is gone.
+fn follow_window(s: &mut Stub, hwnd: *mut c_void) {
+    let (w, h) = (s.mode.width, s.mode.height);
+    let old = s.hwnd;
+    describe_windows(hwnd, old);
+    // `OneWindow` (host.rs): the new window goes inside Display8's host, which the swap
+    // chain is on (moved there once, should the host be made only now) and stays on. Only
+    // where the profile says the game makes a window at each switch: anywhere else (the
+    // bench's `BenchWindow` on Armada II) the swap chain follows as before.
+    if let Some((host, made)) = crate::host::from_start().then(|| crate::host::adopt(hwnd, w, h)).flatten() {
+        if made {
+            let r = if vulkan() {
+                crate::vk::get().map(|v| v.rebind(host))
+            } else {
+                crate::dx12::get().map(|d| d.rebind(host))
+            };
+            match r {
+                Some(Err(e)) => log!("stub: the swap chain could not move to the host window: {}", e),
+                _ => log!("stub: CreateDevice on another window ({:p}, was {:p}): the swap chain is on the host {:p} from now on", hwnd, old, host),
+            }
+        }
+        s.hwnd = hwnd;
+        crate::window::device_opened(host, w, h);
+        return;
+    }
+    unsafe {
+        SetWindowLongA(hwnd, -16, 0x9000_0000u32 as i32);
+        SetWindowPos(hwnd, core::ptr::null_mut(), 0, 0, w as i32, h as i32, 0x0020 | 0x0040);
+    }
+    let r = if vulkan() {
+        crate::vk::get().map(|v| v.rebind(hwnd))
+    } else {
+        crate::dx12::get().map(|d| d.rebind(hwnd))
+    };
+    match r {
+        Some(Ok(())) => log!("stub: CreateDevice on another window ({:p}, was {:p}): the swap chain follows it", hwnd, old),
+        Some(Err(e)) => log!("stub: CreateDevice on another window ({:p}, was {:p}): the swap chain could not follow: {}", hwnd, old, e),
+        None => {}
+    }
+    s.hwnd = hwnd;
+    crate::window::device_opened(hwnd, w, h);
+}
+
+/// What a later `CreateDevice` names, before the swap chain moves: the new window's class,
+/// whether it is shown and its thread, and whether the old one still exists. Armada II's
+/// engine makes a new device on a new window of its class when its display is made again
+/// (its assert and exception handlers flip it to windowed), its old window destroyed with
+/// the old device; Roots makes a window at each switch.
+fn describe_windows(hwnd: *mut c_void, old: *mut c_void) {
+    let mut class = [0u8; 64];
+    let n = unsafe { GetClassNameA(hwnd, class.as_mut_ptr(), class.len() as i32) }.max(0) as usize;
+    let class = core::str::from_utf8(&class[..n.min(class.len())]).unwrap_or("?");
+    let shown = unsafe { IsWindowVisible(hwnd) } != 0;
+    let thread = unsafe { GetWindowThreadProcessId(hwnd, core::ptr::null_mut()) };
+    let old_thread = if old.is_null() { 0 } else { unsafe { GetWindowThreadProcessId(old, core::ptr::null_mut()) } };
+    let old_alive = !old.is_null() && unsafe { IsWindow(old) } != 0;
+    log!("stub: CreateDevice on another window {:p}: class \"{}\", {}, thread {} (the old window {:p}: {}, thread {})",
+         hwnd, class, if shown { "shown" } else { "hidden" }, thread, old,
+         if old_alive { "still there" } else { "gone" }, old_thread);
 }
 
 /// Copies the levels written since into the mirror.
@@ -357,10 +454,18 @@ pub fn present(dev: &mut device::Dev, _src: *mut c_void, _dst: *mut c_void, _wnd
     };
     if let Some(v) = crate::vk::get() {
         written(true);
+        if crate::host::hold() {
+            v.skip();
+            return 0;
+        }
         return if v.present() { 0 } else { 0x8876_0868u32 as i32 }; // D3DERR_DEVICELOST
     }
     if let Some(x) = crate::dx12::get() {
         written(true);
+        if crate::host::hold() {
+            x.skip();
+            return 0;
+        }
         return if x.present() { 0 } else { 0x8876_0868u32 as i32 }; // D3DERR_DEVICELOST
     }
     0

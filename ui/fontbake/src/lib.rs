@@ -24,10 +24,12 @@ pub const SPREAD: f32 = 6.0;
 const ATLAS_W: usize = 1024;
 const GAP: usize = 1;
 
-/// The charset: ASCII, Latin-1 and the typographic extras the UI uses.
+/// The charset: ASCII, Latin-1, the rest of Windows-1252 (the game's code page: its
+/// strings are drawn through `text::game`) and the typographic extras the UI uses.
 pub fn charset() -> Vec<char> {
     let mut v: Vec<char> = (32u32..=126).chain(160..=255).filter_map(char::from_u32).collect();
     v.extend(['\u{2018}', '\u{2019}', '\u{201C}', '\u{201D}', '\u{2013}', '\u{2014}', '\u{2026}', '\u{2022}', '\u{20AC}', '\u{00D7}']);
+    v.extend(['\u{201A}', '\u{0192}', '\u{201E}', '\u{2020}', '\u{2021}', '\u{02C6}', '\u{2030}', '\u{0160}', '\u{2039}', '\u{0152}', '\u{017D}', '\u{02DC}', '\u{2122}', '\u{0161}', '\u{203A}', '\u{0153}', '\u{017E}', '\u{0178}']);
     v.sort();
     v.dedup();
     v

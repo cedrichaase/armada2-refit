@@ -25,6 +25,9 @@ doc = "A vtable slot that holds something else"
 doc = "Bytes that differ"
 rows = ["Graphics.Thing"]
 
+[hook.fieldhook]
+doc = "A field only a child build has (b2's fx): it stands down in b1"
+
 [[sym]]
 id = "f1"
 symbol = "One::f1"

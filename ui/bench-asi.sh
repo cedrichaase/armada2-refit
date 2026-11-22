@@ -54,15 +54,27 @@ while [ $# -gt 0 ]; do
 done
 work="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["work"])' "$state")"
 [ -d "$work/game" ] || { echo "no clone at $work/game" >&2; exit 1; }
+# The plugins sit beside the executable: the clone's root, or its Data/ on Fleet Operations:
+# Roots (games/<id>.toml, exe.data_dir; A2_PROFILE comes from a2test --game).
+repo="$(cd "$here/.." && pwd)"
+exe_dir="$(cd "$repo" && python3 -c 'import os, a2env; print(os.path.relpath(os.path.dirname(a2env.EXE), a2env.GAME))')"
+game="$work/game/$exe_dir"
 
 [ "$dplay" = 1 ] && bash "$here/../online/reference-dplay.sh" "$state"
 [ "$online" = 1 ] && bash "$here/../online/bench-asi.sh" "$state" --server
 bash "$here/build.sh" >/dev/null
-cp "$here/build/UI.asi" "$here/UI.ini" "$work/game/"
+cp "$here/build/UI.asi" "$game/"
+# On another game the clone's own UI.ini, which ./install gave that game's defaults
+# (ui/defaults/<id>.ini), is the base; without one the same defaults are applied here.
+if [ -f "$here/defaults/${A2_PROFILE:-armada2}.ini" ]; then
+    [ -f "$game/UI.ini" ] || python3 "$here/apply-defaults.py" "$here/UI.ini" "$here/defaults/$A2_PROFILE.ini" "$game/UI.ini"
+else
+    cp "$here/UI.ini" "$game/"
+fi
 for s in "${sets[@]}"; do
     sec="${s%%.*}" rest="${s#*.}"
     key="${rest%%=*}" val="${rest#*=}"
-    python3 - "$work/game/UI.ini" "$sec" "$key" "$val" <<'PY'
+    python3 - "$game/UI.ini" "$sec" "$key" "$val" <<'PY'
 import sys, re
 path, sec, key, val = sys.argv[1:]
 lines = open(path).read().splitlines()
@@ -83,14 +95,15 @@ if not done:
 open(path, "w").write("\r\n".join(out) + "\r\n")
 PY
 done
-echo "UI.asi -> $work/game/ ${sets[*]:-}"
+echo "UI.asi -> $game/ ${sets[*]:-}"
 for kv in "${rts[@]}"; do
     k="${kv%%=*}" v="${kv#*=}"
-    grep -qE "^int +$k *=" "$work/game/RTS_CFG.h" || { echo "RTS_CFG.h has no int $k" >&2; exit 1; }
-    sed -i -E "s/^(int +$k *= *)[-0-9]+;/\\1$v;/" "$work/game/RTS_CFG.h"
-    echo "RTS_CFG.h: $(grep -E "^int +$k *=" "$work/game/RTS_CFG.h" | tr -d '\r')"
+    grep -qE "^int +$k *=" "$game/RTS_CFG.h" || { echo "RTS_CFG.h has no int $k" >&2; exit 1; }
+    sed -i -E "s/^(int +$k *= *)[-0-9]+;/\\1$v;/" "$game/RTS_CFG.h"
+    echo "RTS_CFG.h: $(grep -E "^int +$k *=" "$game/RTS_CFG.h" | tr -d '\r')"
 done
-bash "$here/../retire/retire.sh" "$work/game" >/dev/null
+# retire/ is Armada II's (render3d/install.sh does the same).
+[ "${A2_PROFILE:-armada2}" != armada2 ] || bash "$here/../retire/retire.sh" "$work/game" >/dev/null
 if [ -n "$scene" ]; then
     bash "$here/../testbench/scene/bench-setup.sh" "$state" "$scene"
 fi

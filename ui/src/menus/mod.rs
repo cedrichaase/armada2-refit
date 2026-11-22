@@ -12,14 +12,18 @@
 //! - `locks`: which campaigns are not yet open (the campaign selection, the scene).
 pub mod actions;
 pub mod backdrop;
+pub mod roots;
+pub mod roots_dialogs;
 pub mod generic;
 pub mod locks;
+pub mod main_layout;
 pub mod model;
 pub mod refit;
 pub mod scene;
+pub mod title_art;
 pub mod screens;
 
-use crate::engine::dialogs::{self, DESIGN_H, DESIGN_W};
+use crate::engine::api::dialogs::{self, design_h, design_w};
 use crate::gfx::{self, Tex, R};
 use crate::rt::win::HWND;
 use crate::widgets::Ui;
@@ -37,8 +41,8 @@ pub struct Fit {
 
 impl Fit {
     pub fn of(w: f32, h: f32) -> Fit {
-        let s = if w * DESIGN_H as f32 > h * DESIGN_W as f32 { h / DESIGN_H as f32 } else { w / DESIGN_W as f32 };
-        Fit { x: libm::floorf((w - DESIGN_W as f32 * s) * 0.5), y: libm::floorf((h - DESIGN_H as f32 * s) * 0.5), s }
+        let s = if w * design_h() as f32 > h * design_w() as f32 { h / design_h() as f32 } else { w / design_w() as f32 };
+        Fit { x: libm::floorf((w - design_w() as f32 * s) * 0.5), y: libm::floorf((h - design_h() as f32 * s) * 0.5), s }
     }
     /// A design rectangle (x, y, w, h) on the screen.
     pub fn rect(&self, r: [i32; 4]) -> R {
@@ -46,7 +50,7 @@ impl Fit {
     }
     /// The design area.
     pub fn area(&self) -> R {
-        self.rect([0, 0, DESIGN_W, DESIGN_H])
+        self.rect([0, 0, design_w(), design_h()])
     }
     /// A screen point in design coordinates.
     pub fn design(&self, p: (f32, f32)) -> (i32, i32) {
@@ -76,12 +80,12 @@ pub fn mirror(s: &dialogs::Slot) -> Option<Tex> {
                 i
             }
             None => {
-                v.push((s.hwnd, gfx::texture_dynamic(DESIGN_W as u32, DESIGN_H as u32), 0));
+                v.push((s.hwnd, gfx::texture_dynamic(design_w() as u32, design_h() as u32), 0));
                 v.len() - 1
             }
         },
     };
-    gfx::tex_update(v[i].1, s.frame.bits, DESIGN_W as usize * 4, DESIGN_W as u32, DESIGN_H as u32);
+    gfx::tex_update(v[i].1, s.frame.bits, design_w() as usize * 4, design_w() as u32, design_h() as u32);
     Some(v[i].1)
 }
 
@@ -107,6 +111,10 @@ pub fn wants_keys() -> bool {
 /// A frame of the menus: every hosted dialog, outermost first, each by its spec or the
 /// generic screen; only the innermost takes input.
 pub fn frame(ui: &mut Ui) {
+    if crate::engine::api::forms::active() {
+        roots::frame(ui);
+        return;
+    }
     let fit = Fit::of(ui.w, ui.h);
     unsafe {
         if LAST_FIT != Some(fit) {
@@ -120,7 +128,7 @@ pub fn frame(ui: &mut Ui) {
     backdrop::draw(ui);
     let all = dialogs::stack();
     // A full-screen dialog hides everything under it.
-    let first = all.iter().rposition(|s| s.w() >= DESIGN_W && s.h() >= DESIGN_H).unwrap_or(0);
+    let first = all.iter().rposition(|s| s.w() >= design_w() && s.h() >= design_h()).unwrap_or(0);
     let stack = &all[first..];
     let n = stack.len();
     let cfg = crate::config::get();
@@ -149,7 +157,7 @@ pub fn frame(ui: &mut Ui) {
         ui.scope(&crate::sfmt!("dlg{:p}", s.hwnd), |ui| ui.inert_unless(live, |ui| {
             if cfg.menus_specs {
                 if let Some(spec) = screens::find(m.screen) {
-                    if (spec.draw)(ui, &scr) {
+                    if spec.draw(ui, &scr) {
                         return;
                     }
                 }
@@ -161,6 +169,57 @@ pub fn frame(ui: &mut Ui) {
     refit::frame(ui, &all);
     // The whole screen is the menus': nothing of the engine's is under them.
     ui.claim(ui.screen());
+}
+
+/// What the layouts several screens share (`screens::setup_kit`, Game Setup) read and act
+/// through: Armada II's hosted dialog (`Screen`) or Roots' adopted one
+/// (`roots_dialogs::Screen`). Every action is what the player's input would send.
+pub trait Host {
+    fn model(&self) -> &model::Model;
+    /// It takes input (the innermost dialog).
+    fn top(&self) -> bool;
+    /// A click at a design point of the dialog.
+    fn click(&self, x: i32, y: i32);
+    fn click_control(&self, c: &model::Control) {
+        self.click(c.rect[0] + c.rect[2] / 2, c.rect[1] + c.rect[3] / 2);
+    }
+    /// The part `r` (design coordinates) of the dialog's picture drawn into `dst`.
+    fn mirror_part(&self, ui: &mut Ui, r: [i32; 4], dst: R, tint: u32);
+    /// A key or a character for a window control (`WM_KEYDOWN`, `WM_CHAR`).
+    fn key(&self, h: HWND, msg: u32, wp: usize);
+    /// Enter in the edit `h`, as the dialog's modal loop gives it.
+    fn enter(&self, h: HWND);
+    /// A list's or combo box's selection and its parent's notification.
+    fn select(&self, h: HWND, combo: bool, index: i32, double: bool);
+    /// Whether the dialog fills the design space.
+    fn full_screen(&self) -> bool;
+}
+
+impl Host for Screen<'_> {
+    fn model(&self) -> &model::Model {
+        self.model
+    }
+    fn top(&self) -> bool {
+        self.top
+    }
+    fn click(&self, x: i32, y: i32) {
+        Screen::click(self, x, y);
+    }
+    fn mirror_part(&self, ui: &mut Ui, r: [i32; 4], dst: R, tint: u32) {
+        Screen::mirror_part(self, ui, r, dst, tint);
+    }
+    fn key(&self, h: HWND, msg: u32, wp: usize) {
+        actions::push(actions::Action::Key { h, msg, wp });
+    }
+    fn enter(&self, h: HWND) {
+        actions::push(actions::Action::Enter { h });
+    }
+    fn select(&self, h: HWND, combo: bool, index: i32, double: bool) {
+        actions::push(actions::Action::Select { h, combo, index, double });
+    }
+    fn full_screen(&self) -> bool {
+        self.model.rect[2] >= design_w()
+    }
 }
 
 /// What a screen is drawn from.
@@ -180,8 +239,8 @@ impl Screen<'_> {
         let Some(t) = self.mirror else { return };
         // The mirror holds the dialog at its own origin.
         let (ox, oy) = (self.model.rect[0], self.model.rect[1]);
-        let (u0, v0) = ((r[0] - ox) as f32 / DESIGN_W as f32, (r[1] - oy) as f32 / DESIGN_H as f32);
-        let (u1, v1) = (u0 + r[2] as f32 / DESIGN_W as f32, v0 + r[3] as f32 / DESIGN_H as f32);
+        let (u0, v0) = ((r[0] - ox) as f32 / design_w() as f32, (r[1] - oy) as f32 / design_h() as f32);
+        let (u1, v1) = (u0 + r[2] as f32 / design_w() as f32, v0 + r[3] as f32 / design_h() as f32);
         ui.draw.image_uv(t, dst, [u0, v0, u1, v1], tint);
     }
     /// A click on a design point of this dialog, sent after the frame.

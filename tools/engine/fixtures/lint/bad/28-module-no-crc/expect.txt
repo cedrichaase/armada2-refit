@@ -1,0 +1,1 @@
+text_crc must be the CRC-32

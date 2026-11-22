@@ -2,10 +2,11 @@
 //! the unit view's Bink frame), as an image of Display8's, kept up to date as the
 //! engine writes it by lock (`stub/mod.rs`, "The mirror table"). Formats are the
 //! engine's two (phase 0): A8R8G8B8 and X8R8G8B8, both B8G8R8A8 here, the second with
-//! its alpha read as one.
+//! its alpha read as one; and, for a game that loads DDS files through D3DX8 (Fleet
+//! Operations: Roots), DXT1, DXT3 and DXT5 as BC1, BC2 and BC3, sampled natively.
 use super::{get, Img};
 use crate::log;
-use crate::stub::obj::SObj;
+use crate::stub::obj::{self, SObj};
 use alloc::boxed::Box;
 use ash::vk;
 use core::sync::atomic::Ordering;
@@ -48,7 +49,8 @@ fn make(o: *mut SObj, plugin: bool) -> Option<VkImage8> {
     let v = get()?;
     let t = unsafe { (*o).tex() };
     if t.vk == 0 {
-        if t.faces != 1 || !matches!(t.format, 21 | 22) {
+        let bc = obj::bc_kind(t.format);
+        if t.faces != 1 || !(matches!(t.format, 21 | 22) || (bc.is_some() && v.bc)) {
             if plugin {
                 log!("vulkan: no mirror for a texture of format {} ({} faces)", t.format, t.faces);
             } else {
@@ -58,7 +60,13 @@ fn make(o: *mut SObj, plugin: bool) -> Option<VkImage8> {
         }
         let l0 = &t.levels[0];
         // Copied from too: a recorded frame reads it back (gpu/README.md, "Record and replay").
-        let mut img = match v.image(l0.w, l0.h, t.nlev, vk::Format::B8G8R8A8_UNORM, vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::TRANSFER_SRC, vk::ImageAspectFlags::COLOR) {
+        let vkfmt = match bc {
+            Some(1) => vk::Format::BC1_RGBA_UNORM_BLOCK,
+            Some(2) => vk::Format::BC2_UNORM_BLOCK,
+            Some(_) => vk::Format::BC3_UNORM_BLOCK,
+            None => vk::Format::B8G8R8A8_UNORM,
+        };
+        let mut img = match v.image(l0.w, l0.h, t.nlev, vkfmt, vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::TRANSFER_SRC, vk::ImageAspectFlags::COLOR) {
             Ok(i) => i,
             Err(e) => {
                 log!("vulkan: no mirror: {}", e);
@@ -117,16 +125,17 @@ pub fn update(o: *mut SObj) {
     // A big texture through a staging buffer of its own, let go of with the frame: the
     // upload ring's chunks live as long as the device, and the passthrough brings a
     // mission's hull textures up at once when render3d's hulls are off.
+    let block = obj::format_block(t.format).unwrap_or((4, 1));
     let staged = bytes > super::STAGE_ABOVE
         && v.upload_levels(img.image, levels.iter().map(|&i| {
             let l = &t.levels[i as usize];
             (i, l.w, l.h, l.data.as_slice(), l.pitch)
-        }), from, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
+        }), block, from, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
     if !staged {
         for &i in &levels {
             let l = &t.levels[i as usize];
             let data = l.data.as_slice();
-            v.upload(img.image, vk::ImageAspectFlags::COLOR, i, l.w, l.h, data, l.pitch, 4, from, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
+            v.upload_blocks(img.image, vk::ImageAspectFlags::COLOR, i, l.w, l.h, data, l.pitch, block, from, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
         }
     }
     if img.layout == vk::ImageLayout::UNDEFINED {

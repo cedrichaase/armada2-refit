@@ -15,12 +15,7 @@ pub use crate::rt::clock::bench;
 /// `Get_Time`'s float (`ui.core.toml`, hook `core.reads_clock`): the simulation's time in
 /// seconds, which stands while paused. The wall clock where the build is not known.
 fn sim_time() -> f64 {
-    use crate::engine::eng;
-    use crate::syms_core::{hook, sym};
-    if eng().ready(hook::CORE_READS_CLOCK).is_err() {
-        return crate::rt::now();
-    }
-    unsafe { crate::engine::rd::<f32>(eng().addr(sym::CORE_SIM_TIME)) as f64 }
+    crate::engine::api::sim_time().unwrap_or_else(crate::rt::now)
 }
 
 /// Reads `[Bench] Clock=` once, at start (`rt::clock`).

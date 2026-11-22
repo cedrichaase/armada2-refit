@@ -1,0 +1,11 @@
+# Fleet Operations: Roots 5.0Z11: the UI's core values (FO-6 step 3), written by hand.
+schema = 1
+plugin = "ui"
+
+# The game window is FleetOpsHook's own form, whose window procedure hands the keyboard and
+# mouse messages to ProcessKeyboardMessages and ProcessMouseMessages itself: the engine's
+# WindowProc, where stock's two calls sit, never runs (measured on the bench, FO-6 step 3).
+# Input is taken at the two functions' entries (PLAN-FLEETOPS.md, FO-6, decision 71).
+[[sym]]
+id = "core_input_at_callee"
+value = 1

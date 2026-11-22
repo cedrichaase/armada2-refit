@@ -224,15 +224,18 @@ typedef int  (__thiscall *RaceEventFn)(const void *race);
 
 static int g_voice;   /* StartBuild's calls are the ones this was read from */
 
-static const int k_topic[] = {
-    0,
-    QOLRULES_V_TOPIC_DIL,   /* InsufficientDilithium */
-    0,                      /* officers: the race's event */
-    QOLRULES_V_TOPIC_CREW,  /* InsufficientCrew */
-    QOLRULES_V_TOPIC_LAT,   /* InsufficientLatinum */
-    QOLRULES_V_TOPIC_MET,   /* InsufficientMetal */
-    QOLRULES_V_TOPIC_BIO,   /* InsufficientBiomatter */
-};
+/* The advisor's topic for each shortfall (the build's values, resolved at start-up). */
+static int topic_of(int why)
+{
+    switch (why) {
+    case SHORT_DIL:  return QOLRULES_V_TOPIC_DIL;   /* InsufficientDilithium */
+    case SHORT_CREW: return QOLRULES_V_TOPIC_CREW;   /* InsufficientCrew */
+    case SHORT_LAT:  return QOLRULES_V_TOPIC_LAT;   /* InsufficientLatinum */
+    case SHORT_MET:  return QOLRULES_V_TOPIC_MET;   /* InsufficientMetal */
+    case SHORT_BIO:  return QOLRULES_V_TOPIC_BIO;   /* InsufficientBiomatter */
+    default: return 0;                      /* SHORT_OFF: the race's event */
+    }
+}
 
 typedef long (__cdecl *UserTeamFn)(void);
 #define USER_TEAM ((UserTeamFn)a2s_qolrules_user_team)       /* Entity::GetUserTeam: the local player's */
@@ -243,7 +246,7 @@ static void advise(BYTE *p, BYTE *team, int why)
     if (!g_voice || why == SHORT_NONE) return;
     m[0] = 0;
     s_cat(m, "  advisor: topic ");
-    s_num(m, why == SHORT_OFF ? -1 : k_topic[why]);
+    s_num(m, why == SHORT_OFF ? -1 : topic_of(why));
     s_cat(m, *(const int *)(p + P_TEAMIDX) == (int)USER_TEAM()
              ? " for the local team (stock plays it unless it just did)"
              : " for another team (stock keeps it silent here)");
@@ -252,7 +255,7 @@ static void advise(BYTE *p, BYTE *team, int why)
         const void *race = *(void *const *)(team + T_RACE);
         SAY_EVENT(OFFICER_EVENT(race), p, race);
     } else {
-        SAY_TOPIC(k_topic[why], p, NULLPTR);
+        SAY_TOPIC(topic_of(why), p, NULLPTR);
     }
 }
 

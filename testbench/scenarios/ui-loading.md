@@ -24,7 +24,7 @@ The campaign is reached from Instant Action's match by Esc, Exit to the main men
 4. Take a screenshot called "instant action load".
 5. Expect "INSTANT ACTION" is visible.
 6. Expect "Players" is visible.
-7. Check that the screen is a loading screen drawn edge to edge: a starry nebula sky behind, a mission title at the top left, a players panel at the right listing two players with races, a progress bar across the bottom near half full, and no 3D logo or stock loading bar anywhere.
+7. Check that the screen is a loading screen drawn edge to edge: the map's own space sky behind (Warzone's face is dark, with a bright point and radial star streaks; any dark sky of stars, nebula or streaks counts), a mission title at the top left, a players panel at the right listing two players with races, a progress bar across the bottom near half full, and no 3D logo or stock loading bar anywhere.
 8. Wait 2 seconds.
 9. Take a screenshot called "instant action load later".
 10. Check that the ring of dots at the left of the status line has turned since the previous screenshot (the frames between the engine's are animated).

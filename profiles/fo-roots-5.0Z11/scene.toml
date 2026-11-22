@@ -1,0 +1,10 @@
+# Fleet Operations: Roots 5.0Z11: FleetOpsHook.dll takes over cPrjID::GetOdfName at its entry as
+# it loads (a jump to its own file system's version). Scene.asi's marks only call it, to name an
+# ordnance's ODF, and what Roots puts there is what Roots means, so this build checks nothing at
+# its entry (PLAN-FLEETOPS.md, "FleetOpsHook.dll at run time"; written by tools/engine/fo-scan.py).
+schema = 1
+plugin = "scene"
+
+[[sym]]
+id = "fn_prj_get_odf"
+check = ""

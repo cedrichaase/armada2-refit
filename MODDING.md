@@ -61,9 +61,9 @@ exports yourself.
   be filled says its room and the writer fills no more and sets `size` to what it wrote.
   Whatever is past the other side's size is the field's default. Use what minor N added
   only when Display8's minor is N or more. A struct inside another does not grow in a
-  minor, since that would move what follows. The contract is at 1.4 (the claims at 1.1,
+  minor, since that would move what follows. The contract is at 1.5 (the claims at 1.1,
   Direct3D 12's pipeline library at 1.2, `CLAIM_MENUS` and `display8v1_mode` at 1.3,
-  the Direct3D 12 pass at 1.4).
+  the Direct3D 12 pass at 1.4, `CLAIM_WINDOW` at 1.5).
 - **Anything else is a new major**: a field removed, moved, retyped or given a new
   meaning, an export's signature or meaning, a rule between recorders (layouts,
   states, heaps, who closes a pass). The exports are named with the major
@@ -145,22 +145,28 @@ a C header. The format, the resolver and the lints are described in
 [`tools/engine/README.md`](tools/engine/README.md).
 
 - A profile is keyed by **(game, build)**. Armada II's are in `profiles/<build>/`
-  (`gog-1.1` today); another game's would be in `<game>/profiles/<build>/`.
+  (`gog-1.1` today); another game's would be in `<game>/profiles/<build>/`. The game is
+  one of [`games/`](games/README.md)'s descriptors (`games/<id>.toml`), which the tools
+  read for its executable, its folders, its settings file and the layers on offer; a
+  build's `exe` must be one of its descriptor's `exe.names`
+  (`tools/layers.py --check`).
 - A build is recognised by three numbers read from the process's own PE headers: the
   timestamp, the image size and a fingerprint of the section table. All three must
-  match; the timestamp alone is never the key (Fleet Operations: Roots shares stock's).
+  match; the timestamp alone is never the key (a modified build of the same game can share stock's).
 - One file per plugin or part: `<plugin>.toml`, `<plugin>.<part>.toml`. It lists
   **hooks** (each with a one-line description and the settings rows it feeds) and
   **entries** (function, call, jmp, slot, label, patch, scan, vtable, global, field,
   value), each tied by `used_by` to a hook. A `check` signature is at most 32 bytes.
-- **The limit today: offsets are compile-time.** Addresses are resolved per build at
-  run time, but `field` and `value` entries are generated as constants, so every build
-  of a game must agree on them. render3d still keeps most of its struct offsets in its
-  sources (its `hooks.rs` files) rather than in its profile. A build or game whose
-  structs differ, which Armada 1's do, needs both fixed first. That is
-  `PLAN-ARCHITECTURE.md`, AR-3.
+- **Struct offsets are per build too.** A `field` (a struct's offset) and a `value` (a
+  count, an id, a frame local's offset from `ebp`) are resolved at start-up like an
+  address: the code reads `field::X()` in Rust or `<P>_F_X` in C, never a literal, so a
+  build whose structs differ gets its own offsets from its profile, and a field the build
+  has no entry for makes the hooks that use it stand down. `tools/engine/lint.py` and
+  `render3d/lint-layers.sh` fail on a literal struct offset in a plugin's source.
 - **At start-up** the plugin identifies the executable, picks the profile, relocates,
-  and logs `engine: build armada2/gog-1.1` and `symbols: N/M resolved; H hooks blocked`.
+  and logs `engine: <exe> timestamp ...` (the executable named by the build's
+  `build.toml` `exe`, or on an unknown build by the process's own file name),
+  `engine: build armada2/gog-1.1` and `symbols: N/M resolved; H hooks blocked`.
   Before a hook writes anything, `ready(hook)` checks its entries in live memory. A
   hook that fails stands down alone and logs `engine: <hook> stands down: <symbol> <why>`;
   the rest of the plugin runs. On an unknown build only hooks that resolve by scan, and
@@ -169,7 +175,7 @@ a C header. The format, the resolver and the lints are described in
 **How a new build gets a profile.**
 
 1. Identify it. Start the game with any plugin of ours and read the log's
-   `engine: Armada2.exe timestamp ..., image size ..., sections ...` line, or run
+   `engine: <exe> timestamp ..., image size ..., sections ...` line, or run
    `./a2test syms --exe <path>` on the file, read only. It says `unknown build` and lists
    the hooks that stood down.
 2. Make `profiles/<build>/build.toml` with that identity. If the build is another
@@ -177,7 +183,7 @@ a C header. The format, the resolver and the lints are described in
    each function the build changes (with `how` and the hooks `verified` beside it) and
    `[[disable]]` globs for hooks that must not run. A hook that touches a changed
    function is **blocked** until someone verifies it; a child's entries override the
-   parent's by `id`.
+   parent's by `id`, a moved field included (`offset = 0x..` under the field's `id`).
 3. `tools/engine/gen.py --check` and `tools/engine/lint.py` validate it; `./a2test syms
    --exe <path> --build <build>` runs every hook's checks against the file and prints
    each `ready` or its reason. Fix by adding an override entry or disabling the hook,
@@ -186,17 +192,58 @@ a C header. The format, the resolver and the lints are described in
    `[[known]]` list as information. It refuses a build that is not matched, and the hash
    is never a run-time key.
 5. Run the game on the bench to see what only a running game shows (`engine: ...` lines
-   in each plugin's log). The plans for the first two additional builds are
-   [`PLAN-FLEETOPS.md`](PLAN-FLEETOPS.md) and [`PLAN-ARMADA1.md`](PLAN-ARMADA1.md).
+   in each plugin's log). The plan for Armada I is [`PLAN-ARMADA1.md`](PLAN-ARMADA1.md).
 
 **Content profiles.** A plugin's tables of the game's own names (ODFs, sprites, SOD
 nodes, factions, recipes) are not addresses and are not tied to the executable. A
 build's `content` names the set its plugins read (`stock` for `gog-1.1`), a
 `content.toml` may map a plugin to another, and the generator hands the plugin its
-resolved set id. A Rust plugin picks its tables by that id (`by_set`) and keeps an empty
-one for every other case: a plugin with no content set has no built-in names or
-recipes and the engine's own look shows through. A file in the game folder still wins
+resolved set id. A set is a folder of data, not code ("Content sets" below): a plugin
+looks up the set's folder by that id and has no built-in names or recipes when there is
+none, and the engine's own look shows through. A file in the game folder still wins
 over any set.
+
+### Content sets
+
+A content set is a folder of small ini tables, one per plugin part:
+
+| Folder | Tables |
+|---|---|
+| `render3d/content/sets/<set>/` | `effects.ini`, `hulls.ini`, `ordnance.ini`, `overlays.ini`, `particles.ini`, `sky.ini`, `specials.ini`, `world.ini`: each module's names (nodes, sprites, SODs, faction keys and colours, the special effects' kinds) and the recipes it builds in, named by their file under `render3d/content/` |
+| `ui/content/sets/<set>/` | `ui.ini`: the races (with the theme's look for each), resources, campaign cards, the credits' and menus' views, the game files the UI reads, the widget gallery's lists, and `[Glyphs]`: the codes the game's fonts draw as pictures or figures of their own (a code in hex = the word or figure the UI writes instead; any other code is Windows-1252) |
+
+Every `.ini` under `render3d/content/` and `ui/content/` is built into the plugin
+(`render3d/core/build.rs`, `ui/build.rs`), so a set needs nothing installed; the modules
+parse their table once, at first use. A set with no table for a part is the empty table
+for it: that part has no names and draws the engine's own. `stock` is the set of
+`gog-1.1`, and a build that inherits it (`inherits` in `build.toml`) reads the parent's
+sets until its own `content.toml` names others; `fleetops` is render3d's set of another
+build.
+
+To add a set:
+
+1. Copy the stock folders: `render3d/content/sets/stock/` to
+   `render3d/content/sets/<set>/` and `ui/content/sets/stock/` to `ui/content/sets/<set>/`.
+2. Edit the copies to the game's names. A recipe of the set's own goes in its folder
+   (`render3d/content/sets/<set>/sky/<name>.ini`) and its table names it by that path;
+   leave out a table, or a line, the game has no use for. Where the game's ODFs are not
+   stock's, two tables say how its names map onto the built-in looks rather than copying
+   them: `ordnance.ini`'s `[Names]` (`Ordnance.<odf> = <recipe>`, `Wave.<odf> =
+   <recipe>`: which ordnance ODF each built-in recipe draws; with it, a recipe draws only
+   the ODFs named, since a stock name the game shares may be another weapon there) and
+   `effects.ini`'s `[Races]` (`<race> = <faction key>`: a ship's faction by its ODF's
+   `race`, read through its includes, instead of its name's first letter).
+3. Name the set in the build's profile: `content = "<set>"` in
+   `profiles/<build>/build.toml`, or per plugin or part in
+   `profiles/<build>/content.toml` (`[set] render3d = "<set>"`, `"render3d.hulls" = "<set>"`,
+   `ui = "<set>"`).
+4. `tools/engine/selftest.sh` (`lint.py` checks that every set a build names has its
+   folder), then build the plugins.
+
+No set is chosen in code: there is no `match` to extend. `render3d/lint-layers.sh` (rule 4)
+and `ui/lint-content.sh` keep the names out of the sources: a game file's or race's name
+as a literal outside a `content.rs` fails CI, unless it is the engine's own format or
+default, marked `// lint-allow(content): <reason>`.
 
 ## render3d
 
@@ -234,7 +281,8 @@ content and settings are.
 
 Skies, planet and moon surfaces, nebulae, ordnance and the menu scene are **recipes**:
 text in `render3d/content/<kind>/` (`sky/`, `surfaces/`, `nebulae/`, `ordnance/`,
-`menu/`), built into the module that reads them. A recipe in the game folder wins over
+`menu/`), built into the plugin; a content set's table names the ones its modules take
+("Content sets"). A recipe in the game folder wins over
 the built-in one of the same name:
 
 | Folder in the game directory | Replaces |
@@ -243,6 +291,12 @@ the built-in one of the same name:
 | `Surfaces\<name>.ini` | a planet, moon or asteroid surface recipe |
 | `Nebulae\<name>.ini` | a nebula's gas recipe |
 | `Menu\map.ini` | the main menu's scene |
+
+These folders are mounts of render3d's file system (`a2fmt::vfs`, the `LAYOUT` table in
+`render3d/core/src/files/mod.rs`), like the game's texture roots and its `SOD`, `Sprites` and
+`odf` folders (`games/README.md`, "Files"): a recipe is looked up as `sky\<name>.ini`
+and the mount says which folder of the game directory that is. In Armada II each is the
+folder of that name, so a recipe file goes where it always did.
 
 A missing recipe means the engine's behaviour for that object, as a missing asset does.
 The format of each kind's keys is in the README, "Sky recipes", "world" and the other
@@ -261,7 +315,35 @@ as long as they are current; CI (`verify-generated.sh`) fails on a stale one.
 `gpu/shaders/compat.hlsli` holds the few places the two forms part. Constants keep
 their registers and loops keep a fixed count and no branches.
 
+## The UI
+
+`UI.asi` draws the HUD, the menus and the loading screen ([`ui/README.md`](ui/README.md)).
+Like render3d it keeps the engine on one side of a line: everything it knows of
+`Armada2.exe` is in `ui/src/engine/` and the profile (`profiles/gog-1.1/ui.<part>.toml`),
+and the rest of the UI reaches it only through the facade `ui/src/engine/api.rs`
+(`crate::engine::api`). `ui/lint-layers.sh` enforces it in CI ([`ui/README.md`](ui/README.md#the-engine-boundary)).
+
+### Adding a HUD panel or menu screen
+
+- **A HUD panel** is a `Panel` (`ui/src/hud/panels.rs`): its name, its `[HUD]` key, the
+  stock component it takes over through the panel switch (whose rectangle it can read
+  in canvas units), whether it hides with the engine's HUD or takes the whole screen's
+  mouse, and its draw. Write it in `ui/src/hud/<name>.rs` and add it to `PANELS`; the
+  stock component keeps simulating, and the panel reads its state and presses its
+  buttons. Step by step: [`ui/HUD.md`](ui/HUD.md#adding-a-panel).
+- **A menu screen** is a `Screen` (`ui/src/menus/screens/mod.rs`): the key of the stock
+  dialog it lays out and its draw. Write it in `ui/src/menus/screens/<name>.rs` and add
+  a `Spec` to `SPECS`. The stock dialog still runs hidden underneath and a screen acts
+  only through its controls, so it never writes a setting. Step by step:
+  [`ui/MENUS.md`](ui/MENUS.md#writing-a-screen-spec).
+- **Either one** takes what it needs of the engine from `crate::engine::api`. A new
+  read goes in the right `ui/src/engine/<area>.rs` file with its finding documented,
+  and is then named in `api.rs`. The HUD canvas is `api::CANVAS`, never a literal.
+
 ## Building a plugin
+
+To set up the toolchain and build the whole release zip from a fresh machine (Windows
+through WSL2, or Linux), follow [`BUILDING.md`](BUILDING.md).
 
 ### The SDK in the release zip
 
@@ -318,6 +400,7 @@ so in its log. Rules for a plugin that sits next to ours:
   file locks the player out of games with stock players. Scale a value in memory after
   the parse instead.
 - Export `<Plugin>_Settings` so the Refit screen shows your keys.
+- **`QOL.asi` exports its move queue** for Render3D.asi's move paths (found by the export, in any loaded module, never by file name): `int QOL_MoveQueueVersion(void)` (1) and `int QOL_MoveQueue(const void *ship, float *xyz, int *flags, int cap)` (cdecl; -1 no queues, 0 none for the ship, else the points ahead, flags bit 0 a warp leg, bit 1 a patrol run looping to its first point). Contract in `render3d/README.md`, "Move paths".
 - **Separate rule changes from local ones.** Anything that changes what every machine
   simulates belongs in a plugin that is required of every player and is checked when a
   network game is set up (see `rules/README.md` for the protocol `Online.asi` speaks).

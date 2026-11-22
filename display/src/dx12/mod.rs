@@ -90,6 +90,8 @@ pub struct Dx {
     pub dev: P,
     queue: P,
     swap: P,
+    /// `CreateDXGIFactory1`, to make the swap chain again on another window (`rebind`).
+    create_factory: usize,
     sc_buffers: Vec<P>,
     sc_w: u32,
     sc_h: u32,
@@ -272,6 +274,7 @@ impl Dx {
             dev,
             queue,
             swap: core::ptr::null_mut(),
+            create_factory,
             sc_buffers: Vec::new(),
             sc_w: w,
             sc_h: h,
@@ -477,6 +480,31 @@ impl Dx {
         release(sc1);
         self.swap = made(hr, sc3, "IDXGISwapChain3")?;
         self.swap_buffers()
+    }
+
+    /// Moves the swap chain to another window (`Vk::rebind`): the GPU's work is waited for,
+    /// the swap chain and its buffers let go of, and a new one made on `hwnd` at the same
+    /// size and format. The colour target, the pipelines and the mirrors stay.
+    pub fn rebind(&mut self, hwnd: *mut c_void) -> Result<(), &'static str> {
+        if self.lost {
+            return Err("the device is lost");
+        }
+        self.flush();
+        if !self.wait(self.fence_value) {
+            return Err("the GPU did not finish");
+        }
+        for b in self.sc_buffers.drain(..) {
+            release(b);
+        }
+        release(self.swap);
+        self.swap = core::ptr::null_mut();
+        let f = self.create_factory;
+        let r = self.make_swapchain(f, hwnd);
+        if r.is_err() {
+            // No swap chain to present to: treated as a lost device, nothing drawn from here.
+            self.lost = true;
+        }
+        r
     }
 
     /// The swap chain's buffers and their render-target views.
@@ -822,13 +850,23 @@ impl Dx {
     /// the ring: a mirror's level, the ramp, the engine's back buffer written by lock.
     /// The level goes from state `from` to `to`.
     pub fn upload(&mut self, res: P, format: u32, level: u32, w: u32, h: u32, src: &[u8], pitch: u32, bpp: u32, from: u32, to: u32) -> bool {
+        self.upload_blocks(res, format, level, w, h, src, pitch, (bpp, 1), from, to)
+    }
+
+    /// The same for a block-compressed level: `block` is (bytes a block, its edge in
+    /// texels), `pitch` the bytes of a row of blocks. The footprint of a level under one
+    /// block (2x2, 1x1) is the whole block, as Direct3D 12 sizes it.
+    pub fn upload_blocks(&mut self, res: P, format: u32, level: u32, w: u32, h: u32, src: &[u8], pitch: u32, block: (u32, u32), from: u32, to: u32) -> bool {
         if !self.ready() {
             return false;
         }
-        let row = w * bpp;
+        let (bytes, edge) = block;
+        let (w, h) = (w.div_ceil(edge) * edge, h.div_ceil(edge) * edge);
+        let rows = h / edge;
+        let row = w / edge * bytes;
         let rp = row.div_ceil(TEXTURE_DATA_PITCH_ALIGNMENT) * TEXTURE_DATA_PITCH_ALIGNMENT;
-        let Some(a) = self.alloc(rp * h, TEXTURE_DATA_PLACEMENT_ALIGNMENT) else { return false };
-        for y in 0..h as usize {
+        let Some(a) = self.alloc(rp * rows, TEXTURE_DATA_PLACEMENT_ALIGNMENT) else { return false };
+        for y in 0..rows as usize {
             unsafe { core::ptr::copy_nonoverlapping(src.as_ptr().add(y * pitch as usize), a.cpu.add(y * rp as usize), row as usize) };
         }
         self.barrier(res, level, from, STATE_COPY_DEST);
@@ -923,6 +961,15 @@ impl Dx {
             log!("d3d12: frame {} presented", self.index);
         }
         true
+    }
+
+    /// A `Present` not shown (`host::hold`): the frame is ended without its last pass and
+    /// without a `Present`, so the buffer on the screen stays.
+    pub fn skip(&mut self) {
+        if self.lost || !self.ready() {
+            return;
+        }
+        let _ = self.end_frame(false);
     }
 
     /// Ends a frame that cannot be presented: its commands are executed without a

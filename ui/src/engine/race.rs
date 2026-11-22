@@ -26,7 +26,7 @@ pub fn mission_race_name() -> &'static str {
     if r == 0 {
         return "";
     }
-    unsafe { super::hud::cstr_static((r + field::PANELS_RACE_NAME) as *const u8) }
+    unsafe { super::hud::cstr_static((r + field::PANELS_RACE_NAME()) as *const u8) }
 }
 
 static mut LAST: usize = 0;

@@ -1,7 +1,5 @@
-// lint fixture: the toy plugin content sets
-pub fn by_set(id: &str) -> u32 {
-    match id {
-        "stock" => 1,
-        _ => 0,
-    }
+// lint fixture: the toy plugin's content: its sets are folders of src/content/sets/
+pub fn table(id: &str) -> Option<&'static str> {
+    let _ = id;
+    None
 }

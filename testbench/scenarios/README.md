@@ -58,18 +58,21 @@ each phase has got. Without headings it makes one phase per screenshot.
 | `Wait for the main menu` / `… the single player screen` / `… the briefing` / `… the options menu` / `… the admiral's log` / `… the mission selection` | OCR signature from `../ui.json` |
 | `Click the single player emblem` (any `ui.json` target) | design coordinates, mapped the way Menus.asi maps them, unless the target names another space (`objectives`, `minimap fog` are HUD targets) |
 | `Click "TEXT"` / `Right-click …` / `Double-click …` | OCR, then click the centre |
-| `Click at 100,200` / `… at design 400,300` / `… at hud 25,27` / `… at hud-right 1500,26` | screen pixels, 800x600 shell space, HUD canvas (1200 high, top-left), or HUD canvas anchored top right at its stock 1600-wide position |
+| `Click at 100,200` / `… at design 400,300` / `… at hud 25,27` / `… at hud-right 1500,26` | screen pixels, 800x600 shell space, HUD canvas (1200 high, top-left), or HUD canvas anchored top right at its stock 1600-wide position; `at shell 270,114` is Fleet Operations: Roots' 1200x900 shell as the Instant Action setup screen has it at the top left, moved by where LAUNCH is found (0,0 under Display8, 40,30 on the DxWrapper chain) |
 | `Move the mouse to …` / `Hover over …` | same four coordinate spaces |
 | `Drag from hud 400,300 to hud 1400,900` | press, glide with the button held, release (a selection box); either end in any of the four spaces |
 | `Right-drag from 960,500 to 760,500` | the same with the right button: pans the map in a mission |
+| `Right-click at 560,330 holding the middle mouse button` | the pointer goes there, the named button (left, middle or right) goes down, a right click is made and the button comes up, in one step. A held key is let go at once under Xwayland and a held button is not: `testbench/bench/roots-waypoint.sh` (a `Setup:` script) binds Roots' waypoint key to the middle button, so the move queue can be staged there. The middle button's camera drag takes over if it is held for long or while the pointer moves |
 | `Take the focus from the game` / `… with an overlay for 2 seconds` | another window on the session's sway (a terminal) takes the focus, which takes the game out of full screen, and is closed, the game focused and full screen again; or a region screenshot's overlay (`slurp`) with a region dragged on it; `… with a screenshot` takes one as Omarchy's Print key does, a frozen screen (`hyprpicker -r -z`) under the `slurp`, the freeze ended after. The pointer ends where it was. Under Proton the game is not told: Wine only drops and maybe redoes its pointer clip (`ui/README.md`, "Focus and the pointer") |
 | `Show a bar along the top of the screen` / `Hide the bar` | a desktop panel's stand-in (`swaynag` on the overlay layer, `logs/bar.log`) that takes the pointer moving over it and never the keyboard, as Omarchy's bar and waybar do; sway draws its top layer under a full-screen window, so the overlay layer. It stays until hidden or the session ends |
+| `Put the window "TITLE" full screen` | the session's sway makes the X11 window of that title full screen, as the desktop does for a game's window. Sway puts a window the game makes later behind the full-screen one, where nothing drawn on it shows and Xwayland lets through only a few of its presents a second (`display-window-follow`) |
 | `Move the mouse into the bottom right corner` | pushes the pointer into the corner in steps of 100 pixels, so the compositor's pointer and the game's are both there whatever each was: after a change of focus the two part, and later moves aim from where the bench thinks the pointer is |
 | `Press Escape` / `Press ctrl+s` / `Press Return 3 times` | virtual keyboard; xkb key names |
 | `Type "TEXT"` | |
 | `Type this machine's address` | the source address of the default route: what the game shows as "Local IP Address", and where every player of a case is |
 | `Type what follows "TEXT" in "LOG" of PLAYER` | the word after TEXT on the last line of that player's log that has it (`of PLAYER` left out: this game's), waiting up to 30 s for it: how a joiner types the host's join code |
 | `Take a screenshot called "NAME"` | kept in the report; same-named shots are compared across resolutions |
+| `Take 16 screenshots called "NAME" every 0.25 seconds` | a series across a transition (`NAME-01` ...) and its contact sheet; `Check that the series "NAME" shows ...` gives the sheet to the judge |
 | `Dump the frame called "NAME"` | Render3D.asi's targets (PFM) and UI.asi's presented frame (PPM), read back inside the game, into `dumps/NAME/` with PNG previews (`../README.md`, "Frame dumps"); fails when no plugin dumped |
 | `Overlay Render3D.Modules:hulls=0 UI.HUD:Minimap=0` / `Overlay --unset Render3D.Modules:hulls` | `a2test drive overlay` as a step: writes `RefitPlayer.ini` in the running game (`tools/settings/overlay.py`), then waits up to 5 s for UI.asi's `settings: RefitPlayer.ini changed` in `UI.log`; fails without it. It is an action, so a log wait or `Expect` after it sees only lines written since. The `Overlay:` header does the same before launch |
 | `Note "TEXT"` | a line in the log |
@@ -79,6 +82,46 @@ each phase has got. Without headings it makes one phase per screenshot.
 | `Scene "select yard1 yard2"` | commands to `Scene.asi` (`../scene/README.md`), `;` between several; a refused command fails the step. Needs `Setup: testbench/scene/bench-setup.sh <scene>` |
 | `Expect scene "selection" answers "TEXT"` / `… not answer …` | that command's own answer, not the whole `Scene.log` (a check) |
 | `Include "_enter-borg-mission"` | that file's steps, in place, at parse time. Files starting with `_` are fragments and are not listed |
+
+## Objects
+
+With `Scene.asi` in the game (any scene; `game` is the harness alone on whatever map the
+game loaded: `../scene/README.md`), steps can find, count, select and order the game's
+objects by what they are rather than where they are on the screen. Each one asks the
+plugin for `objects`, which writes the engine's object list into `Scene.objects.jsonl`
+(read-only on the game), and filters it (`../bench/objects.py`; `a2test drive objects`
+lists the same by hand). An object is named by its handle, `#<id>`, in every command.
+
+A phrase is a quantifier, a noun and any run of clauses:
+
+| Part | Words | Means |
+|---|---|---|
+| quantifier | `a` `an` `the` `one` `any` · `no` · `3` · `at least 2` · `at most 1` · `every` `all` | at least one · none · exactly · bounds. For a selection or an order, a singular noun takes the first match, a plural every match (up to 30) |
+| noun | `object(s)` `unit(s)` `craft` · `ship(s)` · `station(s)` · `planet(s)` | any kind · that kind (`kind` in the list: ship, station, planet, other) |
+| `of class "Galaxy"` | | the class as the player reads it contains the text, or the ODF is it |
+| `with odf "fgal*"` | | the ODF name, `*` wild, any case |
+| `named "mine"` | | the scene's name for it, or its script label (`fgalaxy12`) |
+| `on team 2` / `owned by player 2` | | its team |
+| `owned by the player` / `of the player's` / `not owned by the player` | | the local player's team, or not |
+| `that is selected` / `not selected` | | the player's selection |
+| `within 300 of 3000,0,3000` | | world distance from a point |
+| `with id 57` | | its handle |
+
+`is` / `are` between clauses is read past (`a ship named "mine" is within 100 of ...`).
+
+| Step | What it does |
+|---|---|
+| `Expect an object of class "Galaxy" owned by player 1` / `Expect no ship on team 2` / `Expect 3 stations of the player's` | counts the matches now (a check; the detail lists them) |
+| `Wait up to 60 seconds until a ship named "mine" is within 100 of 3000,0,3000` / `Wait until no ship is on team 2` | the list read every second until the count holds; at the limit a failed check |
+| `Select the ships of class "Galaxy" on team 1` / `Add the station named "yard1" to the selection` | `select` / `select+` by id: the overview's own `Select`, as clicks are (on Roots FleetOpsHook's, with its cap of 30) |
+| `Center the camera on the station of class "Starbase"` | `camera on #id`: the RTS camera centred on the first match |
+| `Order the ships of the player's to move to 3000,0,3000` / `… at warp` | `goto #a,#b world X Y Z`: a player's move order, world coordinates (the list's own) |
+| `Order the ship named "kli" to attack the station on team 2` | `attack #a #b` for each attacker, at the first target found |
+
+The selection, camera and order steps are actions: a log wait after one reads only
+what was written since. They need the scene to be built (`Wait up to N seconds for
+"Scene.log" to say "scene ready"` first). The file the last list was read from is kept
+with the logs (`logs/Scene.objects.jsonl`).
 
 ## Waits and checks
 
@@ -95,6 +138,7 @@ Pick the wait by what the next steps need:
 | a log line the steps after it read (a join code) | `Wait up to N seconds for "LOG" to say "TEXT"` | whatever follows |
 | text or a screen to show | `Wait up to N seconds for "TEXT"` / `Wait for the main menu` (OCR) | the wait is the check: it fails at the limit |
 | the result of a Scene command | nothing: `Scene "…"` returns on Scene.asi's answer | `Expect scene "…" answers "…"` |
+| a unit to be built, to arrive, to die, to change hands | `Wait up to N seconds until a ship … is within …` ("Objects") | `Expect an object …` |
 | the next frame to be drawn, before a screenshot or OCR check | a short fixed `Wait 2 seconds` | the screenshot, OCR or judged step |
 | time to pass in the game (a battle, an effect developing, a cooldown) | a fixed `Wait N seconds`: here the time is the point | the screenshot or check after it |
 
@@ -141,6 +185,8 @@ audio reached the real output before the bench's guard stopped it (run
 | `Expect the main menu` (any `ui.json` screen) | OCR signature |
 | `Expect the game is still running` / `Expect the game to have exited` | process table |
 | `Expect no crash` | `exception.txt` untouched |
+| `Expect the window manager to see one window` (or `N windows`) | the compositor's managed windows (`swaymsg -t get_tree`): a dialog the game shows as a window of its own counts; one wholly off screen is not mapped and does not |
+| `Watch the window manager`, later `Expect the window manager to have seen no other window` (or `… another window`, its opposite, for a reference run) | sway's window events between the two (`wm-events.jsonl`): any event for a window that is not one of the game's fails, a window that came and went between two shots too; the game's own normal windows with its title count (Roots replaces its device window at each switch between shell and mission, PLAN-FLEETOPS.md decision 311) |
 | `Expect the engine to draw nothing in "NAME"` | no `Draw*` call from `Armada2.exe` in that display context (`Display8.inventory.tsv`, rewritten every two seconds); lists the call sites when there are some |
 | `Expect "Menus.log" contains "TEXT"` / `… not contain …` | any log beside `Armada2.exe`, or one of the bench's |
 | `Check that the screenshot is not stretched compared with 4:3` | template match of the reference shot over horizontal scales; vertical fixed at H/H_ref |

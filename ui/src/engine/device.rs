@@ -46,8 +46,17 @@ pub fn install() -> bool {
     }
 }
 
+/// Releases logged with the windows (`input::log_windows`): the first few of a game, the
+/// shell's device going among them, for which window the engine names before a switch.
+static mut RELEASES: u32 = 0;
+
 unsafe extern "thiscall" fn destroy(this: usize) {
     super::closeup::release();
+    let n = unsafe { RELEASES };
+    if n < 3 {
+        unsafe { RELEASES = n + 1 };
+        super::input::log_windows("a release of the engine's device");
+    }
     let next: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(DESTROY_NEXT) };
     unsafe { next(this) };
 }

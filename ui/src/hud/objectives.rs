@@ -6,10 +6,43 @@
 //! that close it are the stock box's own, run by `popups::objectives_keys`, and the
 //! game's objectives key and button show it again (the stock box's hidden step and
 //! `ButtonPanel::ShowObjectives`, both untouched).
-use crate::engine::popups;
+use crate::engine::api::popups;
 use crate::gfx::{Weight, R};
 use crate::widgets::{theme, Ui};
 use alloc::string::String;
+
+/// The objectives box (`[HUD] Messages`, with the message box), a panel of the table (`panels::PANELS`).
+pub struct Objectives;
+
+impl super::panels::Panel for Objectives {
+    fn name(&self) -> &'static str {
+        "objectives"
+    }
+    fn scope(&self) -> &'static str {
+        "hud.objectives"
+    }
+    fn key(&self, c: &crate::config::Hud) -> bool {
+        c.messages
+    }
+    fn component(&self) -> (usize, &'static str) {
+        (popups::objectives_box(), "ObjectivesDisplay")
+    }
+    fn claim(&self) -> bool {
+        let (at, name) = self.component();
+        crate::engine::api::hud::set_taken(at, false, true);
+        crate::log!("panels: {} ours", name);
+        // With the box ours it never owns the mouse, so its keys run at each simulate
+        // pass instead (`popups::objectives_keys`).
+        crate::engine::api::buttons::set_each_pass(popups::objectives_keys);
+        true
+    }
+    fn modal(&self) -> bool {
+        popups::objectives_shown()
+    }
+    fn draw(&self, ui: &mut Ui) {
+        run(ui)
+    }
+}
 
 static mut LOGGED: bool = false;
 

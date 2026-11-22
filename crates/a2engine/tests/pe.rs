@@ -139,13 +139,43 @@ fn refuses_what_is_not_a_pe() {
 fn the_log_line() {
     let id = identify(&image(0x3c4c76bd, 0x3fa000, &stock_like(), 0x10b)).unwrap();
     assert_eq!(
-        format!("engine: {id}"),
+        format!("engine: {} {id}", "Armada2.exe"),
         "engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa6b2c1cf"
     );
+}
+
+#[test]
+fn identity_lines_of_any_executable() {
+    use a2engine::is_identity_line;
+    assert!(is_identity_line("engine: Armada2.exe timestamp 0x3c4c76bd, image size 0x3fa000, sections 0xa6b2c1cf"));
+    assert!(is_identity_line("engine: ArmadaL.exe timestamp 0x3c4c76bd, image size 0x3fb000, sections 0x00000001"));
+    assert!(is_identity_line("engine: Armada2.exe identity unreadable"));
+    assert!(!is_identity_line("engine: build armada2/gog-1.1"));
+    assert!(!is_identity_line("engine: unknown build"));
+    assert!(!is_identity_line("engine: symbols: 3/3 resolved; 0 hooks blocked"));
+    assert!(!is_identity_line("engine: TEST: A2EngineTest.ini forces a mismatch for x"));
+    assert!(!is_identity_line("engine: ui.hud stands down: X is not stock (bytes differ)"));
 }
 
 #[test]
 fn no_executable_section_gives_an_empty_code_range() {
     let id: Identity = identify(&image(1, 0x5000, &[(b".data", 0x1000, 0x100, 0x100, DATA)], 0x10b)).unwrap();
     assert_eq!(id.code, (0, 0));
+}
+
+#[test]
+fn crc32_is_the_zlib_one_and_a_section_is_its_content_without_padding() {
+    use a2engine::pe::{crc32_update, section_crc_file, Bytes, Image};
+    assert_eq!(!crc32_update(!0, b"123456789"), 0xcbf4_3926);
+    // .text: VirtualSize 5, SizeOfRawData 8 (file alignment): the first 5 bytes of the raw data.
+    let mut v = image(1, 0x5000, &[(b".text", 0x1000, 5, 8, CODE), (b".test", 0x2000, 3, 3, DATA)], 0x10b);
+    let (a, b) = (v.len(), v.len() + 8);
+    v[0x80 + 24 + 224 + 20..0x80 + 24 + 224 + 24].copy_from_slice(&(a as u32).to_le_bytes());
+    v[0x80 + 24 + 224 + 40 + 20..0x80 + 24 + 224 + 40 + 24].copy_from_slice(&(b as u32).to_le_bytes());
+    v.extend_from_slice(b"hello\0\0\0abc");
+    assert_eq!(section_crc_file(&mut |at, out| Bytes(&v).read(at, out), ".text"), Some(!crc32_update(!0, b"hello")));
+    assert_eq!(Bytes(&v).file_crc(".test"), Some(!crc32_update(!0, b"abc")));
+    assert_eq!(Bytes(&v).file_crc(".rsrc"), None);
+    v.truncate(v.len() - 1); // the file ends inside .test
+    assert_eq!(Bytes(&v).file_crc(".test"), None);
 }

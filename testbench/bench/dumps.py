@@ -79,7 +79,7 @@ def take(sess, name='dump', timeout=20.0):
     status 'ok' when every installed plugin dumped, 'warn' when some did, 'fail' when
     none did (the text says why)."""
     name = _safe(name)
-    g = sess.game_dir
+    g = sess.exe_dir
     out_dir = g / 'Dumps'
     pending, notes = [], []
     for trigger, asi, plugin in PLUGINS:

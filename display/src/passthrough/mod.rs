@@ -49,7 +49,9 @@ pub fn begin_scene(fp: usize) {
         return;
     }
     let claimed = crate::claims::ask();
-    let want = match crate::drop::scene(fp) {
+    let scene = crate::drop::scene(fp);
+    crate::host::scene_begun(matches!(scene, crate::drop::Scene::Cursor));
+    let want = match scene {
         crate::drop::Scene::Loading => gpu::display::CLAIM_LOADING,
         crate::drop::Scene::Credits => gpu::display::CLAIM_CREDITS,
         crate::drop::Scene::Cursor => gpu::display::CLAIM_CURSOR,

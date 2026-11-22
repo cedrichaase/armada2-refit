@@ -19,7 +19,12 @@ set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$here/../a2env.sh"
-GAME="$A2_GAME"
+# The executable's folder: the install folder itself, or its Data/ on Fleet Operations:
+# Roots (games/<id>.toml, exe.data_dir), where Display8 takes the place of DxWrapper's
+# d3d8.dll and everything else of Roots' Direct3D chain stays (README.md, "Installing").
+GAME="$(dirname "$A2_EXE")"
+# What earlier Armada II installs left (d3d8_real.dll) is not looked for in another game.
+legacy=0; [ "$A2_PROFILE" = armada2 ] && legacy=1
 [ -d "$GAME" ] || { echo "game directory not found: $GAME" >&2; exit 1; }
 
 ours() { [ -f "$1" ] && grep -qa "Display8 stopped the game" "$1"; }
@@ -32,11 +37,12 @@ if [ "${1:-}" = "--remove" ]; then
         # retire has not taken out yet; with neither, the system's d3d8.dll is the game's.
         if [ -f "$BACKUP" ]; then
             mv "$BACKUP" "$GAME/d3d8.dll"
-        elif [ -f "$GAME/d3d8_real.dll" ]; then
+        elif [ "$legacy" = 1 ] && [ -f "$GAME/d3d8_real.dll" ]; then
             mv "$GAME/d3d8_real.dll" "$GAME/d3d8.dll"
         fi
     fi
-    rm -f "$BACKUP" "$GAME/d3d8_real.dll" "$GAME/Display8.ini" "$GAME/Display8.log" \
+    [ "$legacy" = 0 ] || rm -f "$GAME/d3d8_real.dll"
+    rm -f "$BACKUP" "$GAME/Display8.ini" "$GAME/Display8.log" \
           "$GAME/Display8.inventory.tsv" "$GAME/Display8.inventory.tmp" "$GAME/Display8.mark" \
           "$GAME/Display8.go"
     echo "display: removed; d3d8.dll is the one from before Display8 again"
@@ -58,4 +64,5 @@ if [ -f "$GAME/Display8.ini" ]; then
 else
     cp "$here/Display8.ini" "$GAME/Display8.ini"
 fi
+[ "$legacy" = 1 ] || echo "display: $A2_PROFILE: DxWrapper's d3d8.dll is $(basename "$BACKUP"); dxwrapper.dll, dxwrapper.ini, d3d9.dll and ReShade untouched"
 echo "display: Display8 $(sed -n 's/^version = "\(.*\)"/\1/p' "$here/Cargo.toml" | head -1); the bail-out is the system's d3d8.dll"

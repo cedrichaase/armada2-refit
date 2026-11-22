@@ -281,10 +281,11 @@ impl Planets {
     /// The mean colour of a texture's lit texels (any channel sum of 24 or more), as
     /// `Lighting.asi`'s glow colour reads it; None if the file does not read.
     fn tex_mean(name: &str) -> Option<[f32; 3]> {
-        let mut p = rt::game_path("Textures\\RGB\\");
+        let mut p = String::from("textures\\");
         p.push_str(name);
+        // lint-allow(content): the engine's texture files are TGA; the name comes from the planet.
         p.push_str(".tga");
-        let img = a2fmt::tga::decode(&rt::read_file(&p)?).ok()?;
+        let img = a2fmt::tga::decode(&r3d_core::files::open(&p)?).ok()?;
         let (mut s, mut n) = ([0f64; 3], 0f64);
         for px in img.pixels.chunks_exact(4) {
             let (b, g, r) = (px[0] as u32, px[1] as u32, px[2] as u32);
@@ -561,7 +562,7 @@ impl Planets {
             // The cities, blended over the ground (pass 1 of ST3D_PlanetaryMaterial): the
             // race's development texture times the planet's own picture of its people.
             if let Some((o, race)) = b.people {
-                let rname = unsafe { rt::cstr_at((race + 0x452) as *const u8, 32) };
+                let rname = hooks::race_name(race);
                 let dtex = assets::texture(&super::name("PD_", rname, Some(h + 1)));
                 let ctex = self.city(o, race, h, v.frame);
                 if let (Some(d), Some(c)) = (dtex, ctex) {

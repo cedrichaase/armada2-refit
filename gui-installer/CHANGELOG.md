@@ -4,6 +4,27 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 3.2.0 — 2026-11-06
+
+Reads package schemas 0 and 1, unchanged.
+
+Reads package schemas 0 and 1, unchanged.
+
+### Added
+- The pre-release build of the latest main: the newest release tagged `vX.Y.Z-pre.N` (`parse_releases`) is one extra, last entry, "Pre-release (latest main) · version · commit · date — untested", never the default; `--install pre-release`; older cached `-pre.` zips are pruned on download.
+- `A2_RELEASES_API` points the release list at another URL (a `file://` mock in `test.sh`).
+- `--selftest` and `test.sh` cases for the release list, the default and `--install pre-release`. `3736679`
+- **Launch game** shows that the request arrived (issue #48): at once the button is off and reads "Launching…" with a small spinner (GTK) or a turning amber arc beside the label (Tk), then "Game running" until the game exits, when it comes back. A second click or key repeat is refused in the handler as well (`LaunchWatch.begin`). It counts as launched when the game's process is seen (`/proc` on Linux for Heroic, `tasklist` on Windows, `ps` on macOS for the prefix's Wine or a wrapper) and at least `LAUNCH_MIN` (4 s) have passed; a process never seen within `LAUNCH_GIVE_UP` (60 s) re-enables the button and says so in the status line, as does a launcher that fails. The process list is read on a thread, every 1.5 s.
+- `--selftest`: the launch state machine. `462cabf`
+
+### Changed
+- Only tags `vX.Y.Z` and `vX.Y.Z-pre.N` count, explicitly; any other tag is ignored. `default_release` never returns the pre-release build.
+- A versioned release GitHub flags as a pre-release is now an "untested release" (`Release.untested`; `--list` kind `untested`); caches that say `prerelease` still read.
+- `vtuple` reads the leading X.Y.Z only, so a `-pre.N` version's build number stays out of the tuple; `merge_cached` knows pre-release zips.
+- With only the pre-release build listed, nothing is selected (Tk `ri = -1`, GTK `INVALID_LIST_POSITION`). `3736679`
+
+Confirmed in game 2026-11-06.
+
 ## 3.1.1 — 2026-11-04
 
 Reads package schemas 0 and 1, unchanged.

@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Install / remove the ASI loader of a game that ships none (Fleet Operations: Roots).
+#
+#   install             put the Ultimate ASI Loader in the executable's folder as winmm.dll
+#   install --remove    take it out again and put back the winmm.dll that was there
+#
+# What it does to the executable's folder (README.md):
+#   winmm.dll                  the Ultimate ASI Loader 4.68 (x86), MIT, vendored unmodified
+#                              in platform/vendor/STA2WidescreenPatch-1.0/
+#   winmm.dll.a2asi-backup     a winmm.dll that was there and is not the loader, if any
+#
+# Armada II's loader is the platform layer's and a2mod never switches it: refused there.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$here/../a2env.sh"
+if [ "$A2_PROFILE" = armada2 ]; then
+    echo "asiloader: not for armada2 (its ASI loader is the platform layer's)" >&2
+    exit 1
+fi
+GAME="$(dirname "$A2_EXE")"
+[ -d "$GAME" ] || { echo "game directory not found: $GAME" >&2; exit 1; }
+
+SRC="$here/../platform/vendor/STA2WidescreenPatch-1.0/winmm.dll"
+SHA=baba99929487b005bb9b168acfd852550055f22e5f1059c9032765209bb185e5
+DLL="$GAME/winmm.dll"
+BACKUP="$GAME/winmm.dll.a2asi-backup"
+
+ours() { [ -f "$1" ] && [ "$(sha256sum "$1" | cut -d' ' -f1)" = "$SHA" ]; }
+
+if [ "${1:-}" = "--remove" ]; then
+    if ours "$DLL"; then
+        rm -f "$DLL"
+        [ ! -f "$BACKUP" ] || mv "$BACKUP" "$DLL"
+        echo "asiloader: removed from $GAME"
+    elif [ ! -e "$DLL" ]; then
+        # Nothing of ours in the slot; a backup left alone is put back.
+        [ ! -f "$BACKUP" ] || mv "$BACKUP" "$DLL"
+        echo "asiloader: not installed"
+    else
+        echo "asiloader: $DLL is not the loader; left alone"
+    fi
+    exit 0
+fi
+[ $# -eq 0 ] || { echo "unknown argument: $1" >&2; exit 2; }
+
+[ -f "$SRC" ] || { echo "missing $SRC" >&2; exit 1; }
+ours "$SRC" || { echo "$SRC is not the vendored ASI loader (sha256)" >&2; exit 1; }
+if [ -f "$DLL" ] && ! ours "$DLL"; then
+    # A winmm.dll that is not ours is what stock means from now on. With a backup already
+    # there it would be the second foreign one: overwriting would lose it, so refuse.
+    if [ -f "$BACKUP" ]; then
+        echo "asiloader: $DLL is not the loader and $BACKUP already holds another winmm.dll;" >&2
+        echo "  refusing to overwrite either. Decide which one is the game's, move the other away, and run this again." >&2
+        exit 1
+    fi
+    cp -p "$DLL" "$BACKUP"
+fi
+cp "$SRC" "$DLL.a2asi-new"
+mv "$DLL.a2asi-new" "$DLL"
+echo "asiloader: Ultimate ASI Loader in $GAME as winmm.dll (needs Wine's winmm=n,b; loads *.asi beside the executable)"

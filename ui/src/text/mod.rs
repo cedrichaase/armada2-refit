@@ -14,6 +14,8 @@
 //!   .. the atlas, atlas_w * atlas_h bytes, top row first
 //! The blob is read in place (no allocation, no parse step), so a `Font` is a static.
 
+pub mod game;
+
 /// One glyph's metrics, in ems (y down, relative to the pen on the baseline), and
 /// where it sits in the atlas.
 #[derive(Clone, Copy, Debug, Default)]
@@ -138,13 +140,16 @@ pub struct GlyphQuad {
 /// Lays `text` out on one line with the top of its line box at `y`, starting at `x`;
 /// calls `out` with each glyph's quad and returns the advance width. The baseline is
 /// rounded to a whole pixel so stems sit on the pixel grid; '\n' is ignored (see
-/// `layout_wrapped` for breaks), and a character the font lacks draws as '?'.
+/// `layout_wrapped` for breaks), a tab is a space, another control character draws
+/// nothing, and a character the font lacks draws as '?'.
 pub fn layout_with(font: &Font, text: &str, size: f32, x: f32, y: f32, out: &mut dyn FnMut(GlyphQuad)) -> f32 {
     let base = libm::roundf(y + font.ascent * size);
     let mut pen = x;
     let mut prev: Option<char> = None;
     for ch in text.chars() {
-        if ch == '\n' || ch == '\r' {
+        // A tab is a space; other control characters draw nothing (not '?').
+        let ch = if ch == '\t' { ' ' } else { ch };
+        if ch.is_control() {
             continue;
         }
         let (c, g) = font.glyph_or_fallback(ch);

@@ -106,9 +106,25 @@ fn wanted() -> Option<(&'static core::ffi::CStr, SceneFn)> {
     if !crate::config::get().menus_scene || super::backdrop::over_mission() {
         return None;
     }
-    let all = crate::engine::dialogs::stack();
-    let full = all.iter().rposition(|s| s.w() >= crate::engine::dialogs::DESIGN_W && s.h() >= crate::engine::dialogs::DESIGN_H)?;
-    let screen = crate::engine::dialogs::screen_name(all[full].proc_addr);
+    // Roots' forms (MENUS.md, "Roots' forms"): the main menu's form shows the main view,
+    // every other form and the dialogs FleetOpsHook opens over them the view last shown.
+    if crate::engine::api::forms::active() {
+        // Roots' Single Player (adopted, with its spec) is the campaign selection.
+        let screen = if crate::engine::api::forms::main_menu_shown() {
+            "main menu"
+        } else if crate::config::get().menus_specs && super::roots_dialogs::full_screen() == "single player" {
+            "single player"
+        } else {
+            "forms"
+        };
+        if screen != "single player" {
+            unsafe { CHOICE = None };
+        }
+        return Some((scene_for(screen)?, scene_fn()?));
+    }
+    let all = crate::engine::api::dialogs::stack();
+    let full = all.iter().rposition(|s| s.w() >= crate::engine::api::dialogs::design_w() && s.h() >= crate::engine::api::dialogs::design_h())?;
+    let screen = crate::engine::api::dialogs::screen_name(all[full].proc_addr);
     if screen != "single player" {
         // Each visit to the campaign selection starts at the Federation's view.
         unsafe { CHOICE = None };

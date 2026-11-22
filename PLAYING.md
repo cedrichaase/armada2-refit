@@ -46,6 +46,13 @@ Three things to know before you click:
 
 - **The installer needs the game closed**, and Heroic closed when it writes Heroic's
   settings.
+- **Pre-release (latest main).** The installer's *Version* list ends with a
+  *Pre-release (latest main)* entry: the newest build of the repository's `main`,
+  rebuilt on every change and not seen in game. It is never chosen for you; pick it to
+  help test, or to live on the edge. A version marked *untested release* is a numbered
+  release that has not been seen in game yet; it is not chosen for you either. To go
+  back, pick a release from the same list and install again (or `--install VERSION`
+  from a terminal; `--install pre-release` takes the latest-main build).
 - **What it adds.** In the game folder: `Display8` (as `d3d8.dll`), the plugins
   (`UI.asi`, `Render3D.asi`, `QOL.asi`, `QOLRules.asi`, `Online.asi`), their `.ini`
   files, the ASI loader (`winmm.dll`) and the widescreen patch if they are missing,
@@ -304,6 +311,8 @@ Every plugin writes a log, rewritten at each launch, in
 The first line of each log says where it is. If that folder cannot be written, the
 plugins fall back to the game folder. The files are `Display8.log`, `Render3D.log`,
 `UI.log`, `QOL.log`, `QOLRules.log` and `Online.log`. An uninstall leaves the folder.
+A log beside `Armada2.exe` whose first line is not `log: ...` is from a version before
+13.50.0 and says nothing of the current one; installing takes such logs out.
 
 What to look for first:
 
@@ -341,7 +350,7 @@ antivirus holds).
 | A change in Refit has no effect | Check its badge: *Next mission* and *Restart* rows apply later |
 | Joiners cannot connect | Check `Online.log` on both sides: it says whether the direct path or the relay was used. A host with `Server=` emptied in `Online.ini` needs the address |
 | The game feels different in a network game | *Pay when queued* is on for that game (see "Multiplayer") |
-| A different edition of the game (Fleet Operations: Roots, Armada 1) | Not supported yet; the plugins run as stock on a build they do not know. Both are planned ([`PLAN-FLEETOPS.md`](PLAN-FLEETOPS.md), [`PLAN-ARMADA1.md`](PLAN-ARMADA1.md)) |
+| A different edition of the game (Armada 1, or a mod with an executable of its own) | Not supported; the plugins run as stock on a build they do not know. Armada 1 is planned ([`PLAN-ARMADA1.md`](PLAN-ARMADA1.md)) |
 
 When you open an issue, attach the installer's report, the version of the release
 installed (the installer shows it), and say which backend `Display8.log` names.

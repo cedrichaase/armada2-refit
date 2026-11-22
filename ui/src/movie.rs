@@ -59,7 +59,7 @@ pub extern "C" fn ui_present_movie(bgra: *const u8, w: i32, h: i32, pitch: i32) 
 /// At a present of the engine's device: the pending frame, if any, drawn over the
 /// whole back buffer.
 #[allow(static_mut_refs)]
-pub fn present(dev8: crate::engine::dev8::Dev8) {
+pub fn present(dev8: crate::engine::api::dev8::Dev8) {
     let Some(p) = (unsafe { PENDING.take() }) else { return };
     let tex = unsafe {
         match TEX {
@@ -74,7 +74,7 @@ pub fn present(dev8: crate::engine::dev8::Dev8) {
     crate::gfx::tex_update(tex, p.px.as_ptr(), p.w as usize * 4, p.w, p.h);
     // PlayMovie presents outside a scene; one is opened for the draw, and closed only if
     // it was ours.
-    let opened = crate::engine::dev8::begin_scene(dev8) >= 0;
+    let opened = crate::engine::api::dev8::begin_scene(dev8) >= 0;
     crate::gfx::frame(|bw, bh, draw| {
         let (bw, bh) = (bw as f32, bh as f32);
         draw.rect(R::new(0.0, 0.0, bw, bh), 0xff000000);
@@ -84,6 +84,6 @@ pub fn present(dev8: crate::engine::dev8::Dev8) {
         draw.image(tex, R::new(x, y, w, h), 0xffffffff);
     });
     if opened {
-        crate::engine::dev8::end_scene(dev8);
+        crate::engine::api::dev8::end_scene(dev8);
     }
 }

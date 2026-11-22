@@ -36,6 +36,19 @@ flags = ["no_row"]
 moved_from = "UI.UI.KeepClip"
 
 [[row]]
+name = "window_onewindow"
+section = "Window"
+key = "OneWindow"
+kind = "bool"
+default = "1"
+apply = "restart"
+scope = "local"
+tab = "none"
+label = "One window for the whole game"
+help = "A game that makes its device on a new window at each switch keeps one window of Display8's, the device's windows inside it."
+flags = ["no_row"]
+
+[[row]]
 name = "window_raiseintro"
 section = "Window"
 key = "RaiseIntro"

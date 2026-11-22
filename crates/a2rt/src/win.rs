@@ -71,6 +71,7 @@ unsafe extern "system" {
     pub fn VirtualProtect(p: *mut u8, n: usize, prot: u32, old: *mut u32) -> i32;
     pub fn FlushInstructionCache(proc_: HANDLE, p: *const u8, n: usize) -> i32;
     pub fn GetCurrentProcess() -> HANDLE;
+    pub fn K32EnumProcessModules(proc_: HANDLE, mods: *mut HANDLE, cb: u32, needed: *mut u32) -> i32;
     pub fn CreateFileA(name: *const u8, access: u32, share: u32, sec: *mut u8, disp: u32, flags: u32, tmpl: HANDLE) -> HANDLE;
     pub fn CreateFileW(name: *const u16, access: u32, share: u32, sec: *mut u8, disp: u32, flags: u32, tmpl: HANDLE) -> HANDLE;
     pub fn ReadFile(h: HANDLE, buf: *mut u8, n: u32, read: *mut u32, ov: *mut u8) -> i32;

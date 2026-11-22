@@ -441,7 +441,7 @@ for k in bar info minimap selection unitview resources buttons messages pause re
 done
 ini_retired() {   # installed file name -> "<section> <key> <old value>;..."
     case "$(echo "$1" | tr 'A-Z' 'a-z')" in
-        render3d.ini) echo "lights beamlight 1.0;lights beamreach 40;nebulae litexplosion 0.75" ;;
+        render3d.ini) echo "lights beamlight 1.0;lights beamreach 40;nebulae litexplosion 0.75;overlays movepathcolour 0.55 1.0 0.55;overlays movepathdot 2.5;overlays movepathspacing 9" ;;
     esac
 }
 ini_merge() {   # shipped installed upgrades retired
@@ -493,12 +493,13 @@ ini_merge() {   # shipped installed upgrades retired
         }
         nr = split(ret, R, ";")
         for (u = 1; u <= nr; u++) {
-            if (split(R[u], f, " ") < 3) continue
+            nf = split(R[u], f, " "); if (nf < 3) continue
+            ov = f[3]; for (j = 4; j <= nf; j++) ov = ov " " f[j]   # an old value may hold spaces
             sk = f[1] SUBSEP f[2]
-            if ((sk in hidx) && (sk in sval) && hval[sk] == f[3] && hval[sk] != sval[sk]) {
+            if ((sk in hidx) && (sk in sval) && hval[sk] == ov && hval[sk] != sval[sk]) {
                 i = hidx[sk]; name = nameof(L[i])
                 L[i] = name "=" sval[sk]
-                printf "  %s: [%s] %s %s -> %s\n", label, f[1], name, f[3], sval[sk]
+                printf "  %s: [%s] %s %s -> %s\n", label, f[1], name, ov, sval[sk]
             }
         }
         # Defaults 3 of Display8.ini (tools/ini-merge.py, display8_defaults3): Mode and Real go,

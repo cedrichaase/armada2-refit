@@ -84,7 +84,7 @@ pub fn units(w: f32, h: f32) -> Vec<Unit> {
     }
     let (object_list, virtual_viewport, current_camera) = (eng().addr(sym::OVERLAY_OBJECT_LIST), eng().addr(sym::OVERLAY_VIRTUAL_VIEWPORT), eng().addr(sym::OVERLAY_CURRENT_CAMERA));
     let list = unsafe { rd::<usize>(object_list) };
-    let cam = peek(super::storm3d(), field::OVERLAY_S3D_CAMERA);
+    let cam = peek(super::storm3d(), field::OVERLAY_S3D_CAMERA());
     let vv = unsafe { rd::<usize>(virtual_viewport) };
     if list == 0 || cam == 0 || vv == 0 {
         return out;
@@ -95,9 +95,9 @@ pub fn units(w: f32, h: f32) -> Vec<Unit> {
     }
     let (sx, sy) = (w / vw, h / vh);
     let sd = selection_display();
-    let pointed = peek(sd, field::OVERLAY_SD_POINTED);
-    let team_on = unsafe { rd::<i32>(sd + field::OVERLAY_SD_TEAM) };
-    let fade = unsafe { rd::<f32>(sd + field::OVERLAY_SD_FADE) };
+    let pointed = peek(sd, field::OVERLAY_SD_POINTED());
+    let team_on = unsafe { rd::<i32>(sd + field::OVERLAY_SD_TEAM()) };
+    let fade = unsafe { rd::<f32>(sd + field::OVERLAY_SD_FADE()) };
     unsafe {
         let saved = rd::<usize>(current_camera);
         *(current_camera as *mut usize) = cam;
@@ -108,33 +108,33 @@ pub fn units(w: f32, h: f32) -> Vec<Unit> {
             let o = peek(n, 8);
             n = rd::<usize>(n);
             guard += 1;
-            if o == 0 || rd::<u8>(o + field::OVERLAY_OBJ_REMOVED) != 0 || rd::<u8>(o + field::OVERLAY_OBJ_DRAWN) == 0 {
+            if o == 0 || rd::<u8>(o + field::OVERLAY_OBJ_REMOVED()) != 0 || rd::<u8>(o + field::OVERLAY_OBJ_DRAWN()) == 0 {
                 continue;
             }
-            let selected = rd::<u8>(o + field::OVERLAY_OBJ_SELECTED) != 0;
+            let selected = rd::<u8>(o + field::OVERLAY_OBJ_SELECTED()) != 0;
             let is_pointed = o == pointed;
             if !selected && !is_pointed {
                 continue;
             }
-            let see: unsafe extern "thiscall" fn(usize) -> bool = core::mem::transmute(rd::<usize>(rd::<usize>(o) + field::OVERLAY_VT_CAN_USER_SEE));
+            let see: unsafe extern "thiscall" fn(usize) -> bool = core::mem::transmute(rd::<usize>(rd::<usize>(o) + field::OVERLAY_VT_CAN_USER_SEE()));
             if !see(o) {
                 continue;
             }
-            let cc = cast_craft_class(peek(o, field::OVERLAY_OBJ_CLASS));
-            let station = cc != 0 && rd::<u8>(cc + field::OVERLAY_CLS_STATION) != 0;
+            let cc = cast_craft_class(peek(o, field::OVERLAY_OBJ_CLASS()));
+            let station = cc != 0 && rd::<u8>(cc + field::OVERLAY_CLS_STATION()) != 0;
             let mut r = [0f32; 4];
             let f: unsafe extern "thiscall" fn(usize, usize, *mut f32, f32) = core::mem::transmute(eng().addr(sym::OVERLAY_CONTAINER_RECT));
             f(sd, o, r.as_mut_ptr(), 1.0);
             if !r.iter().all(|v| v.is_finite()) || r[2] <= 0.0 || r[3] <= 0.0 {
                 continue;
             }
-            let team = rd::<i32>(o + field::OVERLAY_OBJ_TEAM);
-            let craft = rd::<u8>(o + field::OVERLAY_OBJ_FLAGS) & value::OVERLAY_FLAG_CRAFT as u8 != 0;
+            let team = rd::<i32>(o + field::OVERLAY_OBJ_TEAM());
+            let craft = rd::<u8>(o + field::OVERLAY_OBJ_FLAGS()) & value::OVERLAY_FLAG_CRAFT() as u8 != 0;
             let frac = |a: usize, b: usize| -> Option<f32> {
                 let max = rd::<f32>(o + b);
                 if max > 0.1 { Some(rd::<f32>(o + a).clamp(0.0, 1.0)) } else { None }
             };
-            let group = rd::<i32>(o + field::OVERLAY_OBJ_GROUP);
+            let group = rd::<i32>(o + field::OVERLAY_OBJ_GROUP());
             out.push(Unit {
                 obj: o,
                 rect: [r[0] * sx, r[1] * sy, r[2] * sx, r[3] * sy],
@@ -142,17 +142,17 @@ pub fn units(w: f32, h: f32) -> Vec<Unit> {
                 pointed: is_pointed,
                 gauges: fade > 0.5 && (is_pointed || (team_on != 0 && team_on == team)),
                 team,
-                group: if (0..value::OVERLAY_GROUP_COUNT).contains(&group) { Some(group as u8) } else { None },
+                group: if (0..value::OVERLAY_GROUP_COUNT()).contains(&group) { Some(group as u8) } else { None },
                 craft,
                 station,
-                hull: if craft { frac(field::OVERLAY_OBJ_HULL, field::OVERLAY_OBJ_HULL_MAX) } else { None },
+                hull: if craft { frac(field::OVERLAY_OBJ_HULL(), field::OVERLAY_OBJ_HULL_MAX()) } else { None },
                 shields: if craft {
-                    let max = rd::<f32>(o + field::OVERLAY_CRAFT_SHIELD_MAX);
-                    if max > 0.1 { Some((rd::<f32>(o + field::OVERLAY_CRAFT_SHIELD) / max).clamp(0.0, 1.0)) } else { None }
+                    let max = rd::<f32>(o + field::OVERLAY_CRAFT_SHIELD_MAX());
+                    if max > 0.1 { Some((rd::<f32>(o + field::OVERLAY_CRAFT_SHIELD()) / max).clamp(0.0, 1.0)) } else { None }
                 } else {
                     None
                 },
-                special: if craft { frac(field::OVERLAY_OBJ_SPECIAL, field::OVERLAY_OBJ_SPECIAL_MAX) } else { None },
+                special: if craft { frac(field::OVERLAY_OBJ_SPECIAL(), field::OVERLAY_OBJ_SPECIAL_MAX()) } else { None },
             });
         }
         *(current_camera as *mut usize) = saved;
@@ -168,7 +168,7 @@ pub fn name(obj: usize) -> &'static str {
         return "";
     }
     unsafe {
-        let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(rd::<usize>(rd::<usize>(obj) + field::OVERLAY_VT_CLASS_NAME));
+        let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(rd::<usize>(rd::<usize>(obj) + field::OVERLAY_VT_CLASS_NAME()));
         super::hud::cstr_static(f(obj))
     }
 }
@@ -207,35 +207,36 @@ pub struct SystemIcon {
 /// repaired). Empty for anything that is not a craft.
 pub fn systems(obj: usize) -> Vec<SystemIcon> {
     let mut out = Vec::new();
-    if obj == 0 || !ok() || unsafe { rd::<u8>(obj + field::OVERLAY_OBJ_FLAGS) } & value::OVERLAY_FLAG_CRAFT as u8 == 0 {
+    if obj == 0 || !ok() || unsafe { rd::<u8>(obj + field::OVERLAY_OBJ_FLAGS()) } & value::OVERLAY_FLAG_CRAFT() as u8 == 0 {
         return out;
     }
-    let base = peek(obj, field::OVERLAY_CRAFT_SYSTEMS);
+    let base = peek(obj, field::OVERLAY_CRAFT_SYSTEMS());
     if base == 0 {
         return out;
     }
-    let order: [u32; value::OVERLAY_SYSTEM_COUNT as usize] = unsafe { rd(eng().addr(sym::OVERLAY_SYSTEM_ORDER)) };
-    let show_all = unsafe { rd::<u8>(obj + field::OVERLAY_CRAFT_SHOW_ALL) } != 0;
+    let order_at = eng().addr(sym::OVERLAY_SYSTEM_ORDER);
+    let order: Vec<u32> = (0..value::OVERLAY_SYSTEM_COUNT().max(0) as usize).map(|i| unsafe { rd::<u32>(order_at + 4 * i) }).collect();
+    let show_all = unsafe { rd::<u8>(obj + field::OVERLAY_CRAFT_SHOW_ALL()) } != 0;
     for &sys in &order {
         let sys = sys as usize;
-        if sys >= super::info::N_SYSTEMS {
+        if sys >= super::info::n_systems() {
             continue;
         }
-        let s = base + sys * value::OVERLAY_SYSTEM_STRIDE as usize;
-        let size = unsafe { rd::<i32>(s + field::OVERLAY_SYSTEM_SIZE) };
-        if size == 0 || (unsafe { rd::<u8>(s + field::OVERLAY_SYSTEM_HIDDEN) } != 0 && !show_all) {
+        let s = base + sys * value::OVERLAY_SYSTEM_STRIDE() as usize;
+        let size = unsafe { rd::<i32>(s + field::OVERLAY_SYSTEM_SIZE()) };
+        if size == 0 || (unsafe { rd::<u8>(s + field::OVERLAY_SYSTEM_HIDDEN()) } != 0 && !show_all) {
             continue;
         }
         let Some(state) = super::info::system_state(obj, sys) else { continue };
-        let now = unsafe { rd::<f64>(s + field::OVERLAY_SYSTEM_NOW) } as f32;
+        let now = unsafe { rd::<f64>(s + field::OVERLAY_SYSTEM_NOW()) } as f32;
         let strength = if size > 0 && now.is_finite() { (now / size as f32).clamp(0.0, 1.0) } else { 1.0 };
-        let icon = peek(selection_display() + field::OVERLAY_SD_REPAIR_ICONS + sys * 4, 0);
+        let icon = peek(selection_display() + field::OVERLAY_SD_REPAIR_ICONS() + sys * 4, 0);
         out.push(SystemIcon {
             system: sys,
-            sprite: peek(icon, field::OVERLAY_RI_SPRITE),
+            sprite: peek(icon, field::OVERLAY_RI_SPRITE()),
             strength,
             state,
-            flash: icon != 0 && unsafe { rd::<u8>(icon + field::OVERLAY_RI_FLASH) } != 0,
+            flash: icon != 0 && unsafe { rd::<u8>(icon + field::OVERLAY_RI_FLASH()) } != 0,
         });
     }
     out

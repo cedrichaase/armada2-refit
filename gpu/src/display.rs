@@ -203,7 +203,7 @@ pub const ABI_MAJOR: u32 = 1;
 /// display 0.13.0, the claims (`display8v1_register`, `display8v1_claims`). 2: display
 /// 0.15.0, `Dx12Device8::pipeline_library`. 3: display 0.18.0, `CLAIM_MENUS` and
 /// `display8v1_mode`. 4: display 0.19.0, `display8v1_dx12_pass` and `Dx12Pass8`.
-pub const ABI_MINOR: u32 = 4;
+pub const ABI_MINOR: u32 = 5;
 
 /// `display8v1_register` (contract 1.1).
 pub type RegisterFn = extern "C" fn(plugin: *const Plugin8) -> u32;
@@ -246,9 +246,16 @@ pub const CLAIM_CURSOR: u32 = 1 << 19;
 /// size, so Display8 raises the front end's own 800x600 request to the desktop's mode.
 /// It is a request and not a category of draws: Display8 never drops anything for it.
 pub const CLAIM_MENUS: u32 = 1 << 20;
+/// One window (contract 1.5): the plugin draws the game's screens itself across the
+/// game's switches of window (the UI's Roots forms, `[Menus] Forms=1`), so Display8 keeps
+/// one window of its own for the game where the build makes a window per switch
+/// (`[Window] OneWindow`). A request, not a category of draws: asked at the first
+/// `CreateDevice`. Without it the game's own screens are its own windows, which take the
+/// pointer as they always did.
+pub const CLAIM_WINDOW: u32 = 1 << 21;
 
 /// The claims' names, for the logs: (bit, name).
-pub const CLAIM_NAMES: [(u32, &str); 14] = [
+pub const CLAIM_NAMES: [(u32, &str); 15] = [
     (CLAIM_SKY, "sky"),
     (CLAIM_HULLS, "hulls"),
     (CLAIM_WORLD, "world"),
@@ -263,6 +270,7 @@ pub const CLAIM_NAMES: [(u32, &str); 14] = [
     (CLAIM_CREDITS, "credits"),
     (CLAIM_CURSOR, "cursor"),
     (CLAIM_MENUS, "menus"),
+    (CLAIM_WINDOW, "window"),
 ];
 
 /// A plugin, as it registers (`display8v1_register`, contract 1.1): handed in, read

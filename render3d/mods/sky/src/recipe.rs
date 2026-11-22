@@ -47,6 +47,15 @@ pub fn text_for(base: &str) -> Option<(String, &'static str)> {
     Some((r.text, src))
 }
 
+/// The stock recipe of a base name (`render3d/content/sky/<base>.ini`), whatever set the
+/// build reads: for the menu scene of a build whose own set has none.
+pub fn stock_text(base: &str) -> Option<(String, &'static str)> {
+    let mut path = String::from("sky/");
+    path.push_str(base);
+    path.push_str(".ini");
+    r3d_core::content::file(&path).map(|t| (String::from(t), "built in, the stock recipe"))
+}
+
 /// The `[Sky]` section's keys, lower-cased, with their values (comments stripped).
 fn keys(text: &str) -> Vec<(String, String)> {
     let mut out = Vec::new();

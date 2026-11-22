@@ -14,8 +14,8 @@
 //! The left button (held) moves the camera, the right orders the selection to the point
 //! (the buttons swap with the player's option), both through the radar's own engine
 //! calls, made in the panel's always-step.
-use crate::engine::radar::{self, Kind};
-use crate::engine::{hud, sprite};
+use crate::engine::api::radar::{self, Kind};
+use crate::engine::api::{hud, sprite};
 use crate::gfx::{fade, rgba, Color, Corners, Tex, Weight, R};
 use crate::widgets::{Align, Ui};
 use alloc::vec::Vec;
@@ -162,7 +162,7 @@ fn ext_texture(slot: &mut Option<Tex>, st3d: usize) -> Option<Tex> {
 pub fn run(ui: &mut Ui) {
     let s = st();
     let r = radar::radar();
-    if r == 0 || hud::hidden(radar::map_radar()) || crate::engine::ingame::hud_hidden() {
+    if r == 0 || hud::hidden(radar::map_radar()) || crate::engine::api::ingame::hud_hidden() {
         s.drag = None;
         return;
     }
@@ -334,10 +334,21 @@ fn filters(ui: &mut Ui, strip: R) {
         let stt = crate::widgets::theme::State::of(ui, id, hot, held);
         let col = crate::gfx::mix(t.text_dim, t.text, stt.hot);
         let label = crate::widgets::theme::caps(radar::filter_name(station));
-        ui.text_in(R::new(name_r.x + ui.u(7.0), name_r.y, name_r.w - ui.u(7.0), name_r.h), &label, t.micro_size, Align::Left, col, Weight::Bold);
+        // On a game whose HUD icons are its own (Roots, decision 341): the stock filter
+        // button's picture before the word.
+        let mut lx = name_r.x + ui.u(7.0);
+        if crate::icons::game_art_first() {
+            let sp = if station { radar::filter_sprites().1 } else { radar::filter_sprites().0 };
+            if let Some((tex, uv)) = sprite::art(sp) {
+                let isz = (g.h - ui.u(4.0)).max(1.0);
+                ui.draw.image_uv(tex, R::new(name_r.x + ui.u(3.0), g.y + (g.h - isz) * 0.5, isz, isz), uv, if hot { 0xffffffff } else { 0xffd0d0d0 });
+                lx = name_r.x + ui.u(5.0) + isz;
+            }
+        }
+        ui.text_in(R::new(lx, name_r.y, name_r.right() - lx, name_r.h), &label, t.micro_size, Align::Left, col, Weight::Bold);
         if clicked {
             radar::queue_filter(station, 1);
-            crate::engine::sound::click();
+            crate::engine::api::sound::click();
         }
         if hot {
             hovered = (i as u8 + 1, 4);
@@ -367,7 +378,7 @@ fn filters(ui: &mut Ui, strip: R) {
             }
             if clicked && !on && !held {
                 radar::queue_filter(station, ((k + 4 - state) % 4) as u8);
-                crate::engine::sound::click();
+                crate::engine::api::sound::click();
             }
             if hot {
                 hovered = (i as u8 + 1, k as u8);

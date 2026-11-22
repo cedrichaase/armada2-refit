@@ -7,7 +7,7 @@
 use super::raw::*;
 use super::{get, Img};
 use crate::log;
-use crate::stub::obj::SObj;
+use crate::stub::obj::{self, SObj};
 use alloc::boxed::Box;
 use core::sync::atomic::Ordering;
 use gpu::display::Dx12Image8;
@@ -30,7 +30,10 @@ fn make(o: *mut SObj, plugin: bool) -> Option<Dx12Image8> {
     let d = get()?;
     let t = unsafe { (*o).tex() };
     if t.dx12 == 0 {
-        if t.faces != 1 || !matches!(t.format, 21 | 22) {
+        let bc = obj::bc_kind(t.format);
+        // A block-compressed texture's base level is whole blocks in Direct3D 12.
+        let whole = t.levels[0].w % 4 == 0 && t.levels[0].h % 4 == 0;
+        if t.faces != 1 || !(matches!(t.format, 21 | 22) || (bc.is_some() && whole)) {
             if plugin {
                 log!("d3d12: no mirror for a texture of format {} ({} faces)", t.format, t.faces);
             } else {
@@ -40,7 +43,13 @@ fn make(o: *mut SObj, plugin: bool) -> Option<Dx12Image8> {
         }
         let l0 = &t.levels[0];
         let mapping = if t.format == 22 { ALPHA_ONE_COMPONENT_MAPPING } else { DEFAULT_COMPONENT_MAPPING };
-        let img = match d.texture(l0.w, l0.h, t.nlev, FORMAT_B8G8R8A8_UNORM, 0, STATE_COPY_DEST, Some(mapping)) {
+        let dxfmt = match bc {
+            Some(1) => FORMAT_BC1_UNORM,
+            Some(2) => FORMAT_BC2_UNORM,
+            Some(_) => FORMAT_BC3_UNORM,
+            None => FORMAT_B8G8R8A8_UNORM,
+        };
+        let img = match d.texture(l0.w, l0.h, t.nlev, dxfmt, 0, STATE_COPY_DEST, Some(mapping)) {
             Ok(i) => i,
             Err(e) => {
                 log!("d3d12: no mirror: {}", e);
@@ -82,13 +91,14 @@ pub fn update(o: *mut SObj) {
     // Made in COPY_DEST: the first update writes every level there, then hands the
     // whole texture over to the shaders.
     let fresh = img.state == STATE_COPY_DEST;
+    let block = obj::format_block(t.format).unwrap_or((4, 1));
     for i in 0..t.nlev.min(32) {
         if dirty & (1 << i) == 0 {
             continue;
         }
         let l = &t.levels[i as usize];
         let (from, to) = if fresh { (STATE_COPY_DEST, STATE_COPY_DEST) } else { (STATE_SHADER_RESOURCE, STATE_SHADER_RESOURCE) };
-        d.upload(img.res, FORMAT_B8G8R8A8_UNORM, i, l.w, l.h, l.data.as_slice(), l.pitch, 4, from, to);
+        d.upload_blocks(img.res, img.format, i, l.w, l.h, l.data.as_slice(), l.pitch, block, from, to);
     }
     if fresh {
         d.barrier(img.res, ALL_SUBRESOURCES, STATE_COPY_DEST, STATE_SHADER_RESOURCE);

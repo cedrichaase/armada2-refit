@@ -38,9 +38,9 @@ pub fn read() -> Option<Progress> {
     }
     let bytes = |off: usize| -> [u8; 4] { unsafe { rd::<[u8; 4]>(base + off) } };
     let p = Progress {
-        reached: bytes(field::PROGRESS_REACHED),
-        complete: bytes(field::PROGRESS_COMPLETE),
-        missions: bytes(field::PROGRESS_MISSIONS),
+        reached: bytes(field::PROGRESS_REACHED()),
+        complete: bytes(field::PROGRESS_COMPLETE()),
+        missions: bytes(field::PROGRESS_MISSIONS()),
     };
     let sane = (0..4).all(|i| p.missions[i] > 0 && p.missions[i] <= 32 && p.reached[i] < p.missions[i] && p.complete[i] <= 1);
     if sane { Some(p) } else { None }

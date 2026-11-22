@@ -58,7 +58,8 @@ Status values: **idea** (not investigated), **scoped** (approach known, nothing 
 | [QOL-7](#qol-7-pay-when-queuing-refund-on-cancel) | Pay when queuing, refund on cancel | `QOLRules.asi`, `PayOnQueue=` | — | **built**, now the [`rules/`](../rules/README.md) layer |
 | [QOL-8](#qol-8-long-moves-on-the-map-go-to-warp) | Long moves on the map go to warp | `QOL.asi`, `WarpDistance=` | A stock peer in a network game | **done** (`QOL.asi`), bench |
 | [QOL-9](#qol-9-the-view-reaches-across-the-map) | The view reaches across the map | `Render3D.asi`, `[View] Distance=` | — | **done**, render3d's since qol 2.2.0 |
-| [QOL-10](#qol-10-a-move-path-starts-at-its-first-point) | A move path starts at its first point | `QOL.asi`, `PathStartsAtOnce=` | The path key as a binding (issue #26) | **built** (`QOL.asi`), bench |
+| [QOL-10](#qol-10-move-queues) | Move queues: points appended with Tab, flown at once, each leg at its own warp | `QOL.asi`, `PathStartsAtOnce=` | The path key as a binding (issue #26) | **built** (`QOL.asi`), bench |
+| [QOL-11](#qol-11-a-construction-ship-does-not-block-its-own-blueprint) | A construction ship does not block its own blueprint | `QOL.asi`, `RigIgnoresSelf=` | Own, allied ships making way (issues #52, #53) | **built** (`QOL.asi`), bench |
 
 ## Settings live
 
@@ -80,6 +81,7 @@ patch that is in but switched off.
 | `StationGroups` | live | every station hook tests the flag (`sel_pre`, `bind_pre`, `producer_group`, `one_kind`, `focus_stub`) and takes the stock path when it is 0. Groups that already hold stations keep them |
 | `WarpDistance` | live | `warp_pre` already read the distance; 0 does what stock's Alt block did |
 | `PathStartsAtOnce` | live | the three calls stay re-pointed; at 0 a point sends nothing and the release sends as stock |
+| `RigIgnoresSelf` | live | the first stub sets what the check ignores to the rig, or to nothing at 0 (stock's own argument) |
 | `MaxSelection` | restart | the selection array is moved at start; a bigger or smaller one is never re-applied |
 
 `PayOnQueue`, the one row the players must agree on, is `QOLRules.asi`'s, in
@@ -97,7 +99,8 @@ own, with the reason in the log (`engine: <hook> stands down: ...`), on the feat
 for the settings screen. All hooks are asked first, before the first patch, because
 patches change bytes another hook's check reads. Each asm stub continues through a
 resolved variable (`pushl _a2s_qol_<id>; ret`), and reads a global as a load of the
-variable and then of the global; field offsets are spliced in with `A2_STR(QOL_F_...)`.
+variable and then of the global; field offsets, values and frame locals are read from
+the build's own variables (`_a2f_qol_<id>`), filled at start-up.
 
 | Hook | Setting | Entries | Without it |
 |---|---|---|---|
@@ -106,9 +109,12 @@ variable and then of the global; field offsets are spliced in with `A2_STR(QOL_F
 | `qol.selection` | `MaxSelection` | `cOverViewImp` (`global`), its 31 selection-array sites and 3 caps (`patch`, each with the bytes it replaces) | selection of 16 |
 | `qol.special_select` | `MaxSelection` | the five special-weapon array sequences (`patch`) and three continue points | selection of 16 (it is moved only with this hook) |
 | `qol.stations` | `StationGroups` | the eight stub sites (`patch`/`fn`), nine continue points, the engine functions and RTTI the stations code calls, and the object fields | stations as stock |
+| `qol.rebind` | `BarKeys` | the parsed key map: the named controls' array and count (`FieldDesc`: the name inline, the state cell at `+0x20`) and the discrete maps' array and count (`DiscreteMap`: its state cell, its chord's length and keys) | no key moves; the game's own key map |
 | `qol.bar_keys` | `BarKeys` | the call of `mProcessKeyboardInput` in `PopupPaletteImp::Update` (`call`) and that function, the three hotkey counts and the six menu toggles, a button's state and press slot, and the click's sound (`operator new`, the `AudioSound2D` constructor, the click-sound global), `TextInput_IsActive`, `CinematicView::IsPlayingVideo` | position keys off, stock's bar keys |
 | `qol.warp` | `WarpDistance` | the Alt block (`patch`) and its continue point, the warp globals and functions | moves as stock |
 | `qol.move_paths` | `PathStartsAtOnce` | `mAddPathPoint`'s two calls in `mNormalModeRightClick` and `QueueCommand`'s in `mProcessWaypoints` (`call`), those two functions, the craft process's command, path and point fields, the action's no-order flag, the order's packet limit | paths sent on release, as stock |
+| `qol.rig_self` | `RigIgnoresSelf` | two patches in `ConstructionRig::GetAction` (`patch`, each with two continue points as `label`) and the two vtable slots the stubs call | the ghost as stock |
+| `qol.script_input` | none (always on) | `ScriptInputCallbacks::AlwaysSimulate` at its entry (`patch`, its whole body as the check) and the callback's field | the editor after a scripted mission crashes, as stock |
 
 `MaxSelection` needs both of its hooks; the log names the one that failed.
 
@@ -168,6 +174,13 @@ button of that cell", and which button sits in which cell is the UI's layout.
   keys with `MapVirtualKeyA` and read with `GetAsyncKeyState`, so they are positions on
   any layout. A key goes down once. Nothing happens while chat has the keyboard
   (`TextInput_IsActive`), Ctrl or Alt is held, or the game is not the foreground window.
+- **Cells without a key.** `bk_key_cells` (a value of the build's profile, one bit per cell)
+  says which cells get a key: all fifteen, on Armada II and on Fleet Operations: Roots.
+  `QOL_BarLabel` answers NULL for a cell without one and the UI draws no badge there. Roots'
+  own plain W (`select_next_ship`, reworked by Roots to select the damaged ships of the
+  selection, which emptied a shipyard's) moves to M while the keys are on ("Key rebinds" below;
+  PLAN-FLEETOPS.md, decision 349), so the W cell is the bar's there too. On Roots the keys press the UI's grid of Roots' bar (decisions 330 to 338); `qol.bar_keys` is verified there (the call in `Update` is stock's; Roots' edits to
+  `mProcessKeyboardInput` leave its hotkey tables at stock's fields, which the hook empties).
 - **A press** is what releasing a click does: nothing for a disabled button, else the
   click (a fire-and-forget `AudioSound2D` made with the game's `operator new`, named by
   `StandardButton::s_buttonClickSound`, unless a video plays) and the press slot.
@@ -217,6 +230,47 @@ working beside the grid?
 in a real game, the user doesn't have to look down.
 
 ---
+
+### Key rebinds (`rebind.c`, hook `qol.rebind`)
+
+`[BarKeys] Rebind` in `QOL.ini` is a table of rows `action:FROM>TO` (apart by commas): while the
+grid's position keys are on (`BarKeys=1` and the Refit bar drawn), every chord of `action` that
+holds FROM holds TO instead, its other keys (the modifiers it wants held or up) kept; when the keys
+stop, the game's own keys come back. Fleet Operations: Roots ships one row,
+`select_next_ship:W>M` (`qol/defaults/fo-roots.ini`): Roots gives plain W to `select_next_ship`,
+which it reworked to select the damaged ships of the selection, and the overview reads that before
+the bar's keys, so W emptied a shipyard's selection instead of pressing the bar's W cell. Plain M is
+free in Roots' `Input.map` (only Alt+M, `memory_toggle`, is bound; its metal lines are comments).
+Stock ships the key empty.
+
+- **In memory, never in a file.** `Input.map` is parsed once at start (`InputInit`) into two arrays
+  the input thread tests each frame: the named controls (`FieldDesc`: the name, and the state cell
+  the game reads) and the discrete maps (`DiscreteMap`: the state cell it sets and a chord of up to
+  eight keys, each a device, a code and held or up; `s_FindOrAppendDiscreteMap` shares one map
+  among the controls of one chord). A rebind finds the control by name, its maps by its state cell,
+  and writes the held key's code (set-1 scancodes for the keyboard) in each: one aligned word, put
+  back when the keys stop. `RTS_CFG.h` is not involved.
+- **A key never does two things.** While a row has not moved its action off FROM (the hook stood
+  down, the action not in the key map, the target refused, or the table not applied yet), FROM is
+  still the game's: its cell of the bar gets no position key (`QOL_BarLabel` NULL) and the UI puts
+  no button there, as `bk_key_cells` does for a cell without a key; logged once per change
+  (`rebind not applied: W stays the game's (select_next_ship); the W cell is left without a key
+  and empty`). Generic over the table's rows, not tied to W.
+- **Refused, logged:** a target another chord already fires on (it holds TO and wants none of the
+  keys held that ours wants up: Roots' Alt+M is not a clash for M with Alt up), an action not in
+  the key map, a key name not known, a chord without FROM held (its keys' codes logged).
+- **Multiplayer.** The key map is the player's own: a network game checks the executable and
+  `RTS_CFG.h`, the ODF, SOD, TT and AIP/FRM files ("... files do not match node %d"), never
+  `Input.map`, and a key only makes the ordinary command it always made. A player with a rebind
+  plays with stock players and with Roots players as before.
+
+### Keybinds page (later)
+
+The user wants a keybinds page in the game's settings (the Refit screen or Options) where every
+binding can be seen and changed, and where switching the hotkey layout to the grid applies its
+rebinds. The table is meant to feed it: the page lists the key map's controls and chords (the two
+arrays above), writes its changes as rows of `[BarKeys] Rebind` (or a table of the same rows per
+layout), and the grid preset is the rows a layout brings. Not built.
 
 ## QOL-2: Configurable right-drag pan speed
 
@@ -608,23 +662,104 @@ findings are in [`render3d/README.md`](../render3d/README.md#view-distance). `QO
 old `ViewDistance=` is carried over by `tools/settings/move-keys.py` and the release
 installers.
 
-## QOL-10: A move path starts at its first point
+## QOL-10: Move queues
 
-*`QOL.asi`, stock-compatible: stock's own path order, sent earlier. Built:
-`PathStartsAtOnce=` (default 1; 0 leaves paths as stock). Issue #17; the dots that show
-the path are render3d's (`render3d/README.md`, "overlays", Move paths).*
+*`QOL.asi`, stock-compatible: only stock's own path orders are sent. Built:
+`PathStartsAtOnce=` (default 1, a live row; 0 leaves paths as stock). Issue #17; the
+dots that show a queue are render3d's (`render3d/README.md`, "overlays", Move paths),
+read through `QOL_MoveQueue`.*
 
 **Problem.** Stock lets the player sketch a path: hold Tab and right-click points on the
 map, and the selection flies them one after another. Nothing moves until Tab is let go,
-so a long path leaves the ships idle while it is drawn.
+a new path replaces the one being flown, and the whole path is flown with the one
+command the cursor showed at the release (all at impulse or all at warp).
 
-**Wanted.** The ships set off at the first point and take each new point as it comes,
-with only ordinary orders, so stock players in the same game carry them out.
+**Wanted.** Points queued with Tab are flown at once, a point queued for ships already
+following a queue is added to the end of it, each leg is flown at the warp it was
+queued with, the minimap queues points like the 3D view, and the player's own orders
+end the queue, all with ordinary orders, so stock players in the same game carry them
+out.
 
-**Stock.** The key is the `enter_waypoint` binding of `Input.map` (+Tab, without Control,
-Shift or Alt). `cOverViewImp::Init` (0x51e4c0) asks `ControlsGetPointer` for it and keeps
-the pointer to its live state at `cOverViewImp+0x30c`; three places read it: the
-right-click, `mProcessWaypoints` and the sketch's draw. With it held,
+### The design
+
+**A queue belongs to the ships it was given to**: a list of points (the clicked map
+points, as the sketch holds them), each with the mode of its click (GO, GO_WARP or
+PATROL), and the ships flying it. A right-click with Tab held appends the point to the
+queue of every selected ship of the player's; selected ships with no queue start one
+together. When only some of a queue's ships are selected, those go on in a copy of the
+queue and only the copy gets the point. Stations and anything without a craft process
+are left out. At most 32 queues, 256 ships and 64 points per queue.
+
+**A run** is the longest stretch of legs of one mode. One path order carries one
+command, so a queue is flown a run at a time: QOL sends the stock path order (stock's
+`QueueCommand`, as the release does) for the run's points, and the ships fly them as any
+path. A point that extends the run being flown (same mode, the ships on the queue's last
+run) is sent at once: the order goes out again from the point each ship heads to now
+(ships at different points get one order each), so the ships take it without turning
+back; a point of another mode waits. When a ship reaches the end of its run, its next run
+(or the next part of a long one) is sent to it alone, at once: no ship waits for the rest
+of its group, so a ship held back never holds the others up (the log's `N ship(s)
+behind`). The ships still aim for their own places in the formation; they just do not
+wait for each other. (Until the play test of 2026-11-06 a group waited at each run's end
+for its last ship, up to 8 s; it read as the group stalling to form up.)
+The first point of a new queue is sent at once, so the ships are under way from the first
+click, as before.
+
+**Warp per leg.** A leg keeps the mode it was queued with. Alt makes a leg warp, a patrol
+click a patrol leg, and QOL-8 (`WarpDistance`) judges an appended leg by its own length,
+from the queue's last point, not by how far the ships are from the point now (a new
+queue's first leg is judged as QOL-8 judges any move). A minimap point keeps the minimap's
+rule: a move there is GO_WARP unless Alt is held (ui/HUD.md, "The minimap").
+
+**A group's targets.** A path order sends every ship it names to the same points, so a
+group flying one bunched up at each point and circled it, every ship trying to sit on the
+same spot. So each ship of a queue has a place in the group, and flies to the point plus
+that place: QOL sends each ship a path order of its own, to its own targets. The places are
+stock's own formation: the formation type the ships move in (the bar's formation buttons),
+that formation's slots, scaled and filled the way stock fills them for a group move, the
+leader (the filled slot of the lowest rank) on the point itself and every other ship at its
+slot's offset from the leader's. The places are fixed when the queue begins, the formation
+facing the first leg, and at every point the formation is turned to face the leg that
+ends there, as stock's formation faces the way it moves. A single ship's place is the point
+itself. When the player picks another formation for the ships of a queue (an order that
+leaves the queue alone), the places are worked out again from where the ships are, facing
+the point they fly to, and the order is sent again from the point each heads to
+(`formation changed`). Ships the formation has no slot for (more ships than slots, or no
+formation readable) keep where they are in the group, turned to the first leg, at most a
+few ship widths from the group's centre and pushed apart to a ship's width. A copy of a
+queue (a split) keeps its ships' places. A ship counts a point reached when its process goes
+past it (or stops at the end of a run), each ship at its own target, so no ship waits on a
+point another ship holds, and each ship goes on to its next run on its own.
+
+**The packet.** `QueueCommand` drops a path order that would not fit its packet
+(`4 x (ships + 3 x points) + 10` above 0x1fc bytes) without a word. Every ship has an order
+of its own (its own targets), so an order carries one ship and at most 40 points, and a run
+longer than that is sent in parts: the first 40 points, then the rest when the ships reach
+the end of the part (`next part sent`).
+
+**Patrol.** A patrol run loops while it is the queue's last run, as stock's patrol does:
+a patrol point appended to it joins the loop, sent again from the point each ship heads to
+with the loop turned to start there. A point of another mode appended after a patrol ends
+the loop: the ships finish the lap to the patrol's last point and go on to the next run.
+A loop longer than one order takes is cut to what fits.
+
+**What ends a queue.** Any order of the player's that replaces a ship's movement takes
+that ship out of its queue: stop, a plain move or warp, a path not of QOL's, attack,
+guard, follow, dock, repair, build, mine, colonize, a special weapon, forming a formation,
+and every other order except those that leave the movement alone: NONE, DEFAULT, SELECT,
+QUEUE, SET_RALLY_POINT, the two CANCEL_BUILDs, the RED/YELLOW/GREEN alerts, BUY/SELL
+RESOURCE, SET_FORMATION, SET_ATTACK_MODE, the six autonomy settings (special weapons and
+movement) and CMD_SET_FORMATION_ORIENTATION (the masks `mq_keep_lo` / `mq_keep_hi` of the
+profile). A ship destroyed, removed or given to another team leaves its queue
+(`ship gone`), and every queue is dropped when a game is loaded (`g_finish_load_time`
+changes) or `PathStartsAtOnce` goes to 0.
+
+### Stock, and the hooks (hook `qol.move_paths`)
+
+**The key and the sketch.** The key is the `enter_waypoint` binding of `Input.map` (+Tab,
+without Control, Shift or Alt). `cOverViewImp::Init` (0x51e4c0) asks `ControlsGetPointer`
+for it and keeps the pointer to its live state at `cOverViewImp+0x30c`; three places read
+it: the right-click, `mProcessWaypoints` and the sketch's draw. With it held,
 `mNormalModeRightClick` (0x5229a0) adds the map point under the cursor (`+0xa4`) to the
 path at `+0x264` through `mAddPathPoint` (0x5255b0; its call at 0x5229ff makes the path at
 the first point, the one at 0x5229e3 inserts after the last later) and sends nothing.
@@ -634,42 +769,344 @@ moved is read where it is) and, unless the action carries the flag 0x4000, calls
 `GameObject::QueueCommand(the action's command, ids, path)` (0x4d4380, cdecl; its call at
 0x522bba): the path order, `NetOrderObjectsWhatPath`, carrying the command the cursor
 shows (GO, GO_WARP with Alt or QOL-8, PATROL in patrol mode). It then frees the sketch.
-`QueueCommand` reads only the path's count and points, and drops the order silently when
-it would not fit its packet (`4 x (ships + 3 x points) + 10` above 0x1fc bytes: 16 ships
-and 36 points, 40 ships and 28). Every ship given the order flies a copy of its own: its
-craft process (`GameObject+0x44`) holds the command at `+0x38` (4 for every kind of move),
-the path at `+0x88` and the point it heads to at `+0x12c`, and a new path order replaces
-both, starting again at the first point. A double-click with the key held throws the
-sketch away unsent.
+`QueueCommand` reads only the path's count and points. A double-click with the key held
+throws the sketch away unsent.
+*Hooks:* the two calls of `mAddPathPoint` go to `mp_add_hook`, which lets it add the point
+(so the engine still draws the sketch while the key is held) and hands the point and the
+action's command to the queues (`mq_point`); the release's call of `QueueCommand` goes to
+`mp_release_hook`, which leaves it out when the sketch's points went to the queues.
 
-**With `QOL.asi`.** The two calls of `mAddPathPoint` go to `mp_add_hook`, which lets it add
-the point and then sends the order stock sends on release, for the sketch as it stands:
-the ships are under way from the first click. Sent again with every point, the order
-would turn a ship that has already passed the first points back to them, so the points
-every selected ship of the player's has passed are left out: each ship's copy says which
-sketch point it ends at and how far along it the ship is, and a ship whose path is gone
-(it stopped at the end of what was sent, more than 1.5 s after the first send) counts as
-having reached that end. A patrol is always sent whole. The release's call of
-`QueueCommand` goes to `mp_release_hook`, which leaves it out when the last send carried
-every point of the sketch (else it is stock's call: the key let go before a send fitted,
-or the action carries 0x4000). An order that would not fit the packet is not sent and
-waits for the release, as stock would. Each send is an ordinary order, so each ship
-acknowledges it by voice, once per point.
+**Orders are executed, not sent, on every machine.** Every order of a player is written
+into the outgoing `RoundBuffer` (0x76b888) by its sender (`QueueCommand`'s overloads, the
+bar's `mBroadcastCommand`, `mQueueSpecialWeaponCommand`) and carried out on every machine
+when the round is processed (`RoundBuffer::ProcessOrders`), each by its `Execute`. The
+`NetOrderWhat*::Execute`s are the only callers of the `GameObject::DeQueueCommand`
+overloads, which post the order as the ship's next command (its `AiCmdInfo` at
+`GameObject+0x7c`: the command at `+0x80`, a path at `+0x88`); the path order's static
+`DeQueueCommand` (0x4d4650; node, command, ids, points) checks the ship's owner
+(`+0xec`) against the node and builds each ship an `AiPath` of its own. A move of several
+ships from the bar is a `NetOrderMove`, whose `Execute` calls
+`FormationManager::Broadcast_Go_Command` (0x43b3e0; command, point, ids); forming a
+formation is `NetOrderFormFormation` → `FormationManager::FormFormation` (0x43b680; ids);
+a special weapon `NetOrderSpecialAttack` → `GameObject::SetCommand` (0x4d1d90). The
+ships' own AI and the scripts never go through these: they set the process's command
+directly (`GameObject::SetCommand` and the like), and so does `CraftProcess::Stop` when a
+ship arrives. So an order seen at one of these calls is a player's, which is how arrival
+and a player's Stop are told apart.
+*Hooks:* the 15 calls are re-pointed: `NetOrderWhat::Execute` (0x55007f),
+`NetOrderWhatOn` (0x5500f1), `WhatWho` (0x5502a6), `WhatWhoWhere` (0x55034a),
+`WhatWhoWhereParam` (0x5503ee), `WhatClass` (0x55017e), `WhatClassWhere` (0x550212),
+`WhatParam` (0x550461), `WhatWhere` (0x5504d1), `WhatWhereParam` (0x550545) and
+`WhatWhoParam` (0x5505da) to stubs that note the ship (`ecx`) and the command (the first
+argument) and go on to the engine's `DeQueueCommand`; the special attack's `SetCommand`
+(0x5518a0) likewise; `NetOrderMove`'s `Broadcast_Go_Command` (0x5521a5) and
+`NetOrderFormFormation`'s `FormFormation` (0x5526f6) to stubs that note the ids; and
+`NetOrderObjectsWhatPath::Execute`'s call of the static `DeQueueCommand` (0x54f9ce) to
+`mq_dq_path_hook`. A path order of QOL's own is known by its command, its point count and
+its first and last points (the last 32 sent are remembered); any other is a player's and
+ends the queue of each ship it names.
 
-**Open.** A network game against a stock player (it is stock's order, so it should
-simply be carried out). The double-click that throws a sketch away no longer stops the
-ships: they keep the path sent so far. The key itself: it is the `enter_waypoint`
-binding, so it can be rebound in `Input.map` today; issue #26 (key bindings in game) is
-the place for Shift. A binding there can rebind `enter_waypoint`, or point
-`cOverViewImp+0x30c` (written once per mission by `Init`, at 0x51e7f9) at a key state of
-its own: all three readers go through that pointer, so no code needs patching. Shift
-alone is taken without modifiers by `enter_waypoint` (`-Shift`) and means "add to the
-selection" on a left click, so the binding has to say +Shift and drop the -Shift.
+**How stock moves a group (hook `qol.move_paths`, read only).** A plain move of several
+ships is `NetOrderMove`, whose `Execute` calls `FormationManager::Broadcast_Go_Command`
+(0x43b3e0): it takes the mean of the ships' bearings to the point and hands on to
+`Give_Formation_Go_Commands`, which splits the ships into clusters
+(`Find_Clusters_Of_Ships`: ships that move in the same formation type, close together)
+and moves each with `Do_Group_Move`, the clusters set side by side across the heading,
+`FORMATION_SPACING` apart. `Do_Group_Move` takes the cluster's formation from the
+`FormationManager` (`g_FormationManager`, 0x73575c, a table of 16 `Formation *` by type),
+its scale from `Formation::GetScale` (the largest ship's bounding radius, at least 28,
+over the formation's own ship radius; 1 when that radius is not above 0), and fills the
+slots in their order (`Choose_Spot_In_Formation_For_Each_Ship`): each slot, placed about
+the group's centre and turned to the group's heading (`BuildDirectionalMatrix`: right is
+(z, 0, -x) of the heading), takes the nearest ship of the first of its seven ship types
+that has one (`Find_Closest_Craft_To_Location`, the class's type at +0x42c; `?` any,
+`-` ends the list). The leader is the filled slot of the lowest rank. Then
+`Send_Ships_In_Formation` (0x43c410) gives the leader the move to the point itself and
+every other ship FOLLOW of the leader at its slot's offset from the leader's, so the group
+holds the formation while it flies; forming up (`FormFormation`) gives each ship
+FORM_FORMATION to its slot's own point instead. A path order does none of this:
+`NetOrderObjectsWhatPath`'s `DeQueueCommand` gives every ship a copy of the same points.
+The formation type a ship moves in is its craft process's `+0x13c`
+(`CraftProcess::SetFormation`; the constructor's default is 3), from SET_FORMATION, whose
+parameter becomes the type (posted with `DeQueueCommand(SET_FORMATION, 1)` a ship moves
+in the column, 2 the X; seen on the bench). The types are 0
+`Assault Wall` and 1 `Column` (read from `AI/formations/*.frm`), and 2 and 3, built in code
+(`XFormation`, `SheetFormation`, radius -1, so not scaled). A `Formation` keeps its slot
+count at +4, ship radius at +8, slots at +0xc (0x30 bytes each: seven ship types, the ship
+it holds at +0x1c, the offset (right, up, ahead) at +0x20, the rank at +0x2c) and its type
+at +0x10.
+*Use:* `spread` reads the queue's ships' formation type (the commonest among them), the
+formation's slots, radii and ship types, and fills the slots as above, facing the first
+leg; nothing of the formation is written, and the orders sent are stock's path orders, one
+per ship (entries `mq_formations`, `mq_form_types`, `mq_proc_formation`, `mq_frm_*`,
+`mq_slot_*`, `mq_min_radius`, `mq_ent_bounds`, `mq_bounds_radius`, `mq_class_shiptype`).
 
-**Seen on the bench (2026-11-05)**, `testbench/scenarios/render3d-move-paths.md` on the
-`warp` scene, one destroyer, three points a second apart with the key held (Scene.asi's
-`waypoint-key`, since the bench cannot hold a key): each right-click sent the order
-(`point N sent at once`), the ship was on its path from the first point while the key
-was still held, the release sent nothing more, and the ship flew the three points and
-stopped. Not yet seen: a selection that has passed a point when the next is added (the
-order then starts further on), a patrol, a network game.
+**The acknowledgement (hook `qol.move_paths`).** A ship speaks its acknowledgement as it
+*takes* an order, not when the order is given: the processes' `Handle_New_Command`
+(`CraftProcess`, and the cargo, colony and repair ships') call `Craft::Say` (0x4c30e0)
+with a voice topic as they start the new command, and `Craft::Say`'s one call of
+`CaptainsVoice::Say` (0x4c30f1 -> 0x45d720) plays it only for a ship of this machine's
+player (`GameObject::IsLocal`) and remembers the last topic and time. Nothing of it is in
+the order on the wire. So every path order QOL sent was spoken by each ship as it was
+carried out. *Hook:* that call is re-pointed at `mq_say_hook`, which leaves the line out
+(answers false, as `Say` does when it has nothing to say) for a ship whose order of QOL's
+own has been carried out and not yet taken up by its process (the window between
+`mq_dq_path_hook` and the tick seeing the ship fly the order), and calls the engine's
+`Say` for everything else. **Which sends are the player's:** any send made while a
+player's Tab right-click is handled (on the map or the minimap: a new queue's first run,
+and a point that extends the run being flown, sent again at once) is that click's order
+and is spoken as a stock click is. The sends QOL makes on its own from its step (a ship's
+next run or next part at the end of its run, the places taken again after a formation
+change) are quiet: their log line ends in `(quiet)`, and each acknowledgement left out is
+logged. Only this machine's sound is touched; the orders sent are the same stock path
+orders as before (entries `mq_say`, `mq_say_call`).
+
+**Where a ship is on its path.** Each ship has a craft process (`GameObject+0x44`). When
+it takes a new command (`CraftProcess::Handle_New_Command`, 0x430000), a path order's
+`AiPath` moves from the object's next command (`+0x88`) to the process's `+0x88`, the
+very object, and the point it heads to (`+0x12c`) starts at 0; `Move_To_Formation`
+advances the index (skipping a point the ship is already at), and on arrival the process
+goes to STOP (command `+0x38` 3) with another path in `+0x88` (seen on the bench: never
+null, so only the pointer tells). So after the path hook has run
+the engine's `DeQueueCommand`, QOL keeps each ship's `AiPath` pointer from its `+0x88`;
+the ship is flying the order while its process's path is that pointer, and the queue
+point it heads to is the one that equals the path's point at the index (an engine point
+in between, a detour, keeps the last one found). When the pointer goes, the ship has
+reached the end of the order; an order executed whose path never shows (arrived at once,
+or refused) counts as flown after 1.5 s of game time, and one sent that never executes as
+given up after 8 s.
+
+**The step and the clock.** The queues advance once a frame where the player's own
+input gives its orders: `cOverViewImp::Simulate`'s call of `mProcessKeyboardInput`
+(0x51ef2e) goes to `mq_ov_keys_hook`, which calls it and then steps the queues. A path
+order sent from inside the simulation step (after `GameObject::PreSimulateAll`, the first
+place tried) is written and never carried out: on the bench every next run sent from
+there stayed `POSTED` and the ships never moved, while the same order sent from the
+overview's step is executed within the round. The timers run on the simulation's clock:
+`GameObject::PreSimulateAll`'s call in `Simulate` (0x483327; static, the step's length in
+seconds, 0.1 on the bench) goes to `mq_presim_hook`, which adds it up, so a paused game's
+timers stand still. The clicks, the executors and the step are all on the game thread;
+nothing the simulation reads is written but by the stock orders sent.
+
+**The minimap.** Stock's minimap (`RadarComponent::Simulate`, 0x4e8a90) never touches the
+sketch: a command click there asks `ActionMode::GetAction` and hands the action to the
+bar's `BroadcastCommand`, a plain order, and the UI's minimap does the same from the
+panel's always-step (ui/HUD.md, "The minimap"). So with Tab held a minimap click would
+have been a plain move, which ends the queue. The UI now offers the click to
+`QOL_MoveQueuePoint(xyz, action)` first (found by name, `find_export`): with the waypoint
+key held (read through `cOverViewImp+0x30c`) and the queue on, QOL appends the point as a
+3D right-click would and returns 1, and the UI gives no order; else 0, and the UI's stock
+order goes out.
+
+**For render3d.** `QOL_MoveQueueVersion()` (1) and
+`QOL_MoveQueue(ship, xyz, flags, cap)`: for a `GameObject *`, -1 when QOL keeps no queues
+(`PathStartsAtOnce=0` or the hook stood down), 0 when the ship has none, else the number
+of points still ahead of it (at most `cap` written), from the one it heads to now, each
+where this ship goes (its own target); flag bit 0 a warp leg, bit 1 a leg of a patrol
+that loops back to its run's first point (a looping patrol is listed from the point the
+ship heads to, round the loop). `QOL_MoveQueueGroup(ship, own, pts, flags, cap, queue)`
+answers the same, and also the queue's own points (where the leader goes) into `pts` and
+the queue's serial into `*queue`, so that several selected ships of one group can be drawn
+as one path; render3d uses it when it is there. Cheap: no allocation, no log.
+
+**`QOL.log`** (the first 600 lines of the queue):
+- `move queue: new queue K, ships S`
+- `move queue: appended point N (go|warp|patrol), queue K: M point(s), ships S` (M: the
+  points still ahead of the group's last ship)
+- `move queue: run sent: go|warp|patrol, P point(s) from point F, S ship(s), queue K`, and
+  `next run sent: ...` when ships go on to the next run, `next part sent: ...` to the
+  rest of a run split for the packet; then `, N ship(s) behind` when ships of the queue are
+  not yet that far, ` (quiet)` for a send of QOL's own (no acknowledgement), and
+  ` (split for the packet: R more later)` when it is split
+- `move queue: acknowledgement left out, queue K ship ID (topic T)`, once per quiet order
+- `move queue: cleared for N ship(s): stop|move|warp|path|<order>` (`<order>` is
+  `AiCommandToName`'s, in lower case: `attack`, `guard`, `special_attack`, ...)
+- `move queue: queue K spread (new queue|formation changed): formation T, scale X, P ship(s)
+  in slots, L by layout`, then one line per ship: `move queue: queue K ship ID slot S|by
+  layout: right R, up U, ahead A`
+- `move queue: queue K ship ID passed point N, D from its target (x,z)` (D in 3D), and
+  `... at the end of its run, point N, ...`; `, short of it` when a ship went past a point
+  more than 200 from its own target (the engine moves a ship on to its next point about 150
+  short of the one it heads to), `, nearer another ship's` when it stopped nearer another
+  ship's target than its own
+- `move queue: ship gone, queue K: S ship(s) left`, `move queue: queue K done, S ship(s)`,
+  with `, each at its own target at every point` for a group whose ships all were, or
+  `, N time(s) a ship not at its own target`
+- `move queue: minimap point at x,z`, `move queue: key let go, the points are queued already`
+- `move queue: reset (a game was loaded | PathStartsAtOnce off)`, `move queue: simulation
+  step T ms` (once), `move queue: an order executed, its path never flown (...)`
+
+**Open.** A network game against a stock player (it is stock's order, so it should simply
+be carried out). A Tab click's own sends are spoken, one order per ship, so a group's
+ships may each acknowledge a click (the engine's voice keeps its own pacing). Which of the bar's formation buttons gives which type was not
+checked in game (the buttons' ODFs say `param` 1 to 4; on the bench, 1 gave the column).
+A formation's up offsets (the column's and the wall's rows, the X's arms) are kept as stock
+keeps them, so ships of a queue fly at different heights as they do in a stock group move. The double-click that throws a sketch away no longer stops the ships. The
+key itself: it is the `enter_waypoint` binding, so it can be rebound in `Input.map` today;
+issue #26 (key bindings in game) is the place for Shift. A binding there can rebind
+`enter_waypoint`, or point `cOverViewImp+0x30c` (written once per mission by `Init`, at
+0x51e7f9) at a key state of its own: all three readers and `QOL_MoveQueuePoint` go through
+that pointer. Shift alone is taken without modifiers by `enter_waypoint` (`-Shift`) and
+means "add to the selection" on a left click, so the binding has to say +Shift and drop
+the -Shift.
+
+**Seen on the bench (2026-11-05)**, on the `warp` scene, Tab held with Scene.asi's
+`waypoint-key`: `testbench/scenarios/qol-move-queue.md` passes (a point appended while the
+ship flies, sent again from point 2; a 3D point then a minimap point, the warp run sent
+when the ship reached the first and flown; a queue ended by the bar's Stop and one by a
+plain right-click; a point for one of two queued ships, which went on in a copy). By hand
+in sessions: two and three ships flying a queue together; a patrol of three points (the
+bar's Order > Patrol) looping, then a go point appended after it, sent when the ships
+reached the patrol's last point; a ship killed in a queue (`ship gone`). The diagnostics
+of the first sessions showed a ship's process taking the order's own `AiPath` and, on
+arrival, STOP with another path in its place; and that a next run sent from inside the
+simulation step was never executed (hence the overview's step). A Scene.asi `stop` (a
+script's order, not the player's) does not clear a queue: the ship's run counts as ended.
+Not yet seen: an attack or special weapon ending a queue, a run split for the packet, a
+network game, render3d drawing `QOL_MoveQueue`.
+
+## QOL-11: A construction ship does not block its own blueprint
+
+*`QOL.asi`, stock-compatible. Built: `RigIgnoresSelf=` (default 1, a live row; 0 leaves
+the ghost as stock). Issue #51, the first of three steps of #47; the next two (own ships
+make way, #52; allies too, a rules change, #53) are not built.*
+
+**Problem.** Placing a building with a construction ship selected often puts the
+blueprint over the ship itself, and the ghost turns red: the ship is in its own way.
+
+**Stock.** Each frame `cOverViewImp::Simulate` asks `ActionMode::GetAction` what a click
+at the cursor would do, and for a construction ship the answer is
+`ConstructionRig::GetAction` (0x4afa30): in build mode, over shroud the build is
+allowed, otherwise it calls the class's `CanPlaceHere` (vtable +0x8, `CraftClass`'s at
+0x4c01b0) with the position, **nothing to ignore** and the marking of blockers on. It
+answers BUILD (0x19), plus 0x4000 ("no order") when the spot is not free; the overview
+colours the ghost from that and `PopupPaletteImp::BroadcastCommand` sends nothing for a
+refused click. `CanPlaceHere` reaches `Station_Placement::Is_Clear_For_Placement`
+(0x494de0), which refuses the map edge, any blocked cell of the 50-unit placement grid
+(stations, sites, terrain) and then every object whose bounding sphere overlaps the
+footprint except the one it was told to ignore, the destroyed, background objects,
+stations (the grid has them) and most nebulae. There is no team test: own, allied and
+enemy ships block alike.
+
+The simulation is the other half, and it is more lenient: when a construction ship
+reaches its building spot, `CraftProcess::Build` (0x4355d0, the call at 0x4359b0) asks the
+same `CanPlaceHere` with **the rig as the object to ignore**, on every node, and builds if
+it says clear. A ship that stands on its own site is therefore no obstacle to the build:
+it is already inside the spot's distance and the order moves it out. Only the ghost made
+it one.
+
+**With `QOL.asi`.** `ConstructionRig::GetAction` is patched at two places. Its first
+instruction after the prologue is a virtual call on `this`, and `this` is lost a few
+instructions later (the register holding it takes the position), so the first stub
+(`rig_this_stub`, 8 bytes at 0x4afa37, which does what they did) stores `this` as the
+object to ignore, or nothing when the setting is 0. The second (`rig_check_stub`, the 13
+bytes at 0x4afa71 that load the class and make the `CanPlaceHere` call) makes the same
+call with that value where stock passes nothing, then hands the answer back to the
+unchanged code that follows. Nothing else changes: own warships, allies and enemies,
+the grid and the map edge still block, so the only new green ghost is one whose sole
+blocker is the constructing ship. The click now sends the ordinary BUILD, which every
+peer treats as any other; stock's arrival check, which already ignores the rig, finds
+the site clear. Both sites' bytes are checked first (`profiles/gog-1.1/qol.toml`, hook
+`qol.rig_self`), else the ghost stays stock and the log says why. `QOL.log` says
+`rig: the blueprint's spot is clear|blocked (...)` when the answer changes (at most 60
+lines), which the scenario waits on.
+
+**Why its own key and not `ClearBuildSite`.** The second step (own ships move out of the
+way, issue #52) is a bigger feature with its own risks (orders sent for the player, a
+held build) and will take `ClearBuildSite=`. This step is only the ghost's argument, so a
+player can keep it with that one off, and each row says what it does.
+
+**Several constructors.** The ghost is shown only with one object selected (stock) and
+the check ignores that one. The palette sends one BUILD per selected rig, so with
+several selected the others still count as blockers in the ghost: step 2 deals with it.
+
+**Seen on the bench:** `testbench/scenarios/qol-rig-ignores-self.md`.
+
+## A script's input monitor (a crash fix, hook `qol.script_input`)
+
+*`QOL.asi`, no key: it changes nothing a player sees, only a crash. Found on Fleet Operations:
+Roots (PLAN-FLEETOPS.md, decision 500); the bug is stock's code.*
+
+**The crash.** Starting the map editor (a new map or Edit Map) after playing Roots' first
+tutorial, *TUTORIAL: Gameplay*, in the same run of the game kills the game at the first frame
+after the load: madExcept's `exceptArmada2.txt` names an access violation at address 0, from
+`DisplayInterface::SimulateAll` (through FleetOpsHook's `DisplayInterface_SimulateAll_Callback`).
+Stock Roots, with nothing of ours installed, crashes the same way (bench, below); the editor
+started without a scripted mission first works.
+
+**Why.** A mission script watches the player's input through
+`ScriptInterfaceImp::MonitorInputControls(fn)`: it stores `fn` in the engine's static
+`s_inputCallbacks` (a `ScriptInputCallbacks`, at +0x24) and registers that object in the
+simulate lists of view 0 and view 1 (`DisplayInterface::AddViewSimulate`); a null `fn` takes it
+out of both again (`RemViewSimulate`). Each frame `ScriptInputCallbacks::AlwaysSimulate` (0x451dc0)
+calls `fn` with no test, and when `fn` answers false it clears the field and leaves the object
+registered. The tutorial's script ends that way, so the next view that simulates the object,
+the editor's, calls address 0.
+
+**The fix.** QOL replaces `AlwaysSimulate` at its entry with a jump to a `__fastcall` function
+of its own (`script_always` in `qol.c`: `this` in ecx, the float popped by its `ret 4`, as the
+original's), which does the same with the test the original lacks: no function, nothing called.
+It leaves the registration as it is (taking it out from inside the list's own walk would free
+the node the walk is on). It is display-side only: nothing the simulation or the network reads
+changes, so a player with it plays a player without it. `QOL.log` says
+`--- QOL script input monitor: called only while a script has one set, patched` at start-up and,
+the first time the guard is needed, `script: the input monitor is registered with no function`.
+On Armada II the editor is started with `-edit`, in a run of its own, so no mission script has
+run before it there; the guard is the same on both builds.
+
+**Seen on the bench:** `testbench/scenarios/fo-mapedit-after-tutorial.md` (Roots with every layer: the tutorial,
+End Mission, Map Editor, Create new map, the editor up). Roots as it ships was driven the same way
+by hand in a stock session (PLAN-FLEETOPS.md, decision 500): the editor opens from a fresh start
+and crashes after the tutorial.
+
+## On Fleet Operations: Roots
+
+`./install --game fo-roots` puts QOL.asi into Roots' `Data/` with `qol/defaults/fo-roots.ini`
+applied over `QOL.ini`: `PanSpeed`, `ShiftAddsToGroup` and `PathStartsAtOnce` run, every other key is 0
+because it was measured beside Roots' own behaviour and found moot or blocked (PLAN-FLEETOPS.md,
+"FO-7: QOL on Roots", decisions 100-115).
+
+- **The pan hook** is `RTS_Configure`'s store over the parsed `FASTSCROLL_COEFFICIENT`.
+  Roots' executable has the function byte for byte as stock, FleetOpsHook's one run-time
+  write inside it is a call far past the site, and Roots' `RTS_CFG.h` has stock's value, so the
+  hook is the same as on Armada II; `QOL.log` says `RTS_CFG.h parsed: ... now 0.0125`.
+- **The overview** is read through `g_pOverView` (`ov_base()` in `qol.c`), since Roots
+  constructs an enlarged one of its own instead of the static object. Anything of QOL that
+  addresses the overview must do the same.
+- **`ShiftAddsToGroup` is on** (decision 108): Roots has no Shift+number of its own, and every
+  site `qol.shift_group` uses is stock's in the file and in memory. Roots jumps out of
+  `mCheckGroupSelect` before its key loop to take **Alt+number** itself, and Roots' Alt+number
+  empties the selection and recalls the *station* group, not QOL's "select and centre the ship
+  group" (the log and Refit text say so): on Roots Shift+number adds, and Shift's old
+  select-and-centre is gone (the second tap still centres). `fo-qol-groups` shows it.
+- **`MaxSelection` stays 16 and `selection` and `special_select` are disabled** (decision 109):
+  FleetOpsHook has moved the selection into an array of its own in the enlarged overview, at
+  +0x3d0 (so the `+0xbc` sites are not stock's), with a cap of 30 in its own `Select` and in the
+  group add of `mBindGroup`, and its own special-weapon gathering. Its readers are not ours to
+  re-point, so QOL's array would disagree with them; Roots' 30 is already past stock's 16.
+- **`BarKeys` stays off**: Roots' bar is FleetOpsHook's, up to 64 buttons with several per
+  weapon classlabel, so the slot plan of QOL-1 does not hold there.
+- **`PathStartsAtOnce` is on** (decision 114): QOL-10's queue reads and hooks only functions
+  that Roots leaves byte for byte as stock's (the right-click and its release, `mAddPathPoint`,
+  `QueueCommand` and `DeQueueCommand`, the `NetOrder*::Execute` family, the formation manager's
+  two entries), reads the selection through `GetSelectList` and the overview through
+  `g_pOverView`, and the three functions of Roots that it shares ground with
+  (`mProcessKeyboardInput`, `Simulate`, `Craft::Say`) are marked verified. Two differences:
+  `Craft::Say` is FleetOpsHook's port, so the re-pointed call of `CaptainsVoice::Say` never
+  runs and the ships **speak as they take each leg** (QOL's own sends are not quiet there); and
+  the engine moves a path on about 300 short of a point for the Mediterranean class, not the
+  150 of stock's destroyers, which the log marks `short of it`. render3d (`EngineMoves = all` on
+  Roots) draws QOL's queue where a ship has one and the engine's path for its ordinary moves.
+  `fo-qol-move-queue` stages it: the bench cannot hold Tab, so `testbench/bench/roots-waypoint.sh`
+  binds Roots' `enter_waypoint` to the middle mouse button in the clone.
+- **`StationGroups` is off and `stations` is disabled** (decision 111): Roots replaces
+  `cOverViewImp::Select` (the site that lets a second station be selected) and the bar's
+  `mUpdateButtonsAndPosition` (the build button's enable site) with FleetOpsHook's own ports, so
+  two of QOL-6's sites are in bodies that never run; Roots has station groups of its own.
+- **`WarpDistance` stays 0** (decision 112): the hook is verified and installed, but Roots has no
+  warp in its games (`GAME_OPTIONS_WARP = 0`, no warp option on the Instant Action settings, AI
+  warp distance 999999), and the hook asks `isAllowWarpSpeed` first.
+- **`RigIgnoresSelf` stays 0** (decision 113): the hook is verified and works (the log says the
+  ship is ignored, the ghost is green, the click builds), but Roots' ghost is green over its
+  own construction ship, and over other ships, with the key at 0 as well (`fo-qol-rig`,
+  `fo-qol-rig-off`).

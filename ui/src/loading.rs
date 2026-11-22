@@ -9,7 +9,7 @@
 //! the shell, with each network player's progress; the load's own progress, and what
 //! it is doing, animated between the engine's frames by the frames of ours that
 //! `engine::loading` presents.
-use crate::engine::{loading as eng, setup};
+use crate::engine::api::{loading as eng, setup};
 use crate::gfx::{fade, Corners, Tex, Weight, R};
 use crate::widgets::theme::{self, Race};
 use crate::widgets::{Align, Theme, Ui};
@@ -83,14 +83,12 @@ fn kicker(map: &str, single: bool, ia: bool) -> String {
         return String::from("Multiplayer");
     }
     let m = crate::rt::lower(map);
-    let campaign = [("a2_fed", "Federation campaign"), ("a2_kling", "Klingon campaign"), ("a2_borg", "Borg campaign"), ("a2_tutorial", "Tutorial")]
-        .iter()
-        .find(|(p, _)| m.starts_with(p))
-        .map(|&(p, name)| (p, name));
+    // The campaigns' map prefixes and lines are the content set's (`[Campaign.*]`).
+    let campaign = crate::content::get().campaigns.iter().find(|c| !c.map.is_empty() && m.starts_with(c.map));
     match campaign {
-        Some((p, name)) => {
-            let n: u32 = m[p.len()..].chars().take_while(|c| c.is_ascii_digit()).fold(0, |a, c| a * 10 + c.to_digit(10).unwrap_or(0));
-            if n > 0 && p != "a2_tutorial" { crate::sfmt!("{}  ·  Mission {}", name, n) } else { String::from(name) }
+        Some(c) => {
+            let n: u32 = m[c.map.len()..].chars().take_while(|c| c.is_ascii_digit()).fold(0, |a, c| a * 10 + c.to_digit(10).unwrap_or(0));
+            if n > 0 && c.numbered { crate::sfmt!("{}  ·  Mission {}", c.kicker, n) } else { String::from(c.kicker) }
         }
         None => String::from("Mission"),
     }
@@ -105,7 +103,7 @@ fn read_objectives(l: &mut Load) {
     let mut found = None;
     for part in ["a", "main", "primary", "main_objectives"] {
         let rel = crate::sfmt!("objectives\\{}_{}.txt", l.map, part);
-        if let Some(b) = crate::rt::read_file(&crate::rt::game_path(&rel)) {
+        if let Some(b) = crate::files::open(&rel) {
             found = Some(b);
             break;
         }
@@ -175,7 +173,7 @@ fn flush(p: &mut String, out: &mut Vec<String>) {
 /// 00` (textures/README.md, "The skybox is not in any config file"). Either a cube
 /// model (`mbgborg.sod`) or a prefix whose faces are `<prefix>0..5.tga`.
 fn bzn_background(map: &str) -> Option<String> {
-    let b = crate::rt::read_file(&crate::rt::game_path(&crate::sfmt!("bzn\\{}.bzn", map)))?;
+    let b = crate::files::open(&crate::sfmt!("bzn\\{}.bzn", map))?;
     let marker = [2u8, 0, 0, 0, 0x64, 0, 0, 0];
     let i = b.windows(8).position(|w| w == marker)? + 8;
     let name: String = b[i..].iter().take(64).take_while(|&&c| c != 0).map(|&c| c as char).collect();
@@ -183,9 +181,11 @@ fn bzn_background(map: &str) -> Option<String> {
 }
 
 /// The candidate face files of a background: each `(path, quadrant)`, a quadrant of a
-/// 2x2 atlas (`MBG02`) or the whole file (None).
+/// 2x2 atlas (`MBG02`) or the whole file (None). Each name is looked for with the game's
+/// texture extensions in turn (`files::game`: `.tga` on Armada II; `.tga`, then `.dds` on
+/// Fleet Operations: Roots, whose faces are mostly DDS), and read by `a2fmt::image`.
 fn sky_faces(bg: &str) -> Vec<(String, Option<u8>)> {
-    let tex = |n: &str| crate::rt::game_path(&crate::sfmt!("Textures\\RGB\\{}", n));
+    let tex = |n: &str| crate::sfmt!("textures\\{}", n);
     let mut out = Vec::new();
     let lower = crate::rt::lower(bg);
     let mut names: Vec<String> = Vec::new();
@@ -194,7 +194,7 @@ fn sky_faces(bg: &str) -> Vec<(String, Option<u8>)> {
             names.push(String::from(stem));
             // The cube's own texture names, which may be another set's (MbgBlue.SOD draws
             // MBG02).
-            if let Some(sod) = crate::rt::read_file(&crate::rt::game_path(&crate::sfmt!("SOD\\{}", bg))) {
+            if let Some(sod) = crate::files::open(&crate::sfmt!("SOD\\{}", bg)) {
                 for w in sod.split(|c| !c.is_ascii_alphanumeric() && *c != b'_') {
                     if w.len() >= 4 && w.len() < 24 && w[..3].eq_ignore_ascii_case(b"mbg") {
                         let n: String = w.iter().map(|&c| c as char).collect();
@@ -208,18 +208,22 @@ fn sky_faces(bg: &str) -> Vec<(String, Option<u8>)> {
         }
         None => names.push(lower.clone()),
     }
+    // A face by its name without extension: the first of the game's extensions present.
+    let face = |stem: &str| -> Option<String> {
+        crate::files::game().texture_exts.iter().map(|e| tex(&crate::sfmt!("{}{}", stem, e))).find(|p| crate::files::exists(p))
+    };
     for n in &names {
-        if crate::rt::file_exists(&tex(&crate::sfmt!("{}.1.tga", n))) {
+        if face(&crate::sfmt!("{}.1", n)).is_some() {
             for k in 1..=6 {
-                out.push((tex(&crate::sfmt!("{}.{}.tga", n, k)), None));
+                out.extend(face(&crate::sfmt!("{}.{}", n, k)).map(|p| (p, None)));
             }
-        } else if crate::rt::file_exists(&tex(&crate::sfmt!("{}0.tga", n))) {
+        } else if face(&crate::sfmt!("{}0", n)).is_some() {
             for k in 0..6 {
-                out.push((tex(&crate::sfmt!("{}{}.tga", n, k)), None));
+                out.extend(face(&crate::sfmt!("{}{}", n, k)).map(|p| (p, None)));
             }
-        } else if crate::rt::file_exists(&tex(&crate::sfmt!("{}.tga", n))) {
+        } else if let Some(p) = face(n) {
             for q in 0..4 {
-                out.push((tex(&crate::sfmt!("{}.tga", n)), Some(q)));
+                out.push((p.clone(), Some(q)));
             }
         }
         if !out.is_empty() {
@@ -264,20 +268,20 @@ fn quadrant(img: &a2fmt::tga::Image, q: Option<u8>) -> (u32, u32, u32, u32) {
 fn sky(map: &str) -> Option<(Tex, [f32; 4], f32)> {
     let bg = bzn_background(map)?;
     let faces = sky_faces(&bg);
-    let mut best: Option<(u32, a2fmt::tga::Image, Option<u8>)> = None;
+    let mut best: Option<(u32, a2fmt::tga::Image, Option<u8>, bool)> = None;
     let mut i = 0;
     while i < faces.len() {
         // An atlas's quadrants share a file: it is read once.
         let path = faces[i].0.clone();
         let quads: Vec<Option<u8>> = faces[i..].iter().take_while(|f| f.0 == path).map(|f| f.1).collect();
         i += quads.len();
-        let Some(img) = crate::rt::read_file(&path).and_then(|b| a2fmt::tga::decode(&b).ok()) else { continue };
+        let Some(img) = crate::files::open(&path).and_then(|b| a2fmt::image::decode(&b).ok()) else { continue };
         let Some((score, q)) = quads.iter().map(|&q| (interest(&img, q), q)).max_by_key(|e| e.0) else { continue };
         if best.as_ref().is_none_or(|b| score > b.0) {
-            best = Some((score, img, q));
+            best = Some((score, img, q, crate::rt::lower(&path).ends_with(".dds")));
         }
     }
-    let (score, img, q) = best?;
+    let (score, img, q, dds) = best?;
     let (x0, y0, w, h) = quadrant(&img, q);
     if w == 0 || h == 0 || w > 4096 || h > 4096 {
         return None;
@@ -286,7 +290,7 @@ fn sky(map: &str) -> Option<(Tex, [f32; 4], f32)> {
     let pitch = img.width as usize * 4;
     let start = (y0 as usize * img.width as usize + x0 as usize) * 4;
     crate::gfx::tex_update(tex, img.pixels[start..].as_ptr(), pitch, w, h);
-    crate::log!("loading: sky \"{}\", face {}x{}{} (brightness {})", bg, w, h, if q.is_some() { " of an atlas" } else { "" }, score);
+    crate::log!("loading: sky \"{}\", face {}x{}{} (brightness {}, {})", bg, w, h, if q.is_some() { " of an atlas" } else { "" }, score, if dds { "DDS" } else { "TGA" });
     Some((tex, [0.0, 0.0, 1.0, 1.0], w as f32 / h as f32))
 }
 
@@ -334,6 +338,18 @@ fn doing(status: &str) -> &'static str {
     STEPS.iter().find(|(p, _)| status.starts_with(p)).map_or("Loading the interface", |&(_, s)| s)
 }
 
+/// Which bar the loading screen draws: `[Loading] Bar=` `classic` (the rounded bar, Armada
+/// II's) or `panel` (a square bar inset in a thin box); empty or `auto`, the content set's
+/// `[Loading] Bar`, else classic.
+fn bar_boxed() -> bool {
+    let k = crate::config::get().loading_bar.as_str();
+    match k {
+        "panel" => true,
+        "classic" => false,
+        _ => crate::content::get().loading_bar == "panel",
+    }
+}
+
 pub fn run(ui: &mut Ui) {
     let Some(l) = load() else { return };
     let now = ui.time();
@@ -359,7 +375,8 @@ pub fn run(ui: &mut Ui) {
     let p = eng::progress().unwrap_or(1.0);
 
     // The bottom band: what the load is doing, the percentage, the bar.
-    let bar_h = ui.u(10.0);
+    let boxed = bar_boxed();
+    let bar_h = if boxed { ui.u(22.0) } else { ui.u(10.0) };
     let bar = R::new(m, screen.h - m - bar_h, screen.w - 2.0 * m, bar_h);
     let line_h = ui.u(40.0);
     let line = R::new(bar.x, bar.y - ui.u(14.0) - line_h, bar.w, line_h);
@@ -368,7 +385,11 @@ pub fn run(ui: &mut Ui) {
     let txt = R::new(line.x + sp + ui.u(14.0), line.y, line.w * 0.6, line.h);
     ui.text_in(txt, doing(eng::status()), t.text_size, Align::Left, t.text, Weight::Regular);
     ui.text_in(line, &crate::sfmt!("{:.0}%", p * 100.0), t.title_size, Align::Right, t.title, Weight::Bold);
-    theme::bar(ui, bar, p, None);
+    if boxed {
+        theme::bar_boxed(ui, bar, p, None);
+    } else {
+        theme::bar(ui, bar, p, None);
+    }
 
     // The mission, down the left.
     let right_w = if l.players.is_empty() && l.preview.is_none() { 0.0 } else { ui.u(440.0).min(screen.w * 0.3) };
@@ -502,8 +523,8 @@ fn players(ui: &mut Ui, l: &Load, r: R) {
         ui.text_in(name_r, &p.name, t.text_size, Align::Left, col, if p.local { Weight::Bold } else { Weight::Regular });
         let race = p.race.and_then(Race::from_name).map_or("Random", |r| r.name());
         ui.text_in(name_r, race, t.small_size, Align::Right, t.text_dim, Weight::Regular);
-        if let Some(fr) = fr
-            && let Some(f) = fr[p.slot]
+        if let Some(fr) = &fr
+            && let Some(f) = fr.get(p.slot).copied().flatten()
         {
             theme::bar(ui, R::new(nx, row.y + ui.u(40.0), row.right() - nx, ui.u(6.0)), f, Some(if f >= 1.0 { t.good } else { t.fill }));
         }

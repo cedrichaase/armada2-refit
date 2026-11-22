@@ -12,6 +12,9 @@ extern crate alloc;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+pub mod table;
+pub use table::Table;
+
 /// An ini file parsed as `GetPrivateProfileString` reads one: names without case, a
 /// section written twice read as one, the first of a repeated key winning, surrounding
 /// whitespace and one pair of quotes dropped, `;` lines skipped.

@@ -17,6 +17,11 @@ use alloc::vec::Vec;
 const SETTLE: u32 = 5;
 
 struct Rec {
+    /// A mission's HUD is being laid out (`begin` to `end`), whether or not it is logged.
+    laying: bool,
+    /// Every panel frame of ours drawn so far this frame, logged or not: what the overlay
+    /// messages keep clear of (`occupied`).
+    occ: Vec<R>,
     on: bool,
     open: bool,
     name: &'static str,
@@ -28,6 +33,8 @@ struct Rec {
 }
 
 static mut REC: Rec = Rec {
+    laying: false,
+    occ: Vec::new(),
     on: false,
     open: false,
     name: "",
@@ -45,6 +52,8 @@ fn rec() -> &'static mut Rec {
 /// A mission's frame starts: from here to `end`, panels are noted.
 pub fn begin() {
     let r = rec();
+    r.laying = true;
+    r.occ.clear();
     r.on = crate::config::get().hud.layout_log;
     r.open = r.on;
     r.name = "";
@@ -63,6 +72,9 @@ pub fn at(name: &'static str) {
 /// log is on and a mission's HUD is being laid out.
 pub fn note(p: R) {
     let r = rec();
+    if r.laying && r.occ.len() < 64 {
+        r.occ.push(p);
+    }
     if !r.open || r.name.is_empty() {
         return;
     }
@@ -70,9 +82,16 @@ pub fn note(p: R) {
     r.frame.push((r.name, q));
 }
 
+/// The panel frames of ours drawn so far in this mission frame (screen pixels).
+pub fn occupied() -> Vec<R> {
+    let r = rec();
+    if r.laying { r.occ.clone() } else { Vec::new() }
+}
+
 /// The frame's panels are all drawn: write them when they changed and have settled.
 pub fn end(w: f32, h: f32) {
     let r = rec();
+    r.laying = false;
     if !r.open {
         return;
     }

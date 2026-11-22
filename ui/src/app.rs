@@ -43,6 +43,10 @@ pub fn run(ctx: Context, ui: &mut Ui) {
     if on {
         demo(ctx, ui);
     }
+    if ctx == Context::Mission {
+        // The Refit screen opened by its key over the mission: a modal, so drawn last.
+        crate::menus::refit::mission_frame(ui);
+    }
 }
 
 /// A panel showing what the runtime draws: text in both weights, every widget, the
@@ -81,7 +85,7 @@ fn demo(ctx: Context, ui: &mut Ui) {
     };
     ui.note(s.row(row), &m);
     if ctx == Context::Loading {
-        let p = crate::engine::loading::progress();
+        let p = crate::engine::api::loading::progress();
         ui.note(s.row(row), &match p {
             Some(f) => crate::sfmt!("Loading {:.0}%", f * 100.0),
             None => crate::sfmt!("No load in progress"),

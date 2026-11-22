@@ -161,7 +161,7 @@ pub const WM_PRINT: u32 = 0x317;
 pub const WM_NULL: u32 = 0;
 pub const PRF_NONCLIENT: usize = 2;
 pub const PRF_CLIENT: usize = 4;
-pub const PRF_CHILDREN: usize = 0x10;
+pub const PRF_CHILDREN: usize = 0x10; // not an offset: a Win32 flag
 pub const MK_LBUTTON: usize = 1;
 pub const MK_RBUTTON: usize = 2;
 
@@ -226,6 +226,7 @@ unsafe extern "system" {
     pub fn GetDlgCtrlID(w: HWND) -> i32;
     pub fn GetWindowTextA(w: HWND, buf: *mut u8, n: i32) -> i32;
     pub fn RedrawWindow(w: HWND, r: *const WinRect, rgn: HANDLE, flags: u32) -> i32;
+    pub fn EnumThreadWindows(thread: u32, f: unsafe extern "system" fn(HWND, isize) -> i32, lp: isize) -> i32;
 }
 
 #[link(name = "gdi32")]
@@ -249,4 +250,8 @@ unsafe extern "system" {
     pub fn SizeofResource(module: HANDLE, res: HANDLE) -> u32;
     pub fn VirtualQuery(p: *const u8, info: *mut MemoryBasicInformation, n: usize) -> usize;
     pub fn GetProcAddress(module: HANDLE, name: *const u8) -> usize;
+    pub fn GetModuleHandleExA(flags: u32, name: *const u8, module: *mut HANDLE) -> i32;
 }
+
+/// `GetModuleHandleExA`: `name` is an address in the module, and its count is left alone.
+pub const GET_MODULE_HANDLE_EX_FROM_ADDRESS: u32 = 0x4 | 0x2;

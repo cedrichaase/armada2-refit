@@ -42,9 +42,12 @@ pub fn load_panel() -> usize {
     if ok() { addr(sym::PANELS_LOAD) } else { 0 }
 }
 
-const C_MSG: [usize; 4] = [field::PANELS_C_MSG_0, field::PANELS_C_MSG_1, field::PANELS_C_MSG_2, field::PANELS_C_MSG_3];
-const C_ROWS: [usize; 5] = [field::PANELS_C_ROW_0, field::PANELS_C_ROW_1, field::PANELS_C_ROW_2, field::PANELS_C_ROW_3, field::PANELS_C_ROW_4];
-const B_ALLIANCE: [usize; 3] = [field::PANELS_B_ALLIANCE_0, field::PANELS_B_ALLIANCE_1, field::PANELS_B_ALLIANCE_2];
+#[inline(always)]
+fn c_msg() -> [usize; 4] { [field::PANELS_C_MSG_0(), field::PANELS_C_MSG_1(), field::PANELS_C_MSG_2(), field::PANELS_C_MSG_3()] }
+#[inline(always)]
+fn c_rows() -> [usize; 5] { [field::PANELS_C_ROW_0(), field::PANELS_C_ROW_1(), field::PANELS_C_ROW_2(), field::PANELS_C_ROW_3(), field::PANELS_C_ROW_4()] }
+#[inline(always)]
+fn b_alliance() -> [usize; 3] { [field::PANELS_B_ALLIANCE_0(), field::PANELS_B_ALLIANCE_1(), field::PANELS_B_ALLIANCE_2()] }
 const CB_ALLIANCE: [a2engine::Sym; 3] = [sym::PANELS_CB_ENEMY, sym::PANELS_CB_NEUTRAL, sym::PANELS_CB_ALLY];
 const CB_MSG: [a2engine::Sym; 4] = [sym::PANELS_CB_MSG_ALL, sym::PANELS_CB_MSG_ALLIES, sym::PANELS_CB_MSG_ENEMIES, sym::PANELS_CB_MSG_PRIVATE];
 
@@ -111,7 +114,7 @@ fn vt_is(o: usize, vt: a2engine::Sym) -> bool {
 
 /// A text component's label, localised as its `Render` does.
 fn label_text(t: usize) -> String {
-    let k = fld(t, field::PANELS_TEXT_LABEL_KEY);
+    let k = fld(t, field::PANELS_TEXT_LABEL_KEY());
     if t == 0 || k == 0 {
         return String::new();
     }
@@ -131,7 +134,7 @@ fn information(t: usize) -> Option<([f32; 3], String)> {
     }
     let mut out = [0u32; 4];
     unsafe {
-        let f: unsafe extern "thiscall" fn(usize, *mut [u32; 4]) -> *mut [u32; 4] = core::mem::transmute(fld(fld(t, 0), field::PANELS_VT_GET_INFORMATION));
+        let f: unsafe extern "thiscall" fn(usize, *mut [u32; 4]) -> *mut [u32; 4] = core::mem::transmute(fld(fld(t, 0), field::PANELS_VT_GET_INFORMATION()));
         f(t, &mut out);
     }
     let c = [f32::from_bits(out[0]), f32::from_bits(out[1]), f32::from_bits(out[2])];
@@ -207,41 +210,41 @@ pub fn comm() -> Option<Comm> {
     }
     let c = comm_panel();
     let rd8 = |o: usize| unsafe { rd::<u8>(c + o) } != 0;
-    let teams = rd8(field::PANELS_C_TEAMS);
-    let alliances = rd8(field::PANELS_C_ALLIANCES);
-    let selected = fld(c, field::PANELS_C_SELECTED);
+    let teams = rd8(field::PANELS_C_TEAMS());
+    let alliances = rd8(field::PANELS_C_ALLIANCES());
+    let selected = fld(c, field::PANELS_C_SELECTED());
     let mut bars = Vec::new();
-    let (n, arr) = (fld(c, field::PANELS_C_BAR_COUNT), fld(c, field::PANELS_C_BARS));
+    let (n, arr) = (fld(c, field::PANELS_C_BAR_COUNT()), fld(c, field::PANELS_C_BARS()));
     if arr != 0 && n <= 16 {
         for i in 0..n {
             let b = fld(arr, 4 * i);
-            if !vt_is(b, sym::PANELS_VT_BAR) || unsafe { rd::<u8>(b + field::PANELS_B_PRESENT) } == 0 {
+            if !vt_is(b, sym::PANELS_VT_BAR) || unsafe { rd::<u8>(b + field::PANELS_B_PRESENT()) } == 0 {
                 continue;
             }
-            let name = buttons::latin1(fld(b, field::PANELS_B_NAME) + field::PANELS_TEXT_INLINE, 64);
-            let show_team = unsafe { rd::<u8>(b + field::PANELS_B_SHOW_TEAM) } != 0;
-            let team = if show_team { Some(unsafe { rd::<i32>(fld(b, field::PANELS_B_TEAM_TEXT) + field::PANELS_TEXT_INLINE) }) } else { None };
-            let cb = fld(b, field::PANELS_B_COLOUR);
+            let name = buttons::latin1(fld(b, field::PANELS_B_NAME()) + field::PANELS_TEXT_INLINE(), 64);
+            let show_team = unsafe { rd::<u8>(b + field::PANELS_B_SHOW_TEAM()) } != 0;
+            let team = if show_team { Some(unsafe { rd::<i32>(fld(b, field::PANELS_B_TEAM_TEXT()) + field::PANELS_TEXT_INLINE()) }) } else { None };
+            let cb = fld(b, field::PANELS_B_COLOUR());
             // The colour button's own colour stayed white for a computer player on the
             // bench; the player's team (its start location) has the colour the radar and
             // the setup screen show.
-            let rgb = super::radar::team_colour(unsafe { rd::<i32>(b + field::PANELS_B_TEAM) });
+            let rgb = super::radar::team_colour(unsafe { rd::<i32>(b + field::PANELS_B_TEAM()) });
             let select = checked(cb, sym::PANELS_CB_PLAYER_SELECT);
-            let select = if select != 0 { select } else { checked(fld(b, field::PANELS_B_NAME_BUTTON), sym::PANELS_CB_PLAYER_SELECT) };
-            let chat = checked(fld(b, field::PANELS_B_CHAT), sym::PANELS_CB_CHAT);
-            let show_alliance = unsafe { rd::<u8>(b + field::PANELS_B_SHOW_ALLIANCE) } != 0;
+            let select = if select != 0 { select } else { checked(fld(b, field::PANELS_B_NAME_BUTTON()), sym::PANELS_CB_PLAYER_SELECT) };
+            let chat = checked(fld(b, field::PANELS_B_CHAT()), sym::PANELS_CB_CHAT);
+            let show_alliance = unsafe { rd::<u8>(b + field::PANELS_B_SHOW_ALLIANCE()) } != 0;
             let mut alliance = [(0usize, false, false); 3];
             for (k, a) in alliance.iter_mut().enumerate() {
-                let ab = fld(b, B_ALLIANCE[k]);
+                let ab = fld(b, b_alliance()[k]);
                 if ab == 0 {
                     continue;
                 }
                 let st = buttons::state(ab);
-                let pending = unsafe { rd::<u8>(ab + field::PANELS_ALLIANCE_PENDING) } != 0;
+                let pending = unsafe { rd::<u8>(ab + field::PANELS_ALLIANCE_PENDING()) } != 0;
                 *a = (if show_alliance { checked(ab, CB_ALLIANCE[k]) } else { 0 }, st == 2, pending);
             }
             bars.push(Bar {
-                slot: fld(b, field::PANELS_B_SLOT),
+                slot: fld(b, field::PANELS_B_SLOT()),
                 name,
                 team,
                 colour: buttons::colour(rgb),
@@ -254,22 +257,22 @@ pub fn comm() -> Option<Comm> {
         }
     }
     let mut rows = Vec::new();
-    for (k, &o) in C_ROWS.iter().enumerate() {
+    for (k, &o) in c_rows().iter().enumerate() {
         let r = fld(c, o);
         if r == 0 {
             continue;
         }
         let (up, down, give) = (fld(r, 0), fld(r, 4), fld(r, 8));
-        let td = fld(up, field::PANELS_TD_USER);
+        let td = fld(up, field::PANELS_TD_USER());
         if td == 0 {
             continue;
         }
         let rdi = |off: usize| unsafe { rd::<i32>(td + off) };
         rows.push(Row {
             name: buttons::localize(ROW_KEYS[k]),
-            amount: rdi(field::PANELS_TD_AMOUNT),
-            min: rdi(field::PANELS_TD_MIN),
-            max: rdi(field::PANELS_TD_MAX),
+            amount: rdi(field::PANELS_TD_AMOUNT()),
+            min: rdi(field::PANELS_TD_MIN()),
+            max: rdi(field::PANELS_TD_MAX()),
             up: checked(up, sym::PANELS_CB_UP),
             down: checked(down, sym::PANELS_CB_DOWN),
             give: checked(give, sym::PANELS_CB_GIVE),
@@ -277,27 +280,27 @@ pub fn comm() -> Option<Comm> {
     }
     let mut msg = [0usize; 4];
     for (k, m) in msg.iter_mut().enumerate() {
-        *m = checked(fld(c, C_MSG[k]), CB_MSG[k]);
+        *m = checked(fld(c, c_msg()[k]), CB_MSG[k]);
     }
     Some(Comm {
-        title: label_text(fld(c, field::PANELS_C_TITLE)),
-        head_player: label_text(fld(c, field::PANELS_C_HEAD_PLAYER)),
-        head_message: label_text(fld(c, field::PANELS_C_HEAD_MESSAGE)),
-        head_team: label_text(fld(c, field::PANELS_C_HEAD_TEAM)),
-        head_alliance: label_text(fld(c, field::PANELS_C_HEAD_ALLIANCE)),
-        group_message: label_text(fld(c, field::PANELS_C_GROUP_MESSAGE)),
-        group_give: label_text(fld(c, field::PANELS_C_GROUP_GIVE)),
-        label_victory: label_text(fld(c, field::PANELS_C_LABEL_VICTORY)),
-        label_latency: label_text(fld(c, field::PANELS_C_LABEL_LATENCY)),
+        title: label_text(fld(c, field::PANELS_C_TITLE())),
+        head_player: label_text(fld(c, field::PANELS_C_HEAD_PLAYER())),
+        head_message: label_text(fld(c, field::PANELS_C_HEAD_MESSAGE())),
+        head_team: label_text(fld(c, field::PANELS_C_HEAD_TEAM())),
+        head_alliance: label_text(fld(c, field::PANELS_C_HEAD_ALLIANCE())),
+        group_message: label_text(fld(c, field::PANELS_C_GROUP_MESSAGE())),
+        group_give: label_text(fld(c, field::PANELS_C_GROUP_GIVE())),
+        label_victory: label_text(fld(c, field::PANELS_C_LABEL_VICTORY())),
+        label_latency: label_text(fld(c, field::PANELS_C_LABEL_LATENCY())),
         teams,
         alliances,
         bars,
         msg,
-        give_units: checked(fld(c, field::PANELS_C_GIVE_UNITS), sym::PANELS_CB_GIVE_UNITS),
-        okay: checked(fld(c, field::PANELS_C_OKAY), sym::PANELS_CB_OKAY),
+        give_units: checked(fld(c, field::PANELS_C_GIVE_UNITS()), sym::PANELS_CB_GIVE_UNITS),
+        okay: checked(fld(c, field::PANELS_C_OKAY()), sym::PANELS_CB_OKAY),
         rows,
-        victory: toggle(fld(c, field::PANELS_C_VICTORY), sym::PANELS_CB_VICTORY),
-        latency: toggle(fld(c, field::PANELS_C_LATENCY), sym::PANELS_CB_LATENCY),
+        victory: toggle(fld(c, field::PANELS_C_VICTORY()), sym::PANELS_CB_VICTORY),
+        latency: toggle(fld(c, field::PANELS_C_LATENCY()), sym::PANELS_CB_LATENCY),
     })
 }
 
@@ -326,8 +329,8 @@ pub fn drop_box() -> Option<Drop> {
     if !drop_shown() {
         return None;
     }
-    let (c, text) = information(fld(drop_panel(), field::PANELS_D_TEXT))?;
-    Some(Drop { text, colour: buttons::colour(c), drop: checked(fld(drop_panel(), field::PANELS_D_DROP), sym::PANELS_CB_DROP), ai: checked(fld(drop_panel(), field::PANELS_D_AI), sym::PANELS_CB_AI) })
+    let (c, text) = information(fld(drop_panel(), field::PANELS_D_TEXT()))?;
+    Some(Drop { text, colour: buttons::colour(c), drop: checked(fld(drop_panel(), field::PANELS_D_DROP()), sym::PANELS_CB_DROP), ai: checked(fld(drop_panel(), field::PANELS_D_AI()), sym::PANELS_CB_AI) })
 }
 
 // ---- the wait for the other players' loads --------------------------------------------
@@ -351,8 +354,8 @@ pub fn load_wait() -> Option<(f32, String)> {
     if !load_shown() {
         return None;
     }
-    let t = fld(load_panel(), field::PANELS_L_TEXT);
-    let ms = if t != 0 { unsafe { rd::<i32>(t + field::PANELS_L_MS) } } else { 0 };
+    let t = fld(load_panel(), field::PANELS_L_TEXT());
+    let ms = if t != 0 { unsafe { rd::<i32>(t + field::PANELS_L_MS()) } } else { 0 };
     let text = information(t).map(|i| i.1).unwrap_or_default();
     Some((ms.max(0) as f32 / 1000.0, text))
 }
@@ -364,7 +367,7 @@ pub fn functions_stock() -> bool {
     }
     // `StandardText::GetInformation` is called through each text's own vtable; the
     // three classes' entries must be theirs.
-    let gi = |vt: a2engine::Sym, slot: a2engine::Sym, f: a2engine::Sym| fld(addr(vt), field::PANELS_VT_GET_INFORMATION) == addr(f) && fld(addr(slot), 0) == addr(f);
+    let gi = |vt: a2engine::Sym, slot: a2engine::Sym, f: a2engine::Sym| fld(addr(vt), field::PANELS_VT_GET_INFORMATION()) == addr(f) && fld(addr(slot), 0) == addr(f);
     gi(sym::PANELS_VT_DROP_TEXT, sym::PANELS_DROP_TEXT_SLOT, sym::PANELS_DROP_TEXT_INFO)
         && gi(sym::PANELS_VT_LOAD_TEXT, sym::PANELS_LOAD_TEXT_SLOT, sym::PANELS_LOAD_TEXT_INFO)
         // `ToggleButton::mButtonPressFunction`, which `buttons::press` calls for a toggle

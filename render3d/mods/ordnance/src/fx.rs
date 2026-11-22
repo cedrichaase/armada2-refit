@@ -366,10 +366,15 @@ pub struct Fx {
 }
 
 impl Fx {
-    /// The recipes of `[Ordnance.<odf>]` and `[Wave.<odf>]` sections, by name.
+    /// The recipes of `[Ordnance.<odf>]` and `[Wave.<odf>]` sections, by the ODF each
+    /// draws: its own name, or where the content set names ODFs (`[Names]`), the ODFs
+    /// named for it, and its own name only for a section `Render3D.ini` alone has.
     fn load_recipes(s: &Settings) -> (Vec<Recipe>, BTreeMap<(String, bool), usize>) {
+        let names = super::content::get().names;
         let mut recipes = Vec::new();
         let mut by_name = BTreeMap::new();
+        // (lower-case section name without its prefix, wave) -> recipe.
+        let mut by_sec = BTreeMap::new();
         for sec in s.sections() {
             let (wave, name) = if let Some(n) = sec.strip_prefix("Ordnance.") {
                 (false, n)
@@ -379,11 +384,27 @@ impl Fx {
                 continue;
             };
             let key = (crate::rt::lower(name), wave);
-            if by_name.contains_key(&key) {
+            if by_sec.contains_key(&key) {
                 continue;
             }
-            by_name.insert(key, recipes.len());
+            by_sec.insert(key.clone(), recipes.len());
+            if names.is_empty() || !s.builtin(&sec) {
+                by_name.insert(key, recipes.len());
+            }
             recipes.push(Recipe::load(s, &sec, name, wave));
+        }
+        for &(odf, sec) in names {
+            let (wave, odf) = match (odf.strip_prefix("Ordnance."), odf.strip_prefix("Wave.")) {
+                (Some(o), _) => (false, o),
+                (_, Some(o)) => (true, o),
+                _ => continue,
+            };
+            match by_sec.get(&(crate::rt::lower(sec), wave)) {
+                Some(&rc) => {
+                    by_name.entry((crate::rt::lower(odf), wave)).or_insert(rc);
+                }
+                None => crate::log!("ordnance: the content set names {} for recipe {}, which there is none of", odf, sec),
+            }
         }
         (recipes, by_name)
     }

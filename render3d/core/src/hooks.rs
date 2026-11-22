@@ -51,6 +51,9 @@ pub enum Kind {
     Call,
     /// Slot `slot` of the vtable at `vt`, written.
     Slot { vt: usize, slot: usize },
+    /// A function's entry, its first `len` bytes moved to a trampoline
+    /// (`Hooks::install_entry`; never through `install`).
+    Entry { len: usize },
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -157,6 +160,14 @@ impl Hooks {
         t.engine().ready(hk).is_ok()
     }
 
+    /// Whether the matched build has every address of `hk` at all (no check, nothing
+    /// logged): for a hook only a child build (Roots) has, asked before `ready` so that
+    /// stock, which never uses it, logs no stand-down for it.
+    pub fn present(&mut self, t: &'static a2engine::Table, hk: a2engine::HookId) -> bool {
+        engine::start_table(self.name, t);
+        t.engine().present(hk)
+    }
+
     /// A hook the owner cannot draw without did not install: it is not switched on.
     pub fn stand_down(&mut self, why: &'static str) {
         if self.down.is_none() {
@@ -183,6 +194,7 @@ impl Hooks {
                 }
                 engine::field(vt, slot * 4)
             }
+            Kind::Entry { .. } => return None,
         };
         if h.site.expect == 0 || cur == h.site.expect {
             return Some((cur, false));
@@ -210,6 +222,7 @@ impl Hooks {
         let ok = match h.kind {
             Kind::Call => hook::patch_call(h.site.addr, cur, h.to),
             Kind::Slot { vt, slot } => hook::patch_slot(vt, slot, h.to) == Some(cur),
+            Kind::Entry { .. } => false,
         };
         if !ok {
             log!("hooks: {} {} at {} ({:#x}) could not be written: {} stands down for {}", self.name, h.used_by, h.site.symbol, h.site.addr, self.name, h.used_by);
@@ -219,6 +232,45 @@ impl Hooks {
         let prev = Prev(cur);
         #[allow(static_mut_refs)]
         unsafe { INSTALLED.push(Installed { owner: self.name, hook: h, prev, chained }) };
+        Some(prev)
+    }
+
+    /// A callee hook (PLAN-FLEETOPS.md, "The rules of (c)", rule 4): the function `f` of
+    /// `t` detoured at its entry, for a build where another module owns the call sites
+    /// that matter and calls the function through a pointer of its own. The first `len`
+    /// bytes (whole instructions, a value of the profile) move to a trampoline, which
+    /// `Prev` is: the detour calls it to run the function as it was. They must lie within
+    /// the bytes the profile checks at the entry, which `ready` compared with memory, and
+    /// must still be there (another plugin's detour at the entry makes this stand down:
+    /// an entry is never chained). The caller has checked its hook is ready. Logged.
+    pub fn install_entry(&mut self, used_by: &'static str, t: &'static a2engine::Table, f: a2engine::Sym, len: usize, to: usize) -> Option<Prev> {
+        const N: usize = 4;
+        const SIZE: usize = 32;
+        #[repr(align(16))]
+        struct Pool([[u8; SIZE]; N]);
+        static mut POOL: Pool = Pool([[0xcc; SIZE]; N]);
+        static mut USED: usize = 0;
+        let e = t.engine();
+        let at = e.addr(f);
+        let (symbol, _, _) = e.site(f);
+        let check = e.check_bytes(f);
+        let k = unsafe { USED };
+        if at == 0 || k >= N || len < 5 || len > check.len() {
+            log!("hooks: {} {} at {} ({:#x}): the entry cannot be moved ({} of {} checked bytes): {} stands down for {}", self.name, used_by, symbol, at, len, check.len(), self.name, used_by);
+            return None;
+        }
+        #[allow(static_mut_refs)]
+        let tramp: &'static mut [u8] = unsafe { &mut POOL.0[k] };
+        if !hook::patch_entry(at, check, len, to, tramp) {
+            log!("hooks: {} {} at {} ({:#x}) entry not stock: {} stands down for {}", self.name, used_by, symbol, at, self.name, used_by);
+            return None;
+        }
+        unsafe { USED = k + 1 };
+        let prev = Prev(tramp.as_ptr() as usize);
+        log!("hooks: {} {} at {} ({:#x}) installed at the entry ({} bytes moved)", self.name, used_by, symbol, at, len);
+        let h = Hook { owner: self.owner, used_by, kind: Kind::Entry { len }, site: Site { symbol, addr: at, expect: 0 }, to, chain: false };
+        #[allow(static_mut_refs)]
+        unsafe { INSTALLED.push(Installed { owner: self.name, hook: h, prev, chained: false }) };
         Some(prev)
     }
 }

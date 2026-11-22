@@ -86,7 +86,7 @@ unsafe extern "system" fn gdi_get_device_caps(dc: P, n: i32) -> i32 {
 /// The import-table entry of `dll!name` in the exe, or None.
 fn iat_slot(base: usize, dll: &str, name: &str) -> Option<*mut usize> {
     unsafe {
-        let nt = base + *((base + 0x3c) as *const u32) as usize;
+        let nt = base + *((base + 0x3c) as *const u32) as usize; // PE header
         let dir = nt + 0x18 + 0x60 + 8; // OptionalHeader.DataDirectory[IMPORT]
         let rva = *(dir as *const u32) as usize;
         if rva == 0 {
@@ -145,7 +145,7 @@ pub fn install() -> usize {
         let Some(slot) = iat_slot(base, dll, name) else { continue };
         let cur = unsafe { *slot };
         // Bound: an address outside the exe (an unbound entry is an RVA to the name).
-        let image = unsafe { *((base + *((base + 0x3c) as *const u32) as usize + 0x50) as *const u32) } as usize;
+        let image = unsafe { *((base + *((base + 0x3c) as *const u32) as usize + 0x50) as *const u32) } as usize; // PE header
         if cur < 0x10000 || (cur >= base && cur < base + image) {
             log!("user32: {}!{} not bound yet, left alone", dll, name);
             continue;

@@ -10,8 +10,8 @@ your settings in the game.
 
 Gate W: native Windows 10 or 11
 -------------------------------
-1. Install the newest pre-release of Armada II Refit with the GUI installer (or the
-   zip). Unzip this folder somewhere writable.
+1. Install the release under test (the newest untested release) of Armada II Refit
+   with the GUI installer (or the zip). Unzip this folder somewhere writable.
 2. In PowerShell, in this folder:
 
        powershell -ExecutionPolicy Bypass -File .\gate-windows.ps1 -Game "<game directory>"

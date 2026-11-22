@@ -28,8 +28,9 @@ folder has:
 
 - a **`README.md`** — how the layer works and *why*: derivations, measurements, traps;
 - a **`CHANGELOG.md`** — *what* changed, when, at which version, and whether it has been
-  seen in game. **Read it before assuming the state of a layer**, and update it with
-  every change (see "Changelogs and versions").
+  seen in game. **Read it before assuming the state of a layer**, together with the
+  pending changesets in `.changeset/` that name it (`tools/changeset.py status`). Every
+  change adds a changeset; the release writes the entry (see "Changelogs and versions").
 
 The root `CHANGELOG.md` is the project's: the modpack version and the layer versions
 it bundles.
@@ -40,7 +41,7 @@ it bundles.
 | `rules/` | `QOLRules.asi` — the one change every player of a network game must share (pay when queuing, refund on cancel: QOL-7, `PayOnQueue`, on by default). A layer of its own, `scope = 'match'`: a player without it makes the game play stock rules for everyone; Online finds it by its export (`QOLRules_Wanted`) | `rules/README.md` |
 | `render3d/` | `Render3D.asi` — the 3D view through a renderer of our own, in `no_std` Rust, a workspace: the cdylib `render3d/src/lib.rs` (one Cargo feature per module), `core/` (`r3d-core`: frame, gfx, scene, assets, `core/src/engine/`, the menu scene, module/registry/hooks/services/recipes) and one crate per module under `mods/<m>/` that depends on the core alone; engine knowledge on the engine profile (`profiles/gog-1.1/render3d[.<module>].toml`), no address in its sources; recipes in `render3d/content/{sky,surfaces,nebulae,ordnance,menu}/…`. Both views of `Armada_RenderAllOurStuff` drawn into a half-float MSAA target, bloomed by energy and tone-mapped into the back buffer; eight modules of its own (`[Modules]`: hulls, sky, particles, effects, ordnance, specials, world, overlays) draw every category (hulls with the scene lights and shadows, sky, particles, ordnance, effects, the special weapons' effects, planets, moons, asteroids and nebulae, fog and selection) from the game's assets, with its own cosmetic simulation (`PLAN.md`). Each module is live (its Refit row applies at once) and a module at 0 hands its category back to Display8's passthrough. It replaced the per-part plugins (MSAA, Lighting, Sky, Nebulae, Surfaces, Explosions, Shields, Repair, Venting, Specials, Fog and Planets), which were removed from the repository; their recipes live under `render3d/content/`, and `retire/` takes out any of those plugins an earlier install left | `render3d/README.md`, `render3d/PLAN.md` |
 | `ui/` | `UI.asi` — the game's whole 2D side, in `no_std` Rust like render3d: a 2D renderer on the Display8 device (SDF text from a vendored OFL font, rounded panels, nine-slices), immediate-mode widgets, input with capture, and hooks into a mission's frame, the front end (the menus it hosts and draws, `[Menus]`, `MENUS.md`, and the Refit screen) and the loading screen. Its HUD panels and button bar (`[HUD]`, `HUD.md`) replaced the legacy `HUD.asi`, `GridLayout.asi` and `Menus.asi`, which are gone; every part is on in the shipped `UI.ini` (a key at 0 gives a part back to the engine, drawn by Display8's passthrough). `ui/backdrops/` builds the widescreen plates the menus composite (`backdrop.sh`, `install-plates.sh`); `ui/bench-asi.sh` puts a working copy's build in a bench clone | `ui/README.md`, `ui/PLAN.md`, `ui/STYLE.md`, `ui/backdrops/BACKDROPS.md` |
-| `display/` | `d3d8.dll`, "Display8": the game's Direct3D 8, ours — the only one: nothing stands behind it. Its devices accept everything the engine does and draw nothing; render3d and the UI draw the frame on Display8's own Vulkan or Direct3D 12 device (`Backend=auto\|vulkan\|d3d12\|none`, `auto` shipped), and Display8 draws, by passthrough, whatever no plugin claims. When neither backend starts, or with `Backend=none`, it hands the game the system's own `d3d8.dll` (the bail-out) and the plugins stand down. No forward mode, no Direct3D 9. The contract with the plugins is `gpu/src/display.rs` (1.4); `[Window]` (the display mode, `KeepClip`) and `[Samplers]` (anisotropy and LOD bias) are its ini sections. On the bench it traces every call by context and caller (`Display8.inventory.tsv`), names the engine's draws (`Display8.go`) and drops them by category (`[Drop]`). `display/d12probe/` and `display/vkprobe/` are the native gates' probes | `display/README.md` |
+| `display/` | `d3d8.dll`, "Display8": the game's Direct3D 8, ours — the only one: nothing stands behind it. Its devices accept everything the engine does and draw nothing; render3d and the UI draw the frame on Display8's own Vulkan or Direct3D 12 device (`Backend=auto\|vulkan\|d3d12\|none`, `auto` shipped), and Display8 draws, by passthrough, whatever no plugin claims. When neither backend starts, or with `Backend=none`, it hands the game the system's own `d3d8.dll` (the bail-out) and the plugins stand down. No forward mode, no Direct3D 9. The contract with the plugins is `gpu/src/display.rs` (1.5); `[Window]` (the display mode, `KeepClip`) and `[Samplers]` (anisotropy and LOD bias) are its ini sections. On the bench it traces every call by context and caller (`Display8.inventory.tsv`), names the engine's draws (`Display8.go`) and drops them by category (`[Drop]`). `display/d12probe/` and `display/vkprobe/` are the native gates' probes | `display/README.md` |
 | `retire/` | not a layer: `retire.sh`, which takes out of a game directory everything an earlier version put in and nothing installs any more, by the table in `known.txt` — the legacy `HUD`, `GridLayout`, `Menus` and `MenuScale` plugins, the twelve per-part render3d plugins, the font atlases, cursors, UI configs and loading screen that `hud-files.py` puts back from their backups, the vkBasalt bloom, and with `--chain` (which `./install` passes) the old Direct3D chain (`d3d8_real.dll`, `d3d9.dll`, a marked `dxvk.conf`, whose samplers go into `Display8.ini` `[Samplers]` first). `./install`, `render3d/install.sh`, `ui/bench-asi.sh` and the release installers run it; `history/` holds the changelogs of the deleted `hud`, `grid`, `menus` and `renderer` layers | `retire/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 83 `targets/` — recipes only | `textures/README.md` |
 | `models/` | 3D geometry — the smoothed dilithium moons (`moon-sod.py`) and asteroids (`asteroid-sod.py`), and the other SOD rewrites. The planets' sphere is render3d's; the widened loading screen is gone (the UI draws the loading screen) | `models/README.md` |
@@ -48,11 +49,12 @@ it bundles.
 | `online/` | `Online.asi` — online multiplayer: the *Internet – Online* menu entry, our own `IDirectPlay8Peer` over UDP (`peer.c`), and `server/a2online-server.py` for join codes, hole punching and the relay, public at `c20e.de:2399` (the default `Server=`; the bench blanks it). A layer of `./install` and `a2mod`, `scope = 'match'` | `online/README.md` |
 | `platform/` | what `a2mod` never switches: the ASI loader, the widescreen patch, Heroic/Proton and their Wine overrides (`winmm=n,b;d3d8=n,b`); `vendor/` holds the third-party binaries we may redistribute. It carries no Direct3D chain any more (d3d8to9 and DXVK left in platform 4.0.0; `d3d8-chain.py --retire` takes an old one out) | `platform/README.md` |
 | `layers.toml` | not a folder: the layer registry, every layer once (id, install and remove commands, files, backups, `select` = core / on / off / retired, `requires`, `scope` = local / match, `games`, release `steps`). `tools/layers.py` is its only reader; `./install`, `a2mod`, the bench (`--layers`, `Layers:`), `publish/package.sh`, the release scripts and the GUI installer take their layer lists from it, and `tools/layers.py --check` (CI) fails when they disagree | `layers.toml`, `tools/layers.py` |
+| `games/` | not a layer, versioned by the root: one descriptor per game (`armada2.toml`, the default; `fo-roots.toml`, a stub not offered), "which game" as data — its executable and data folder, Heroic and GOG ids, default folder and prefix names, settings file, shell resolution and HUD canvas, texture roots, data directory stem and the layers on offer. `a2env.py` reads it; `A2_PROFILE` or `--game` (on `./install`, `a2mod`, `a2test`, `tools/layers.py`, `a2env`) chooses the game; `tools/layers.py --check` holds it to `layers.toml` and `profiles/` | `games/README.md` |
 | `profiles/` | not a layer, versioned by the root: one directory per build of `Armada2.exe` (`build.toml` plus one `<plugin>[.<part>].toml` per plugin), only names, addresses, offsets and checks tied to hooks; `tools/engine/` generates the plugins' tables from it, lints it and tests the three resolvers. Another build (Fleet Operations: Roots, `PLAN-FLEETOPS.md`) is a new profile | `crates/a2engine/README.md`, `tools/engine/README.md` |
 | `crates/` | not a layer: `a2rt`, the one runtime of Display8, render3d and the UI (allocator, Win32, log, `sfmt!`, ini with the overlay lookup, files, in-memory patching, frame dumps), linked into each as its `rt`; `a2engine`, the resolver of `profiles/` (`no_std`; the C twin is `csdk/a2engine.h`, the host tools `tools/engine/`), which says which build of `Armada2.exe` is running and whether each hook may hook it; `a2fmt`, the readers of the game's SOD, TGA, `.spr` and ODF files | `crates/a2engine/README.md`, `crates/a2rt/src/lib.rs`, `crates/a2fmt/README.md` |
 | `crates/a2ini` | not a layer: the ini parser (shared by reader and writer) and `edit`, the line-keeping writer of the player's overlay `RefitPlayer.ini`, `no_std`, host-tested on `tools/settings/fixtures/` | `tools/settings/README.md` |
 | `tools/settings/` | not a layer: the settings contracts (A2SET_ABI 1.1) — `gen.py` writes each layer's `settings_table` (the descriptor row itself is written by hand in `a2rt` and `a2asi.h`: neither has generated regions), `lint.py` checks the tables, `host.sh` builds the `a2ini` host binary, the one overlay editor, which `overlay.py` wraps for the bench (the GUI installer only reads the overlay, for its report), `move-keys.py` moves a row's `moved_from` key in the plugin inis, `selftest.sh`, `bench-overlay.sh`. Installers, `a2mod` and the release never write, ship or remove `RefitPlayer.ini`; the Refit screen is its only writer in the game. Its sections are `[<Stem>.<Section>]`, the plugin ini's name and section (`[Render3D.Modules]`, `[UI.HUD]`, `[Display8.Display8]`) | `tools/settings/README.md` |
-| `tools/` (the rest) | not layers: `ini-merge.py`, the one ini merge (keys added, the player's values kept, retired defaults moved); `layers.py` (above); `doclinks.py`, which checks the relative links and anchors of every tracked `.md` (run it after moving a file or renaming a heading); `engine/` (the profile tools); `gates/` (the native gates' kit: `gate-windows.ps1`, `gate-macos.sh`, `GATES.txt`; CI attaches it as `native-gates-<commit>`; a test tool like the bench, not an installer); `shaderc/` (below) | `tools/ini-merge.py`, `tools/gates/GATES.txt` |
+| `tools/` (the rest) | not layers: `ini-merge.py`, the one ini merge (keys added, the player's values kept, retired defaults moved); `layers.py` (above); `changeset.py`, the changesets and the release's version step (`.changeset/README.md`); `doclinks.py`, which checks the relative links and anchors of every tracked `.md` (run it after moving a file or renaming a heading); `engine/` (the profile tools); `gates/` (the native gates' kit: `gate-windows.ps1`, `gate-macos.sh`, `GATES.txt`; CI attaches it as `native-gates-<commit>`; a test tool like the bench, not an installer); `shaderc/` (below) | `tools/ini-merge.py`, `tools/gates/GATES.txt` |
 | `csdk/` | not a layer: `a2asi.h`, the header-only base the C plugins (`qol/`, `rules/`, `online/`, `cutscenes/binkproxy/`) are built on (Win32 types and imports, string and log helpers, signature checks, `VirtualProtect` patching, the overlay lookup), `a2engine.h`, and `def/`, their one set of import-library `.def` files | `csdk/a2asi.h` |
 | `gpu/` | not a layer: the graphics interface render3d and the UI draw through (`no_std`, linked into each), on Display8's Vulkan or Direct3D 12 device — no Direct3D 9 (gpu 2.0.0); stood down (nothing drawn) with none; `gpu/shaders/compat.hlsli` lets one HLSL source build SPIR-V and DXIL (dxc only) | `gpu/README.md` |
 | `tools/shaderc/` | not a layer: the shader compiler scripts every crate with shaders builds through (`hlsl-rs.sh` to SPIR-V and DXIL, the pinned dxc fetcher, `verify-generated.sh`, which CI runs); installs nothing, versioned by the root | `render3d/README.md`, "One source, two forms" |
@@ -60,7 +62,7 @@ it bundles.
 | `films/` | `./a2film`: storyboards (`films/<name>/storyboard.md`) filmed on the test bench — probes at 1280x720 in parallel, final takes at 4K — and cut into a rough cut and an edit manifest. Installs nothing | `films/README.md`, the `film` skill |
 | `publish/` | what may be published and the check that enforces it. Installs nothing; versioned by the root | `publish/README.md` |
 | `gui-installer/` | `armada2-refit-installer.py`, the graphical installer for Linux (GTK 4 and libadwaita, released as an AppImage), Windows and macOS (Tk, frozen by PyInstaller into a portable `.exe` and a universal2 `.app`), over a starfield drawn in code: installs GitHub release zips, cached, with a choice of layers, and writes the launch settings (Heroic's variables on Linux, the Wine prefix's registry on macOS; Windows needs none). Versioned on its own, with the release-package schema it reads (`manifest.json`, the scripts' `::step` lines). Leaves out textures and cutscenes for now | `gui-installer/README.md` |
-| `PLAYING.md`, `MODDING.md` | not code: the two published guides. `PLAYING.md` is for players (installing, the Refit screen, `RefitPlayer.ini`, the backends and the bail-out, logs, troubleshooting, uninstalling); `MODDING.md` is for modders (which unit needs what, the contracts and their versions, the symbol profiles, building one layer). The root `README.md` is the front page and links both | `PLAYING.md`, `MODDING.md` |
+| `PLAYING.md`, `MODDING.md` | not code: the two published guides. `PLAYING.md` is for players (installing, the Refit screen, `RefitPlayer.ini`, the backends and the bail-out, logs, troubleshooting, uninstalling); `MODDING.md` is for modders (which unit needs what, the contracts and their versions, the symbol profiles, building one layer). `BUILDING.md` is the build from source, toolchain included (Windows through WSL2, or Linux): keep it true when a build step or a required tool changes. The root `README.md` is the front page and links all three | `PLAYING.md`, `MODDING.md` |
 
 `./a2mod` is the entry point and stays at the root, with `./a2test` beside it for
 testing, `./a2film` for films, `./a2tex` for textures, `./install`, which installs every
@@ -69,11 +71,15 @@ layer `layers.toml` selects (`--only`, `--without`), and
 `ROOT=textures/`, so everything under `textures/` addresses `$ROOT/lib`,
 `$ROOT/targets` and `$ROOT/tools`.
 
-**Never hard-code a path to the game, its prefix or Proton.** Source `a2env.sh` (shell)
-or `import a2env` (Python, with the repository root on `sys.path`): they resolve
-`A2_GAME`, `A2_PREFIX`, `A2_PROTON` and `A2_DATA` (where assets live, default
-`~/.local/share/armada2-refit`; never a working tree) from the environment, then
-`~/.config/armada2-refit.conf`, then the default location.
+**Never hard-code a path to the game, its prefix or Proton, or the game's executable.**
+Source `a2env.sh` (shell) or `import a2env` (Python, with the repository root on
+`sys.path`): they resolve `A2_GAME`, `A2_PREFIX`, `A2_PROTON` and `A2_DATA` (where assets
+live, default `~/.local/share/armada2-refit`; never a working tree) from the environment,
+then `~/.config/armada2-refit.conf`, then the chosen game's descriptor
+(`games/<id>.toml`; `A2_PROFILE`, default `armada2`), and add `A2_PROFILE` and `A2_EXE`.
+`a2env.py` is the one implementation: `a2env.sh` evaluates its `--sh` output, so there is
+no pair to keep in step. A Python tool that takes `--game` calls
+`a2env.use(a2env.take_game_arg(sys.argv))` before it reads the paths.
 
 **To see a change working in the game without taking over the user's screen, use the
 test bench**: `./a2test session start --res 21:9`, then `./a2test drive --session ID shot`
@@ -133,18 +139,36 @@ Required reading, by task:
 
 ## Changelogs and versions
 
-Every layer folder in the table above has a `CHANGELOG.md` with its own semver version.
-The root `CHANGELOG.md` versions the project as a whole. **A commit that changes a layer
-updates that layer's changelog and the root one in the same commit**, with the version
-bumped. A changelog that is updated "later" gets forgotten.
+Every layer folder in the table above has a `CHANGELOG.md` with its own semver version,
+and so do `gui-installer/`, `testbench/` and `films/` (`.changeset/config.toml`). The
+root `CHANGELOG.md` versions the project as a whole. **Versions are never edited by hand.**
+A change records itself as a **changeset**: a small file in `.changeset/` that names the
+layers it touches, the bump each takes, its in-game status and what changed.
+The release assigns the numbers (`.changeset/README.md` has the format).
 
-**What gets an entry:** anything that changes what a layer installs into the game, how
+    python3 tools/changeset.py add --layers render3d,qol --bump minor --section Added -m "..."
+    python3 tools/changeset.py status      # each layer's current -> next version, and why
+
+**Each game has its own version track.** A changeset names its games (`games: [armada2]`,
+the default of `add`; `--games armada2,fo-roots`). Armada II's track is the version files
+and the published changelogs; another game's is only `games/<id>/CHANGELOG.md`, written by
+hand with `changeset.py version --game <id>`. A changeset on Armada II's track never names
+a game that is not offered (`check` fails): word it neutrally, or split off a changeset
+for that game alone (`.changeset/README.md`, "Games").
+
+**A commit that changes a layer adds a changeset in the same commit**, or edits the
+branch's changeset for that work. A changeset written "later" gets forgotten. Do not touch
+a `## X.Y.Z` heading, a `Cargo.toml` version or `INSTALLER_VERSION`.
+`tools/changeset.py check` (CI) fails when a version file disagrees with its changelog,
+and a pull request fails when it changes a version by hand.
+
+**What gets a changeset:** anything that changes what a layer installs into the game, how
 it builds, or its interface (CLI flags, `target.conf`/`.ini`/`.conf` keys, backup
 names). This includes tuning changes like a new blend, seed or threshold, and a revert
-of shipped work. **No entry:** changes to docs and notes only, and scratch work that
+of shipped work. **None:** changes to docs and notes only, and scratch work that
 installs nothing.
 
-**Which part to bump:**
+**Which bump** (the changeset's `bump:`, or `<layer>: <bump>` per layer):
 
 | Bump | When | Examples here |
 |---|---|---|
@@ -152,28 +176,55 @@ installs nothing.
 | MINOR | new content or capability: new targets or texture classes installed, a new menu handled, a new key, flag or tool | the five faction targets; `Embed=1`; `NoiseFloor=` |
 | PATCH | a fix or re-tune behind the same interface | Sovereign blend 35 → 70; main-menu plate seed 6; the `Mmoon` sun-box fix |
 
-The **project version** takes the largest bump among the layers the change touches.
-Changes that belong to no one layer, such as `a2mod`, the repo layout or a cross-layer
-convention, bump only the root. Every root entry lists the new version of each layer it
-touches, for example `menus 1.1.0, textures 1.0.1`.
+At release, each layer's next version is its current one plus the largest bump among the
+pending changesets that name it. The **project version** is the current root plus the
+largest bump of all of them. Changes that belong to no one layer, such as `a2mod`, the
+repo layout or a cross-layer convention, name `root` (`layers: [root]`) and bump only
+the project. The release writes the root entry with the `Layers:` line listing each
+layer's new version.
 
-**Entry format.** Newest first, headed `## X.Y.Z — YYYY-MM-DD`, then `Added` / `Changed`
-/ `Fixed` / `Removed` as needed. Each item is one or two lines saying *what* changed,
-naming the key or target, with the commit hash once there is one. The *why* stays in
-the layer's README. Do not copy derivations into a changelog, and do not copy status
-("confirmed in game", dates, accepted seeds) into this file — that is what the
-changelogs are for.
+**Entry format** (written by `changeset.py version`, newest first): a heading
+`## X.Y.Z — YYYY-MM-DD`, then `Added` / `Changed` / `Fixed` / `Removed`. Each item is one
+or two lines saying *what* changed, naming the key or target, and ends with the hash of
+the commit that added its changeset. The *why* stays in the layer's README. Do not copy
+derivations into a changeset, and do not copy status ("confirmed in game", dates,
+accepted seeds) into this file: status belongs in the changeset and its entry.
 
-**In-game status goes in the entry.** End every entry with "Installed, not yet seen in
-game" or "Confirmed in game". When the user confirms later, **replace** "Installed, not
-yet seen in game" with `Confirmed in game YYYY-MM-DD` and do not bump. Don't keep both:
-an entry that still says "not yet seen" after it has been seen is misleading. This is the
-one permitted edit to an entry that has already been released. A rejection is not a status line. It is a new entry
-that reverts the change, like the font's `--method runs`.
+**In-game status goes in the changeset.** Its `status:` line, by default "Installed, not
+yet seen in game", ends the entry the release writes, and makes the release an
+**untested release** (GitHub's *Pre-release* flag). So does a line starting "Untested"
+(seen, but not past the Windows gate). When the user confirms the change **before it is
+released**, edit the changeset: `status: Confirmed in game YYYY-MM-DD`. When the user
+confirms it **after release**, replace "Installed, not yet seen in game" with
+`Confirmed in game YYYY-MM-DD` in the layer and root entries and do not bump. That is
+the one permitted edit to a released entry. Don't keep both: an entry that still says
+"not yet seen" after it has been seen is misleading. A rejection is not a status line.
+It is a new changeset that reverts the change, like the font's `--method runs`.
 
-**Parallel worktrees** will both claim the next number. Whichever branch merges second
-renumbers its entries (layer and root) while resolving the conflict. Never leave two
-entries with the same version.
+**Releasing** (`publish/README.md`, "Releasing"). The user starts it by hand: the
+Release workflow runs `changeset.py version --commit` on main and opens the pull request
+"Release X.Y.Z". **Merging that PR publishes vX.Y.Z** (with a merge commit or a rebase; do not squash). CI recognises the merge by the
+release commit's `Release-Version` trailer, and no other push releases anything. Every
+push to main also publishes a **pre-release**, `vX.Y.Z-pre.N`, the build of the latest
+main (N is CI's run number; the newest three are kept). The GUI installer offers the
+newest last, as "Pre-release (latest main)", but never picks it for the player. Do not confuse it with an **untested release**, a
+`vX.Y.Z` not yet seen in game. Never run `changeset.py version` on a work branch: only
+the release branch does that.
+
+**Parallel worktrees** no longer clash over numbers: each branch adds its own changeset
+files, which merge without conflict, and no branch assigns a version. Name a changeset
+after its work (`move-paths.md`), not a number.
+
+**A branch with hand-numbered entries** (begun before changesets, such as
+`ar-integration` or `move-queue-2`) converts them before it merges:
+`python3 tools/changeset.py convert` (against its merge-base with `origin/main`, or
+`--base REF`; `--dry-run` first). This turns each layer's new entries into
+`.changeset/converted-<layer>.md`, with the bump from main's version to the branch's
+newest and the status lifted out of the text ("not yet seen" wins). It then takes the
+entries out of the changelogs and puts the version files (`Cargo.toml`, `Cargo.lock`,
+`INSTALLER_VERSION`) back to main's. Root entries are dropped when the branch has layer
+entries, because those carry the items, so read the note it prints. Review the changesets,
+commit, then merge `origin/main`. The changelogs no longer conflict.
 
 ## Finishing work
 
@@ -181,13 +232,15 @@ Work is done when the user has confirmed it working in game **and** signed it of
 done. A test launch, or a passing `verify`, does not count. Then, without being asked
 again, finish in this order:
 
-1. **Record the confirmation** on the branch: `Confirmed in game YYYY-MM-DD` in place
-   of "Installed, not yet seen in game", in the layer and root changelogs (above), and
-   commit.
+1. **Record the confirmation** on the branch: `status: Confirmed in game YYYY-MM-DD` in
+   the branch's changeset(s) (above), and commit. If the work was already released, edit
+   the released entries instead.
 2. **Merge into `main`** from the main checkout, with
-   `git merge --no-ff <branch> -m "Merge <branch>: <what>"`. Resolve version clashes as
-   "Parallel worktrees" says. Don't push unless the user asks: a push to `main` that
-   bumps the root version publishes a GitHub Release (`publish/README.md`).
+   `git merge --no-ff <branch> -m "Merge <branch>: <what>"`. There are no version numbers
+   to resolve: changesets merge side by side. Don't push unless the user asks. A push to
+   `main` publishes the pre-release (the latest main), and no versioned release:
+   releasing is the user's call, through the Release workflow and its pull request
+   (`publish/README.md`, "Releasing").
 3. **Clean up.** Remove the worktree (`git worktree remove`) and delete its branch
    (`git branch -d`). Then do the same for any other worktree whose branch
    `git branch --merged main` lists. Use only the safe forms, never `--force` or
@@ -664,7 +717,9 @@ Two rules from them still bind:
   which also hands a hook back (the engine's own call runs) when the module is off or a
   symbol is unresolved; engine addresses, offsets and checks come from the symbol
   profile (`profiles/gog-1.1/render3d[.<module>].toml`), never from a literal in a
-  source. A hook whose symbols are not all resolved stands down and logs which one.
+  source: a struct offset is a `field` entry read at run time (`field::X()`, the
+  matched build's), and `lint-layers.sh` rule 1 fails on a literal one. A hook whose
+  symbols are not all resolved stands down and logs which one.
   Modules talk through capabilities and services, not by name; module order is an
   explicit priority.
 - **The seam is the two calls of `Armada_RenderAllOurStuff`.** If either site is not
@@ -776,7 +831,7 @@ Two rules from them still bind:
   plugin samples is a mirror (`stub/mod.rs`); the gamma ramp is the frame's last pass.
 - **One device and one frame for both plugins**: Display8 owns them and hands them out
   through the plain C exports of `gpu/src/display.rs`, the contract both sides build
-  against (version 1.4; a major mismatch makes a plugin stand down and log both
+  against (version 1.5; a major mismatch makes a plugin stand down and log both
   versions; minors only append). Change both sides together. The plugins register
   their claims through it (`display8v1_register`), never by looking for a DLL by name.
 - **Samplers** (`[Samplers]` in `Display8.ini`) are made as DXVK made them under the
@@ -797,8 +852,9 @@ Two rules from them still bind:
   `p10-fwd-*`, the last from the forward chain that no longer exists).
 - **The native gates are CI's and the user's, not the bench's**: `display/d12probe/` and
   `display/vkprobe/` run in CI (WARP with the Direct3D 12 debug layer; lavapipe) and in
-  the kit `tools/gates/` attaches as `native-gates-<commit>`. A release carries a
-  "Pre-release" line until the user's Windows gate has passed.
+  the kit `tools/gates/` attaches as `native-gates-<commit>`. A release stays an untested
+  release (an "Untested" status line; "Pre-release" before 15.10.0) until the user's
+  Windows gate has passed.
 
 ### ui
 

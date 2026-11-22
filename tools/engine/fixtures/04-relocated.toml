@@ -1,6 +1,7 @@
 # Build b1 mapped at 0x500000, not its ImageBase: every address moves by 0x100000
 # (the vtable's words are as the loader leaves them, relocated).
 set = "basic"
+field = ["fd", "fx"]
 base = 0x500000
 addr = ["f1", "c1", "s1", "g1", "fd", "v1", "sc1"]
 
@@ -34,9 +35,9 @@ word = [
 
 [expect]
 p = [
-  "engine: Armada2.exe timestamp 0x5eed0001, image size 0x6000, sections 0x777d215e",
+  "engine: Test.exe timestamp 0x5eed0001, image size 0x6000, sections 0x777d215e",
   "engine: build test/b1",
-  "engine: symbols: 13/14 resolved; 0 hooks blocked",
+  "engine: symbols: 13/15 resolved; 0 hooks blocked",
   "ready p.fnhook ok",
   "engine: p.chained: One::chainer at 0x501210 calls 0x80000000 (chained)",
   "ready p.chained ok",
@@ -47,19 +48,24 @@ p = [
   "ready p.wrongslot fail",
   "engine: p.badcheck stands down: One::f2 is not stock (bytes differ)",
   "ready p.badcheck fail",
+  "engine: p.fieldhook stands down: One has no address in b1",
+  "ready p.fieldhook fail",
   "addr f1 0x501000",
   "addr c1 0x501200",
   "addr s1 0x503004",
   "addr g1 0x504010",
   "addr fd 0x1c",
   "addr v1 0x280",
-  "note p.wrongcall Stands down: One::caller is not stock in this Armada2.exe",
-  "note p.wrongslot Stands down: One::vftable is not stock in this Armada2.exe",
-  "note p.badcheck Stands down: One::f2 is not stock in this Armada2.exe",
+  "field fd 0x1c",
+  "field fx 0x0",
+  "note p.wrongcall Stands down: One::caller is not stock in this Test.exe",
+  "note p.wrongslot Stands down: One::vftable is not stock in this Test.exe",
+  "note p.badcheck Stands down: One::f2 is not stock in this Test.exe",
+  "note p.fieldhook Stands down: One is not stock in this Test.exe",
   "note_plugin -",
 ]
 s = [
-  "engine: Armada2.exe timestamp 0x5eed0001, image size 0x6000, sections 0x777d215e",
+  "engine: Test.exe timestamp 0x5eed0001, image size 0x6000, sections 0x777d215e",
   "engine: build test/b1",
   "engine: symbols: 3/3 resolved; 0 hooks blocked",
   "ready s.scan1 ok",
@@ -68,7 +74,7 @@ s = [
   "engine: s.scan2 stands down: Two::twice is found 2 times, not 1",
   "ready s.scan2 fail",
   "addr sc1 0x501800",
-  "note s.scan0 Stands down: Two::missing is not stock in this Armada2.exe",
-  "note s.scan2 Stands down: Two::twice is not stock in this Armada2.exe",
+  "note s.scan0 Stands down: Two::missing is not stock in this Test.exe",
+  "note s.scan2 Stands down: Two::twice is not stock in this Test.exe",
   "note_plugin -",
 ]

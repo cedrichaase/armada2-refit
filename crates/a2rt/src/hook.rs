@@ -56,3 +56,46 @@ pub fn patch_bytes(at: usize, expect: &[u8], new: &[u8]) -> bool {
         writable(p, new.len(), || core::ptr::copy_nonoverlapping(new.as_ptr(), p, new.len()))
     }
 }
+
+/// Detours a function at its entry: the first `len` bytes (whole instructions that do not
+/// depend on where they sit, as the caller's `expect` vouches) are copied into `tramp`
+/// followed by a `jmp` back to `at + len`, and the entry becomes a `jmp` to `to` (the rest
+/// of the `len` bytes `nop`). Calling `tramp` then runs the function as it was. False, and
+/// nothing written, when the entry does not hold `expect`, `len` is under 5 or longer than
+/// `expect`, or `tramp` is too short. `tramp` is made executable and stays so: it must be
+/// memory that lives as long as the process (a static).
+pub fn patch_entry(at: usize, expect: &[u8], len: usize, to: usize, tramp: &mut [u8]) -> bool {
+    if len < 5 || len > expect.len() || tramp.len() < len + 5 || at == 0 {
+        return false;
+    }
+    let p = at as *mut u8;
+    unsafe {
+        if core::slice::from_raw_parts(p, expect.len()) != expect {
+            return false;
+        }
+        let t = tramp.as_mut_ptr();
+        let ok = writable(t, tramp.len(), || {
+            core::ptr::copy_nonoverlapping(p, t, len);
+            *t.add(len) = 0xe9;
+            let back = (at as i64 + len as i64 - (t as i64 + len as i64 + 5)) as i32;
+            core::ptr::write_unaligned(t.add(len + 1) as *mut i32, back);
+        });
+        if !ok {
+            return false;
+        }
+        // Keep the trampoline executable (`writable` put its old protection back).
+        let mut old = 0u32;
+        if VirtualProtect(t, tramp.len(), PAGE_EXECUTE_READWRITE, &mut old) == 0 {
+            return false;
+        }
+        FlushInstructionCache(GetCurrentProcess(), t, tramp.len());
+        writable(p, len, || {
+            *p = 0xe9;
+            let rel = (to as i64 - (at as i64 + 5)) as i32;
+            core::ptr::write_unaligned(p.add(1) as *mut i32, rel);
+            for i in 5..len {
+                *p.add(i) = 0x90;
+            }
+        })
+    }
+}

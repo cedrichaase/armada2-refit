@@ -1,0 +1,27 @@
+# A child of b1 told by the on-disk CRC-32s of .text and .test, and by a companion module
+# (08-companion-ok.toml's image): the Roots shape of FO-5's identity.
+schema = 1
+game = "test"
+build = "b4"
+label = "Fixture build 4"
+exe = ["Test.exe"]
+inherits = "b1"
+content = "stock"
+
+[pe]
+timestamp = 0x5eed0001
+image_size = 0x7800
+sections = 0x48172dda
+image_base = 0x400000
+code = [0x401000, 0x403000]
+file_crc = { ".text" = 0x72e45ba5, ".test" = 0x51a76db8 }
+
+# Comp.dll patches One::caller in memory; p.fnhook is verified beside it.
+[[module]]
+name = "Comp.dll"
+text_crc = 0xc0ffee11
+
+[[changed]]
+fn = "One::caller"
+how = "runtime"
+verified = ["p.fnhook"]

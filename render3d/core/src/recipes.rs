@@ -8,7 +8,6 @@
 //! sets"); a build with no set registers none.
 //!
 //! Staged in the one crate until the crates are split (`core/` then).
-use crate::rt;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -64,7 +63,7 @@ pub fn text(kind: &str, name: &str) -> Option<RecipeText> {
         let mut path = String::from(d);
         path.push_str(name);
         path.push_str(".ini");
-        if let Some(b) = rt::read_file(&rt::game_path(&path)) {
+        if let Some(b) = crate::files::open(&path) {
             return Some(RecipeText { text: String::from_utf8_lossy(&b).into_owned(), source: Source::Game });
         }
     }

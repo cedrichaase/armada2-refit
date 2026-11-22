@@ -141,7 +141,10 @@ pub fn event(event: u32, pass: *const VkPass8) {
     }
     let Some(p) = pt() else { return };
     match event {
-        PASS_ENTER => p.alive += 1,
+        PASS_ENTER => {
+            p.alive += 1;
+            crate::host::drew();
+        }
         _ => {
             p.alive = p.alive.saturating_sub(1);
             if event == PASS_PUBLISH && !pass.is_null() {
@@ -722,6 +725,7 @@ pub fn draw(v: &mut Vk, dv: &Dev, d: &Draw, fp: usize) {
         }
     }
     p.drawn += 1;
+    crate::host::engine_drew();
     if p.drawn.is_power_of_two() && p.drawn >= 1024 {
         log!("passthrough: {} draws of the engine's so far", p.drawn);
     } else if p.drawn == 1 {

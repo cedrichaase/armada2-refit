@@ -21,6 +21,7 @@ import itertools
 import json
 import os
 import re
+import shlex
 import shutil
 import signal
 import struct
@@ -103,15 +104,43 @@ def _group_has_members(pgid):
     return False
 
 
+def split_args(args):
+    """The game's arguments from one string: words, with a double-quoted run kept as one
+    (`-nointro "Blue Skies.bzn"`). Backslashes are kept as typed (`save\\s1.sav`)."""
+    out = []
+    for w in shlex.split(args or '', posix=False):
+        if len(w) >= 2 and w[0] == w[-1] and w[0] in '"\'':
+            w = w[1:-1]
+        out.append(w)
+    return out
+
+
 class GameError(Exception):
     pass
+
+
+def set_xml_value(path, key, value):
+    """`<key>old</key>` to `<key>value</key>` in Fleet Operations: Roots' Settings.xml,
+    the file otherwise untouched; a key the file does not have is added before the
+    closing tag."""
+    path = Path(path)
+    text = path.read_text(encoding='utf-8-sig', errors='replace')
+    pat = re.compile(r'(<%s>)[^<]*(</%s>)' % (re.escape(key), re.escape(key)))
+    if pat.search(text):
+        text = pat.sub(lambda m: f'{m.group(1)}{value}{m.group(2)}', text, count=1)
+    else:
+        i = text.rfind('</')
+        if i < 0:
+            raise GameError(f'{path}: not a Settings.xml (no closing tag)')
+        text = text[:i] + f'\t<{key}>{value}</{key}>\n' + text[i:]
+    path.write_text(text, encoding='utf-8')
 
 
 def exe_identity(path):
     """`exe: {name, sha256, timestamp, image_size, sections}` of the executable at path
     (phase 8, contract P1; crates/a2engine/src/pe.rs is the run-time twin and its
     fixtures pin the same fingerprint). The hex strings are what the plugins log
-    (`engine: Armada2.exe timestamp 0x.., image size 0x.., sections 0x..`); the sha256
+    (`engine: <exe> timestamp 0x.., image size 0x.., sections 0x..`); the sha256
     is the bench's alone, never a run-time key. None parts if the file is not a PE."""
     path = Path(path)
     h = hashlib.sha256()
@@ -169,6 +198,37 @@ def vulkan_validate():
     return os.environ.get('A2TEST_VULKAN_VALIDATE', '1') != '0'
 
 
+def set_vulkan_keys(ini):
+    """Put the clone's `Display8.ini` (beside the game's executable) in step with the
+    bench's Vulkan rules, for every launch path: when its `Backend=` names Vulkan or
+    `auto`, `Validate=1` (`Validate=0` with `--no-validate`) and, with `--vulkan-device
+    lavapipe`, `Device=llvmpipe` unless a `Device=` is set. Only ever a bench clone's
+    ini. Returns the text it left, '' when there is no ini."""
+    ini = Path(ini)
+    try:
+        text = ini.read_text(errors='replace')
+    except OSError:
+        return ''
+    m = re.search(r'^Backend=(.*)$', text, re.M | re.I)
+    if not m or not re.search(r'vulkan|auto', m.group(1), re.I):
+        return text
+
+    def put(t, key, val, only_if_empty=False):
+        km = re.search(rf'^{key}=(.*?)\r?$', t, re.M)
+        if km:
+            if only_if_empty and km.group(1).strip():
+                return t
+            return t[:km.start()] + f'{key}={val}' + t[km.end():]
+        return re.sub(r'^\[Display8\][ \t]*\r?\n', lambda x: x.group(0) + f'{key}={val}\n', t, 1, re.M)
+
+    new = put(text, 'Validate', '1' if vulkan_validate() else '0')
+    if vulkan_device() == 'lavapipe':
+        new = put(new, 'Device', 'llvmpipe', only_if_empty=True)
+    if new != text:
+        ini.write_text(new)
+    return new
+
+
 def log_dirs(prefix, game):
     """The folders a plugin's log may be in: the prefix's LocalAppData logs folder, then
     the game directory. `prefix` is the directory WINEPREFIX points at (its `pfx` inside
@@ -188,8 +248,8 @@ def log_path(dirs, name):
 
 
 def vulkan_env(game_dir, logs=None):
-    """The environment of a game whose Display8 draws on Vulkan (`Mode=stub`,
-    `Backend=vulkan` in its Display8.ini): Mesa's CPU Vulkan (lavapipe) as the only
+    """The environment of a game whose Display8 draws on Vulkan (`Backend=vulkan` in its
+    Display8.ini): Mesa's CPU Vulkan (lavapipe) as the only
     driver and the Khronos validation layer. Since testbench 3.70.0 the default is the
     physical GPU with the layer on (it catches errors before they can hang the GPU);
     `--vulkan-device lavapipe` (`A2TEST_VULKAN_DEVICE=lavapipe`) gives the CPU driver
@@ -215,13 +275,18 @@ def vulkan_env(game_dir, logs=None):
         return {}
     keys = {m.group(1).lower(): m.group(2).strip().lower()
             for m in re.finditer(r'^\s*(\w+)\s*=\s*(.*?)\s*$', text, re.M)}
-    if keys.get('mode') == 'stub' and keys.get('backend') == 'd3d12' and keys.get('validate') == '1':
+    # Since display 1.0.0 the stub is Display8's one mode and `Mode=` is retired (read past,
+    # and absent from the shipped ini): only a retired `Mode=forward` left in an old ini is
+    # not the stub, and Display8 runs the stub then too. Gating on `Mode=stub` left every
+    # game without the validation layer (found in FO-A, 2026-11-06).
+    stub = keys.get('mode', 'stub') in ('stub', 'forward', '')
+    if stub and keys.get('backend') == 'd3d12' and keys.get('validate') == '1':
         env = {'VKD3D_CONFIG': 'vk_debug', 'VK_INSTANCE_LAYERS': 'VK_LAYER_KHRONOS_validation', 'VK_LAYER_DEBUG_ACTION': 'VK_DBG_LAYER_ACTION_LOG_MSG',
                'VK_LAYER_REPORT_FLAGS': 'error,warn'}
         if logs is not None:
             env['VK_LAYER_LOG_FILENAME'] = str(Path(logs) / 'vvl.log')
         return env
-    if keys.get('mode') != 'stub':
+    if not stub:
         return {}
     order = {w.strip() for w in keys.get('backend', '').split(',')}
     if keys.get('backend') != 'vulkan':
@@ -291,7 +356,7 @@ class Session:
         clock = (clock or os.environ.get('A2TEST_CLOCK') or 'wall').strip().lower()
         if clock not in CLOCKS:
             raise GameError(f'clock {clock!r}: one of {", ".join(CLOCKS)}')
-        state = dict(id=sid, dir=str(artifacts_dir), work=str(work), res=list(res), mod=mod, stock_shell=stock_shell,
+        state = dict(id=sid, game=config.GAME_ID, dir=str(artifacts_dir), work=str(work), res=list(res), mod=mod, stock_shell=stock_shell,
                      installs=installs, assets=assets, layers=layers or None,
                      mute=sorted(mute or []), stems=sorted(stems or []), clock=clock,
                      vnc=vnc, record=record, audio=audio, keep=keep, label=label,
@@ -331,6 +396,13 @@ class Session:
         return self.work / 'game'
 
     @property
+    def exe_dir(self):
+        """Where the executable and the game's own files are in the clone (the game
+        directory; `Data/` in Fleet Operations: Roots): plugins, their inis and logs, the
+        settings file and exception.txt live here."""
+        return self.game_dir / config.DATA_DIR if config.DATA_DIR else self.game_dir
+
+    @property
     def prefix_dir(self):
         return self.work / 'prefix'
 
@@ -339,7 +411,7 @@ class Session:
         """Where the plugins write their logs: %LOCALAPPDATA%\\armada2-refit\\logs in this
         clone's Wine prefix, and the game directory (builds before 13.50.0, and the
         fallback when LOCALAPPDATA is unset or not writable)."""
-        return log_dirs(self.prefix_dir, self.game_dir)
+        return log_dirs(self.prefix_dir, self.exe_dir)
 
     def log_path(self, name):
         """The file of the log `name` (a plugin's, or a file beside Armada2.exe), or None."""
@@ -357,7 +429,7 @@ class Session:
         # A stock start takes the game from the stock cache (bench/stockcache.py): the
         # install with `a2mod stock` already run, made once per state of the install.
         self.s['stock_cache'] = None
-        if self.starts_from_stock() and stockcache.enabled():
+        if config.LAYERS and self.starts_from_stock() and stockcache.enabled():
             if not config.GAME.is_dir():
                 raise GameError(f'no {config.GAME}')
             try:
@@ -383,25 +455,52 @@ class Session:
             if r.returncode:
                 raise GameError(f'reflink clone of {src} failed (must be btrfs, same '
                                 f'filesystem as {config.CACHE}): {r.stderr.strip()}')
-        exe = self.game_dir / 'Armada2.exe'
+        exe = self.game_dir / config.EXE_REL
         if exe.is_file():
             self.s['exe'] = exe_identity(exe)
             e = self.s['exe']
-            self.log.action(f"Armada2.exe sha256 {e['sha256']}; timestamp {e['timestamp']}, image size "
+            self.log.action(f"{config.EXE_NAME} sha256 {e['sha256']}; timestamp {e['timestamp']}, image size "
                             f"{e['image_size']}, sections {e['sections']}")
-        exc = self.game_dir / 'exception.txt'
+        exc = self.exe_dir / config.LOG_CRASH
         self.s['exception_mtime'] = exc.stat().st_mtime if exc.exists() else None
         self.save()
         what = 'the prefix' if self.s.get('stock_cache') else 'the game and prefix'
         self.log.action(f'cloned {what} (reflink) in {time.time() - t:.1f}s',
                         detail='\n'.join(f'{a} -> {b}' for a, b in pairs))
 
+    def prf(self):
+        """The clone's settings file (the game descriptor's `[settings] file`, under the
+        game's data directory); the adapters by `[settings] kind` are `armada-prf` and
+        `fo-settings-xml`."""
+        if config.SETTINGS_KIND not in ('armada-prf', 'fo-settings-xml'):
+            raise GameError(f'no settings adapter for {config.SETTINGS_KIND!r} '
+                            f'({config.GAME_ID}) yet')
+        return self.exe_dir / config.SETTINGS_FILE
+
     def prepare(self):
         w, h = self.res
-        set_prf_resolution(self.game_dir / 'ARMADA.PRF', w, h)
-        self.log.action(f'ARMADA.PRF resolution set to {w}x{h}')
-        set_prf_interface_mode(self.game_dir / 'ARMADA.PRF', 1)
-        self.log.action('ARMADA.PRF interface mode set to 1 (no unit view)')
+        sw, sh = config.SHELL_RES
+        if w < sw or h < sh:
+            # The engine asks for the shell's mode (the descriptor's display.shell) and the
+            # headless output must offer it: Fleet Operations: Roots asks for 1200x900 and,
+            # on a 1280x720 output, dereferences a null display mode in
+            # SetActiveDisplay_Internal (a madExcept dialog one second in; games/README.md).
+            raise GameError(f'{config.GAME_ID}: the shell runs at {sw}x{sh}, so the bench '
+                            f'output must be at least that; {w}x{h} is too small '
+                            f'(use --res {max(w, sw)}x{max(h, sh)}, e.g. 1280x960)')
+        if config.SETTINGS_KIND == 'fo-settings-xml':
+            # Fleet Operations: Roots' Settings.xml in place of ARMADA.PRF: the display
+            # mode, fullscreen, no MSAA from the settings (render3d's is its own).
+            for key, val in (('displayWidth', w), ('displayHeight', h), ('WindowMode', 'False'),
+                             ('multisample', 0), ('IntroVideo', 'False')):
+                set_xml_value(self.prf(), key, val)
+            self.log.action(f'{config.SETTINGS_FILE} display mode set to {w}x{h}, fullscreen, '
+                            'no intro video')
+        else:
+            set_prf_resolution(self.prf(), w, h)
+            self.log.action(f'{config.SETTINGS_FILE} resolution set to {w}x{h}')
+            set_prf_interface_mode(self.prf(), 1)
+            self.log.action(f'{config.SETTINGS_FILE} interface mode set to 1 (no unit view)')
         data = config.DATA
         if self.s.get('assets') == 'none':
             data = self.work / 'no-assets'
@@ -420,7 +519,15 @@ class Session:
                         f"built {self.s['stock_cache']['built']})\n{self.s.get('stock_cache_log', '')}[cached]\n\n")
             self.log.action(f"prepare: a2mod stock, from the stock cache {self.s['stock_cache']['key']}",
                             detail='logs/prepare.log')
-        if self.s['mod'] == 'stock':
+        if not config.LAYERS:
+            # A game with no layers on offer (Fleet Operations: Roots in FO-1): nothing of
+            # ours goes in; the clone is the game as it ships. An --install still runs
+            # (a test tool such as testbench/memdiff, or a layer's own script measured
+            # there by hand, FO-2), with no a2mod stock first: there is no stock to reach.
+            steps = [[str(Path(i['path']) / 'install')] for i in installs]
+            if not steps:
+                self.log.action(f'prepare: {config.GAME_ID} has no layers on offer; nothing installed')
+        elif self.s['mod'] == 'stock':
             steps = stock
         elif installs:
             # Checkouts stacked with --install: a known baseline first -- stock, whatever
@@ -468,7 +575,7 @@ class Session:
         own choices must never reach a bench game. A scenario's `Overlay:` writes it again."""
         gone = []
         for name in self.OVERLAY_FILES:
-            f = self.game_dir / name
+            f = self.exe_dir / name
             if f.exists() or f.is_symlink():
                 f.unlink()
                 gone.append(name)
@@ -488,7 +595,7 @@ class Session:
                 raise GameError(f'overlay word {w!r}: want Section:Key=value (or --unset Section:Key), '
                                 'the section spelled as in the overlay, e.g. Render3D.World:Surfaces=0')
         r = subprocess.run([sys.executable, str(config.REPO / 'tools/settings/overlay.py'),
-                            str(self.game_dir / 'RefitPlayer.ini'), *words],
+                            str(self.exe_dir / 'RefitPlayer.ini'), *words],
                            capture_output=True, text=True)
         out = ((r.stdout or '') + (r.stderr or '')).strip()
         if r.returncode:
@@ -527,7 +634,7 @@ class Session:
             return
         done = []
         for name in ('Render3D.ini', 'UI.ini'):
-            ini = self.game_dir / name
+            ini = self.exe_dir / name
             if ini.exists():
                 set_ini_value(ini, 'Bench', 'Clock', clock)
                 done.append(name)
@@ -539,16 +646,19 @@ class Session:
         is made in the edit. The rest keep the player's own settings."""
         vols = {c: 0 for c in self.s.get('mute') or []}
         vols.update({c: VOLUME_MAX for c in self.s.get('stems') or []})
-        if vols:
-            set_prf_volumes(self.game_dir / 'ARMADA.PRF', vols)
-            self.log.action('ARMADA.PRF volumes: ' + ', '.join(f'{c} {v}' for c, v in sorted(vols.items())))
+        if vols and config.SETTINGS_KIND != 'armada-prf':
+            self.log.action(f'{config.SETTINGS_FILE}: --mute and --stems have no adapter for '
+                            f'{config.SETTINGS_KIND!r} yet', status='warn')
+        elif vols:
+            set_prf_volumes(self.prf(), vols)
+            self.log.action(f'{config.SETTINGS_FILE} volumes: ' + ', '.join(f'{c} {v}' for c, v in sorted(vols.items())))
 
     def dll_overrides(self):
         """The overrides the game launches with. Since display 1.0.0 nothing in the chain
         needs Direct3D 9; a clone that carries a `d3d9.dll` of its own (the old Display8 of
         `display/bench-abi.sh old-display`, which forwards to DXVK) gets its override."""
         o = config.DLL_OVERRIDES
-        if (self.game_dir / 'd3d9.dll').exists():
+        if (self.exe_dir / 'd3d9.dll').exists():
             o += ';d3d9=n,b'
         return o
 
@@ -915,13 +1025,15 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         if self.game_pid():
             raise GameError('the game is already running in this session')
         g = self.game_dir
+        d = self.exe_dir                 # the plugins' and the game's own files
+        exe = g / config.EXE_REL          # launched where it is, beside the game's files
         for name in ('Menus.log', 'HUD.log', 'QOL.log', 'QOLRules.log', 'GridLayout.log',
                      'BinkProxy.log', 'Scene.log', 'Scene.marks', 'Armada2_d3d9.log',
                      'Render3D.log', 'Stems.log', 'UI.log', 'Online.log',
                      'Display8.log', 'Display8.inventory.tsv', 'Display8.mark'):
-            for d in self.log_dirs:
+            for ld in self.log_dirs:
                 try:
-                    (d / name).unlink()
+                    (ld / name).unlink()
                 except FileNotFoundError:
                     pass
         logs = self.dir / 'logs'
@@ -958,18 +1070,21 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                 self.start_stems()
             env['WINEDLLOVERRIDES'] = self.dll_overrides() + ';winealsa.drv=d;wineoss.drv=d'
             route_wine_audio(self.prefix_dir / 'pfx' / 'user.reg', sink)
-        env.update(vulkan_env(g, self.dir / 'logs'))
+        set_vulkan_keys(d / 'Display8.ini')
+        venv = vulkan_env(d, self.dir / 'logs')
+        env.update(venv)
         # a marker the watchdog can match whatever pid namespace the game ends up in
         env['PULSE_PROP'] = f'a2test.session={self.s["id"]}'
         env['PIPEWIRE_PROPS'] = f'{{ a2test.session = "{self.s["id"]}" }}'
         (logs / 'launch-env.txt').write_text(
-            f'cwd: {g}\nargv: python3 {config.UMU} {g / "Armada2.exe"} {args}\n\n' +
+            f'cwd: {exe.parent}\nargv: python3 {config.UMU} {exe} {args}\n'
+            f'vulkan validation: {"on" if "VK_INSTANCE_LAYERS" in venv else "off"}\n\n' +
             ''.join(f'{k}={v}\n' for k, v in sorted(env.items())))
         wlog = open(logs / 'wine.log', 'a')
-        wlog.write(f'--- {now()} launch Armada2.exe {args}\n')
+        wlog.write(f'--- {now()} launch {config.EXE_NAME} {args}\n')
         wlog.flush()
-        p = subprocess.Popen(['python3', str(config.UMU), str(g / 'Armada2.exe'), *args.split()],
-                             env=env, cwd=str(g), stdout=wlog, stderr=subprocess.STDOUT,
+        p = subprocess.Popen(['python3', str(config.UMU), str(exe), *split_args(args)],
+                             env=env, cwd=str(exe.parent), stdout=wlog, stderr=subprocess.STDOUT,
                              stdin=subprocess.DEVNULL, start_new_session=True, pass_fds=self._slot_fds())
         self.s['pids']['launcher'] = p.pid
         self.s['game_started'] = time.time()
@@ -982,8 +1097,9 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                 raise GameError(f'the launcher exited ({p.returncode}) before the game started; see logs/wine.log')
             time.sleep(0.1)
         else:
-            raise GameError('Armada2.exe did not appear within 120s; see logs/wine.log')
-        self.log.action(f'launched Armada2.exe {args} through umu (pid {self.game_pid()})' +
+            raise GameError(f'{config.EXE_NAME} did not appear within 120s; see logs/wine.log')
+        self.log.action(f'launched {config.EXE_NAME} {args} through umu (pid {self.game_pid()}), '
+                        f'Vulkan validation {"on" if "VK_INSTANCE_LAYERS" in venv else "off"}' +
                         ('' if self.s['audio'] else f', audio to the null sink {self.s["null_sink"]["name"]}'))
         if not self.s['audio']:
             threading.Thread(target=self._audio_watchdog, daemon=True).start()
@@ -1047,8 +1163,8 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         r = subprocess.run(['bash', str(config.REPO / 'testbench/stems/build.sh')], capture_output=True, text=True)
         if r.returncode:
             raise GameError(f'building Stems.asi failed:\n{r.stdout}{r.stderr}')
-        shutil.copy2(config.REPO / 'testbench/stems/build/Stems.asi', self.game_dir / 'Stems.asi')
-        (self.game_dir / 'Stems.ini').write_text(
+        shutil.copy2(config.REPO / 'testbench/stems/build/Stems.asi', self.exe_dir / 'Stems.asi')
+        (self.exe_dir / 'Stems.ini').write_text(
             '[Stems]\r\n' + ''.join(f'{STEM_KEYS[c]}={sinks[c]["name"]}\r\n' for c in self.s['stems']))
         self.log.action('stems: ' + ', '.join(f'{c} to {sinks[c]["name"]}' for c in self.s['stems']) +
                         f'; the rest (effects) to {self.s["null_sink"]["name"]}')
@@ -1164,11 +1280,12 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         Wine names the process `Armada2.exe` under umu but `Main` elsewhere
         (platform/stop-game.sh), so the name is not used either."""
         out = []
+        exe = config.EXE_NAME.encode()
         pfx = str(self.prefix_dir).encode()
         for d in glob.glob('/proc/[0-9]*'):
             try:
                 argv0 = Path(d, 'cmdline').read_bytes().split(b'\0', 1)[0]
-                if not (argv0.endswith(b'\\Armada2.exe') or argv0.endswith(b'/Armada2.exe')):
+                if not (argv0.endswith(b'\\' + exe) or argv0.endswith(b'/' + exe)):
                     continue
                 if pfx in Path(d, 'environ').read_bytes():
                     out.append(int(d.rsplit('/', 1)[1]))
@@ -1186,7 +1303,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
     def crashed(self):
         """exception.txt is where the game's crash handler writes; it ships non-empty,
         so a crash is a change of mtime."""
-        exc = self.game_dir / 'exception.txt'
+        exc = self.exe_dir / config.LOG_CRASH
         if not exc.exists():
             return False
         return exc.stat().st_mtime != self.s.get('exception_mtime')
@@ -1278,8 +1395,8 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         lines = [c.strip() for a in commands for c in a.split(';') if c.strip()]
         if not lines:
             raise GameError('scene: no command')
-        cmd, slog = self.game_dir / 'Scene.cmd', self.game_dir / 'Scene.log'
-        if not (self.game_dir / 'Scene.asi').exists():
+        cmd, slog = self.exe_dir / 'Scene.cmd', self.exe_dir / 'Scene.log'
+        if not (self.exe_dir / 'Scene.asi').exists():
             raise GameError('scene: Scene.asi is not installed in this game '
                             '(--install testbench/scene, or Setup: testbench/scene/bench-setup.sh)')
         end = time.time() + 10
@@ -1302,11 +1419,25 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             raise GameError('scene: Scene.asi did not answer within 15 s')
         return out.replace('\r', '').rstrip()
 
+    def objects(self):
+        """The game's objects now: Scene.asi's `objects` writes Scene.objects.jsonl beside
+        Scene.log (testbench/scene/README.md), read here as (header, [object dicts])
+        (bench/objects.py has the fields and the filters). Read-only on the game."""
+        from . import objects
+        out = self.scene('objects')
+        if '\n  !' in '\n' + out:
+            raise GameError('scene: objects refused: ' + out)
+        f = self.exe_dir / objects.FILE
+        if not f.exists():
+            raise GameError(f'scene: objects answered but wrote no {objects.FILE}: {out}')
+        return objects.parse(f.read_text(errors='replace'))
+
     def collect_logs(self):
         dst = self.dir / 'logs'
-        g = self.game_dir
-        for name in ('Menus.log', 'HUD.log', 'BinkProxy.log', 'Scene.log', 'Scene.marks', 'RetireCheck.log',
-                     'RefitPlayer.ini', 'Scene.ini', 'ARMADA.PRF',
+        g = self.exe_dir
+        for name in ('Menus.log', 'HUD.log', 'BinkProxy.log', 'Scene.log', 'Scene.marks', 'Scene.objects.jsonl',
+                     'RetireCheck.log',
+                     'RefitPlayer.ini', 'Scene.ini', config.SETTINGS_FILE,
                      'Stems.log', 'Stems.ini',
                      'Menus.ini', 'HUD.ini', 'QOL.log', 'QOL.ini', 'QOLRules.log', 'QOLRules.ini', 'GridLayout.log',
                      'GridLayout.ini', 'dxvk.conf', 'Online.log',
@@ -1314,18 +1445,19 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                      'Display8.log', 'Display8.ini', 'Display8.inventory.tsv'):
             src = self.log_path(name)
             if src:
-                shutil.copy2(src, dst / name)
+                shutil.copy2(src, dst / Path(name).name)
         if self.crashed():
-            shutil.copy2(g / 'exception.txt', dst / 'exception.txt')
+            shutil.copy2(g / config.LOG_CRASH, dst / Path(config.LOG_CRASH).name)
         # frame dumps not yet moved by `drive dump` (a trigger written by hand)
         if (g / 'Dumps').is_dir() and any((g / 'Dumps').iterdir()):
             shutil.copytree(g / 'Dumps', dst / 'Dumps', dirs_exist_ok=True)
         started = self.s.get('game_started') or 0
-        if (g / 'Logs').is_dir():
-            for f in (g / 'Logs').iterdir():
-                if f.is_file() and f.stat().st_mtime >= started:
-                    (dst / 'game-Logs').mkdir(exist_ok=True)
-                    shutil.copy2(f, dst / 'game-Logs' / f.name)
+        for ld in config.LOG_DIRS:
+            if (g / ld).is_dir():
+                for f in (g / ld).iterdir():
+                    if f.is_file() and f.stat().st_mtime >= started:
+                        (dst / 'game-Logs').mkdir(exist_ok=True)
+                        shutil.copy2(f, dst / 'game-Logs' / f.name)
 
     def teardown(self):
         try:

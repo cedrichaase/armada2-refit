@@ -40,12 +40,6 @@ static mut G: Gallery = Gallery {
     closed: 0,
 };
 
-const SHIPS: [&str; 30] = [
-    "Galaxy", "Sovereign", "Defiant", "Akira", "Steamrunner", "Intrepid", "Nova", "Saber", "Norway", "Prometheus",
-    "Excelsior", "Constitution", "D'Deridex", "Valdore", "Scimitar", "Hawk", "Falcon", "Venture", "Negh'Var", "Vor'cha",
-    "Bird of Prey", "Raptor", "Cube", "Sphere", "Diamond", "Scout", "Assimilator", "Queen", "Probe", "Tactical",
-];
-const FACTIONS: [&str; 6] = ["Federation", "Klingon", "Romulan", "Borg", "Cardassian", "Species 8472"];
 const SPEEDS: [&str; 3] = ["Slow", "Normal", "Fast"];
 const TABS: [&str; 4] = ["Text", "Lists", "Choice", "Misc"];
 
@@ -80,9 +74,11 @@ pub fn run(ui: &mut Ui) {
         1 => {
             let h = ui.u(380.0);
             let [a, c] = b.cells::<2>(h);
-            let ev = ui.list_text(a, "ships", &SHIPS, &mut g.ship);
+            // The sample lists are the content set's (`[Gallery]`).
+            let ships = crate::content::get().gallery_ships;
+            let ev = ui.list_text(a, "ships", ships, &mut g.ship);
             if ev == ListEvent::Activated {
-                g.activated = String::from(g.ship.map_or("", |i| SHIPS[i]));
+                g.activated = String::from(g.ship.and_then(|i| ships.get(i).copied()).unwrap_or(""));
             }
             let line = ui.u(30.0);
             let content = 40.0 * line;
@@ -93,14 +89,15 @@ pub fn run(ui: &mut Ui) {
                     ui.text_in(rr, &crate::sfmt!("Scrolled line {}", i + 1), t.text_size, Align::Left, t.text, Weight::Regular);
                 }
             });
-            ui.label(b.row(row), &crate::sfmt!("Selected: {}", g.ship.map_or("none", |i| SHIPS[i])));
+            ui.label(b.row(row), &crate::sfmt!("Selected: {}", g.ship.and_then(|i| ships.get(i).copied()).unwrap_or("none")));
             ui.label(b.row(row), &crate::sfmt!("Activated: {}", if g.activated.is_empty() { "none" } else { &g.activated }));
         }
         2 => {
             let [a, c] = b.cells::<2>(row);
-            ui.dropdown(a, "faction", &FACTIONS, &mut g.faction);
+            let factions = crate::content::get().gallery_factions;
+            ui.dropdown(a, "faction", factions, &mut g.faction);
             ui.dropdown(c, "speed", &SPEEDS, &mut g.speed);
-            ui.label(b.row(row), &crate::sfmt!("Faction: {}   Speed: {}", FACTIONS[g.faction], SPEEDS[g.speed]));
+            ui.label(b.row(row), &crate::sfmt!("Faction: {}   Speed: {}", factions.get(g.faction).copied().unwrap_or(""), SPEEDS[g.speed]));
             ui.checkbox(b.row(row), "Shields", &mut g.checks[0]);
             ui.checkbox(b.row(row), "Cloak", &mut g.checks[1]);
             ui.radio_group(b.row(ui.u(3.0 * 34.0)), "stance", &["Aggressive", "Defensive", "Hold fire"], &mut g.radio);

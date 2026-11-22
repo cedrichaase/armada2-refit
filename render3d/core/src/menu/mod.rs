@@ -114,6 +114,12 @@ pub struct Shot {
     pub stars: Vec<(V3, f32, f32)>,
     /// The sun's ODF (a background object's SOD), the way towards it, its distance.
     pub sun: Option<(String, V3, f32)>,
+    /// The sun's SOD scaled by this (`SunScale=`).
+    pub sun_scale: f32,
+    /// The star sheet laid on a cube of n x n tiles a face, fixed in the sky's frame
+    /// (`StarTiles=`; 0: none), and the level it is drawn at (`StarLevel=`).
+    pub star_tiles: u32,
+    pub star_level: f32,
     pub planet: Option<PlanetAt>,
     pub ships: Vec<ShipAt>,
     pub gas: Vec<Gas>,
@@ -214,8 +220,18 @@ fn text_of() -> (String, &'static str) {
     crate::recipes::builtin("menu", &[("map", BUILT_IN)]);
     match crate::recipes::text("menu", "map") {
         Some(r) if r.source == crate::recipes::Source::Game => (r.text, "Menu\\map.ini in the game directory"),
-        _ => (String::from(BUILT_IN), "built in"),
+        _ => match set_map() {
+            Some(m) => (String::from(m), "the content set's map"),
+            None => (String::from(BUILT_IN), "built in"),
+        },
     }
+}
+
+/// The content set's own map (`sets/<set>/menu/map.ini`), if its set has one.
+fn set_map() -> Option<&'static str> {
+    crate::engine::start_table("core", &crate::syms::TABLE);
+    let set = crate::syms::TABLE.engine().content()?;
+    crate::content::file(&crate::sfmt!("sets/{}/menu/map.ini", set))
 }
 
 /// A group of the map: a place the scenes' ships, gas and cameras are given from.
@@ -292,6 +308,9 @@ struct ViewDef {
     fov: f32,
     sway: V3,
     sway_period: f32,
+    /// The camera turns about the vertical axis through its target at this many radians
+    /// a second (`Orbit=`, degrees a second in the recipe); 0 for a fixed view.
+    orbit: f32,
     /// The camera a departure from this view swings to (`WarpEye=`, `WarpTarget=`);
     /// None: behind the departing ships, looking the way they go.
     warp_eye: Option<V3>,
@@ -333,6 +352,9 @@ struct Map {
     sky_rate: f32,
     stars: Vec<(V3, f32, f32)>,
     sun: Option<(String, V3, f32)>,
+    sun_scale: f32,
+    star_tiles: u32,
+    star_level: f32,
     key: Directional,
     fill: Directional,
     /// Ground, clouds, radius, spin, cloud turn, axis, centre.
@@ -405,7 +427,7 @@ impl Map {
             let b = 0.25 + 0.75 * u * u * u;
             stars.push((d, size * (0.6 + 0.8 * b), b));
         }
-        let sun = t.get(s, "sun").filter(|x| !x.is_empty()).map(|o| (String::from(o), -key_dir, t.f(s, "sundistance", 30000.0)));
+        let sun = t.get(s, "sun").filter(|x| !x.is_empty()).map(|o| (String::from(o), t.v(s, "sunat", -key_dir).norm(), t.f(s, "sundistance", 30000.0)));
         let planet = t.get("planet", "class").map(|cls| {
             let odf = assets::odf(cls);
             let g = |k: &str, d: &str| -> String {
@@ -540,6 +562,7 @@ impl Map {
                 fov: t.f(sec, "fov", 40.0).clamp(5.0, 120.0),
                 sway: t.v(sec, "sway", v3(8.0, 4.0, 6.0)),
                 sway_period: t.f(sec, "swayperiod", 40.0).max(1.0),
+                orbit: t.f(sec, "orbit", 0.0) * DEG,
                 warp_eye: at("warpeye"),
                 warp_target: at("warptarget"),
             });
@@ -550,6 +573,9 @@ impl Map {
             sky_rate: t.f(s, "skyturn", 0.004),
             stars,
             sun,
+            sun_scale: t.f(s, "sunscale", 1.0).clamp(0.01, 20.0),
+            star_tiles: t.f(s, "startiles", 0.0).clamp(0.0, 16.0) as u32,
+            star_level: t.f(s, "starlevel", 0.8),
             key: Directional { dir: key_dir, colour: t.v(s, "keycolour", v3(1.0, 0.95, 0.86)) },
             fill: Directional { dir: fill_dir, colour: t.v(s, "fillcolour", v3(0.10, 0.12, 0.18)) },
             planet,
@@ -611,7 +637,14 @@ impl Map {
         let w = 6.283_185_5 / v.sway_period;
         let s = v.sway;
         let d = v3(s.x * math::sinf(w * t), s.y * math::sinf(w * t * 0.73 + 1.1), s.z * math::sinf(w * t * 0.51 + 2.3));
-        (v.eye + d, v.target + d * 0.3)
+        let (mut eye, target) = (v.eye + d, v.target + d * 0.3);
+        if v.orbit != 0.0 {
+            // About the vertical axis through the target.
+            let (sn, cs) = (math::sinf(v.orbit * t), math::cosf(v.orbit * t));
+            let r = eye - target;
+            eye = target + v3(r.x * cs + r.z * sn, r.y, -r.x * sn + r.z * cs);
+        }
+        (eye, target)
     }
 
     /// The groups a locked view looks at (`Render3D_MenuLocked`), by index.
@@ -683,6 +716,9 @@ impl Map {
             sky_turn: rotation(v3(1.0, 0.0, 0.0), self.sky_rate * t),
             stars: self.stars.clone(),
             sun: self.sun.clone(),
+            sun_scale: self.sun_scale,
+            star_tiles: self.star_tiles,
+            star_level: self.star_level,
             planet,
             ships,
             gas: self.gas.clone(),

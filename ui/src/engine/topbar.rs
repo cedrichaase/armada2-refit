@@ -51,8 +51,8 @@ pub fn shown() -> Vec<(u32, usize)> {
         return v;
     }
     for r in 0..6u32 {
-        let c = fld(panel, field::PANELS_RP_COMPONENTS + 4 * r as usize);
-        if c != 0 && unsafe { rd::<u32>(c + field::PANELS_RC_RESOURCE) } == r {
+        let c = fld(panel, field::PANELS_RP_COMPONENTS() + 4 * r as usize);
+        if c != 0 && unsafe { rd::<u32>(c + field::PANELS_RC_RESOURCE()) } == r {
             v.push((r, c));
         }
     }
@@ -63,11 +63,11 @@ pub fn shown() -> Vec<(u32, usize)> {
 /// amount over the most the team may have.
 pub fn amount_text(r: u32) -> String {
     let t = super::resources::user_team_object();
-    if t == 0 || !ok() || unsafe { rd::<usize>(t + field::PANELS_TEAM_IN_PLAY) } == 0 {
+    if t == 0 || !ok() || unsafe { rd::<usize>(t + field::PANELS_TEAM_IN_PLAY()) } == 0 {
         return crate::sfmt!("0");
     }
     if r == OFFICERS {
-        let have: i32 = unsafe { rd(t + field::PANELS_TEAM_OFFICERS) };
+        let have: i32 = unsafe { rd(t + field::PANELS_TEAM_OFFICERS()) };
         let f: unsafe extern "thiscall" fn(usize) -> i32 = unsafe { core::mem::transmute(addr(sym::PANELS_GET_MAX_OFFICERS)) };
         let max = unsafe { f(t) };
         return crate::sfmt!("{}/{}", have, max);
@@ -167,13 +167,13 @@ pub fn button(w: Which) -> usize {
     if panel == 0 {
         return 0;
     }
-    let b = fld(panel, field::PANELS_BP_BUTTONS + 4 * i);
+    let b = fld(panel, field::PANELS_BP_BUTTONS() + 4 * i);
     if b != 0 && buttons::press_fn(b) == addr(PRESS[i]) { b } else { 0 }
 }
 
 pub fn show_more() -> bool {
     let panel = button_panel();
-    panel != 0 && unsafe { rd::<u8>(panel + field::PANELS_BP_SHOW_MORE) != 0 }
+    panel != 0 && unsafe { rd::<u8>(panel + field::PANELS_BP_SHOW_MORE()) != 0 }
 }
 
 /// `CursorInterface::m_tooltipState`: the help level the help button cycles (0, 1, 2).
@@ -186,4 +186,28 @@ pub fn tooltip_state() -> u32 {
 
 pub fn functions_stock() -> bool {
     ok() && super::resources::functions_stock()
+}
+
+/// What the panel holds, for the bench (FO-6 step 4, the top-right buttons on Roots): each of
+/// the eight fields' button, whether its press function is the one `PostLoad` gives that
+/// field, its rectangle (left, top, right, bottom, in the panel's own units) and its state,
+/// and the panel's own rectangle. Logged once per layout, never written.
+pub fn measure() -> String {
+    let panel = button_panel();
+    let mut s = String::new();
+    if panel == 0 {
+        return s;
+    }
+    for (i, w) in ALL.iter().enumerate() {
+        let b = fld(panel, field::PANELS_BP_BUTTONS() + 4 * i);
+        if b == 0 || !super::readable(b, 0x60) {
+            s.push_str(&crate::sfmt!(" {}=none", w.name()));
+            continue;
+        }
+        let known = buttons::press_fn(b) == addr(PRESS[i]);
+        let r: [i32; 4] = unsafe { rd(b + 8) };
+        s.push_str(&crate::sfmt!(" {}={}[{},{},{},{}]st{}{}", w.name(), if known { "ok" } else { "other" }, r[0], r[1], r[2], r[3], buttons::state(b), if buttons::enabled(b) { "" } else { "off" }));
+    }
+    s.push_str(&crate::sfmt!(" more={}", show_more()));
+    s
 }

@@ -122,10 +122,9 @@
 /* Every engine address is the profile's (profiles/<build>/qol.toml, generated into
  * engine_syms.h): a site is a symbol id, its address read through a2e_addr, and every
  * hook is checked by a2e_ready before the first write.  The asm stubs continue and
- * read globals through the resolved variables a2s_qol_*, filled when the hook is ready;
- * the field offsets in asm are spliced in with A2_STR(QOL_F_...). */
-#define A2_XSTR(x) #x
-#define A2_STR(x)  A2_XSTR(x)
+ * read globals through the resolved variables a2s_qol_*, filled when the hook is ready,
+ * and field offsets and frame locals (from ebp) through a2f_qol_*, the build's own,
+ * filled at start-up: never a literal offset. */
 
 /* A patch site: the profile's symbol, how many bytes the patch overwrites and, within
  * them, where the changed part starts (byte counts, not addresses). */
@@ -195,6 +194,20 @@ static const Site k_cap[] = {
 
 static DWORD g_sel[SEL_MAX];
 
+/* The overview the game uses, through the engine's pointer to it (g_pOverView): stock's is
+ * the static object, but Fleet Operations: Roots constructs an enlarged one of its own, and
+ * only the pointer follows (PLAN-FLEETOPS.md, FO-7).  Before the constructor has run the
+ * pointer is NULL; stock's static object is then the answer, and any other build has none
+ * yet (0), so a hook that needs the object stands down rather than guess. */
+static DWORD ov_base(void)
+{
+    DWORD a = a2e_addr(QOL_S_OVERVIEW_PTR);
+    DWORD p = a ? *(volatile DWORD *)a : 0;
+    const char *b = a2e_build();
+    if (p) return p;
+    return (b && a2e_streq(b, "armada2/gog-1.1")) ? a2e_addr(QOL_S_OVERVIEW) : 0;
+}
+
 /* ---- tiny string/log helpers (no CRT) --------------------------------- */
 
 static char g_logpath[320];
@@ -250,6 +263,7 @@ static void logline(const char *s)
     a2_append_line(g_logpath, s);
 }
 
+#include "rebind.c"
 #include "bar.c"
 
 /* ---- the pan-speed hook ----------------------------------------------- */
@@ -322,7 +336,8 @@ __attribute__((naked)) void group_stub(void)
         "cmpl $0, (%eax)\n\t"
         "je 2f\n\t"
         "pushl $0\n\t"
-        "pushl -4(%ebp)\n\t"
+        "movl _a2f_qol_cgs_group, %eax\n\t"
+        "pushl (%ebp,%eax)\n\t"
         "movl %edi, %ecx\n\t"
         "call *_a2s_qol_bind_group\n\t"
         "jmp *_a2s_qol_group_done\n"
@@ -512,7 +527,8 @@ __attribute__((naked)) void sel_stub(void)
         "popal\n\t"
         "testl %eax, %eax\n\t"
         "jnz 1f\n\t"
-        "cmpl %edi, " A2_STR(QOL_F_OV_COUNT) "(%ebx)\n\t"
+        "movl _a2f_qol_ov_count, %eax\n\t"
+        "cmpl %edi, (%ebx,%eax)\n\t"
         "jne 2f\n\t"
         "pushl _a2s_qol_sel_cont_select\n\t"
         "ret\n"
@@ -554,13 +570,15 @@ __attribute__((naked)) void bind_stub(void)
 __attribute__((naked)) void focus_stub(void)
 {
     __asm__ __volatile__(
-        "leal " A2_STR(QOL_F_OV_SHIPGRP) "(%ecx,%eax,4), %ebx\n\t"
+        "leal (%ecx,%eax,4), %ebx\n\t"
+        "addl _a2f_qol_ov_shipgrp, %ebx\n\t"
         "cmpl $0, _g_stations\n\t"
         "je 1f\n\t"
         "movl (%ebx), %edx\n\t"
         "cmpl $0, (%edx)\n\t"
         "jne 1f\n\t"
-        "addl $(" A2_STR(QOL_F_OV_STNGRP) "-" A2_STR(QOL_F_OV_SHIPGRP) "), %ebx\n"
+        "addl _a2f_qol_ov_stngrp, %ebx\n\t"
+        "subl _a2f_qol_ov_shipgrp, %ebx\n"
         "1:\n\t"
         "pushl _a2s_qol_focus_cont\n\t"
         "ret\n\t");
@@ -687,7 +705,8 @@ __attribute__((naked)) void qsize_stub(void)
 {
     __asm__ __volatile__(
         "pushl %ecx\n\t"
-        "leal -0x28(%ebp), %eax\n\t"
+        "movl _a2f_qol_cce_craft_array, %eax\n\t"
+        "addl %ebp, %eax\n\t"
         "pushl %eax\n\t"
         "call _longest_queue\n\t"
         "addl $4, %esp\n\t"
@@ -707,14 +726,19 @@ __attribute__((naked)) void cancel_stub(void)
 {
     __asm__ __volatile__(
         "pushal\n\t"
-        "leal -0x28(%ebp), %eax\n\t"
+        "movl _a2f_qol_cce_craft_array, %eax\n\t"
+        "addl %ebp, %eax\n\t"
         "pushl %eax\n\t"
         "pushl %esi\n\t"
         "call _cancel_filter\n\t"
         "addl $8, %esp\n\t"
         "popal\n\t"
-        "movl -0x20(%ebp), %eax\n\t"
-        "movl $0, -0x14(%ebp)\n\t"
+        "movl _a2f_qol_cce_cancel_count, %eax\n\t"
+        "movl (%ebp,%eax), %eax\n\t"
+        "pushl %ecx\n\t"
+        "movl _a2f_qol_cce_cancel_index, %ecx\n\t"
+        "movl $0, (%ebp,%ecx)\n\t"
+        "popl %ecx\n\t"
         "testl %eax, %eax\n\t"
         "jle 1f\n\t"
         "pushl _a2s_qol_cancel_cont\n\t"
@@ -737,8 +761,10 @@ __attribute__((naked)) void enable_stub(void)
         "addl $4, %esp\n\t"
         "movl %eax, 20(%esp)\n\t"
         "popal\n\t"
-        "movl " A2_STR(QOL_F_BAR_X44) "(%edi), %ecx\n\t"
-        "movl " A2_STR(QOL_F_BAR_BUILD) "(%edi), %eax\n\t"
+        "movl _a2f_qol_bar_x44, %ecx\n\t"
+        "movl (%edi,%ecx), %ecx\n\t"
+        "movl _a2f_qol_bar_build, %eax\n\t"
+        "movl (%edi,%eax), %eax\n\t"
         "pushl _a2s_qol_enable_cont\n\t"
         "ret\n\t");
 }
@@ -751,9 +777,12 @@ __attribute__((naked)) void route_stub(void)
 {
     __asm__ __volatile__(
         "pushal\n\t"
-        "pushl " A2_STR(QOL_F_MODE_CLASS) "(%edi)\n\t"
-        "pushl -0x18(%ebp)\n\t"
-        "pushl -0x20(%ebp)\n\t"
+        "movl _a2f_qol_mode_class, %eax\n\t"
+        "pushl (%edi,%eax)\n\t"
+        "movl _a2f_qol_cce_route_count, %eax\n\t"
+        "pushl (%ebp,%eax)\n\t"
+        "movl _a2f_qol_cce_route_objects, %eax\n\t"
+        "pushl (%ebp,%eax)\n\t"
         "call _build_route\n\t"
         "addl $12, %esp\n\t"
         "popal\n\t"
@@ -917,6 +946,120 @@ static int patch_warp(void)
     return 1;
 }
 
+/* ---- the construction ship and its own blueprint ----------------------- */
+
+/* ConstructionRig::GetAction asks the class whether the ghost's spot is free with
+ * nothing to ignore, so the selected rig blocks its own blueprint.  Two sites: the
+ * first, at the virtual call that opens the function, notes `this` (the function
+ * overwrites edi with the position before it asks); the second is the 13 bytes that
+ * ask, now given `this` as the object to ignore while RigIgnoresSelf is on.  Both
+ * stubs do what the bytes they replace did and return to the next instruction.
+ * The simulation's arrival check already ignores the rig, on every node. */
+int   g_rigSelf;                /* RigIgnoresSelf */
+DWORD g_rigIgnore;              /* what this call's check ignores: the rig, or 0 */
+static int g_rigOk, g_rdyRig;
+
+__attribute__((naked)) void rig_this_stub(void)
+{
+    __asm__ __volatile__(
+        "xorl %eax, %eax\n\t"
+        "cmpl $0, _g_rigSelf\n\t"
+        "je 1f\n\t"
+        "movl %edi, %eax\n"
+        "1:\n\t"
+        "movl %eax, _g_rigIgnore\n\t"
+        "movl (%edi), %eax\n\t"
+        "addl _a2f_qol_rs_vt_check, %eax\n\t"
+        "call *(%eax)\n\t"
+        "pushl _a2s_qol_rs_this_cont\n\t"
+        "ret\n\t");
+}
+
+/* Logged when the answer changes, a few dozen times at most, so the ghost's frames do not
+ * fill the log: the scenarios wait on these lines. */
+void __cdecl rig_result(int clear)
+{
+    static int last = -1, said;
+    int key = (clear ? 1 : 0) | (g_rigIgnore ? 2 : 0);
+    if (key == last || said >= 60) return;
+    last = key;
+    said++;
+    logline(clear ? (g_rigIgnore ? "rig: the blueprint's spot is clear (the construction ship ignored)"
+                                 : "rig: the blueprint's spot is clear")
+                  : (g_rigIgnore ? "rig: the blueprint's spot is blocked (the construction ship ignored)"
+                                 : "rig: the blueprint's spot is blocked"));
+}
+
+__attribute__((naked)) void rig_check_stub(void)
+{
+    __asm__ __volatile__(
+        "movl 0xc(%esi), %ecx\n\t"
+        "pushl $1\n\t"
+        "pushl _g_rigIgnore\n\t"
+        "pushl %edi\n\t"
+        "movl (%ecx), %edx\n\t"
+        "addl _a2f_qol_rs_vt_can_place, %edx\n\t"
+        "call *(%edx)\n\t"
+        "pushl %eax\n\t"
+        "movzbl %al, %eax\n\t"
+        "pushl %eax\n\t"
+        "call _rig_result\n\t"
+        "addl $4, %esp\n\t"
+        "popl %eax\n\t"
+        "pushl _a2s_qol_rs_check_cont\n\t"
+        "ret\n\t");
+}
+
+static int patch_rig(void)
+{
+    BYTE c1[8], c2[13];
+    if (!g_rdyRig) return 0;
+    jmp_to(c1, a2e_addr(QOL_S_RS_THIS_SITE), 8, rig_this_stub);
+    jmp_to(c2, a2e_addr(QOL_S_RS_CHECK_SITE), 13, rig_check_stub);
+    poke((BYTE *)a2e_addr(QOL_S_RS_THIS_SITE), c1, 8);
+    poke((BYTE *)a2e_addr(QOL_S_RS_CHECK_SITE), c2, 13);
+    return 1;
+}
+
+/* ---- a script's input monitor ------------------------------------------ */
+
+/* ScriptInterfaceImp::MonitorInputControls registers the engine's static
+ * ScriptInputCallbacks in the game's and the editor's simulate lists and stores the
+ * script's function in it; AlwaysSimulate calls that function each frame and, when it
+ * answers false, clears it but leaves the object registered, and calls it again with no
+ * test.  Roots' first tutorial leaves it so: the next view that simulates it, the map
+ * editor after the tutorial, calls address 0 (stock Roots crashes the same way).  This
+ * replaces AlwaysSimulate at its entry (a jump to a __fastcall function, which takes
+ * `this` in ecx and pops the float as the original's `ret 4` does) with the same body
+ * and the missing test.  Display-side only: nothing the simulation reads changes. */
+static int g_rdyScript, g_scriptOk;
+
+static void __fastcall script_always(BYTE *self, void *edx, float dt)
+{
+    typedef unsigned char (__cdecl *MonitorFn)(void);
+    static int said;
+    MonitorFn fn = *(MonitorFn *)(self + QOL_F_SI_CALLBACK);
+    (void)edx; (void)dt;
+    if (!fn) {
+        if (!said) {
+            said = 1;
+            logline("script: the input monitor is registered with no function (a script cleared it): "
+                    "skipped, where stock calls address 0");
+        }
+        return;
+    }
+    if (!fn()) *(MonitorFn *)(self + QOL_F_SI_CALLBACK) = 0;
+}
+
+static int patch_script(void)
+{
+    BYTE c[5];
+    if (!g_rdyScript) return 0;
+    jmp_to(c, a2e_addr(QOL_S_SI_ALWAYS), 5, (void (*)(void))script_always);
+    poke((BYTE *)a2e_addr(QOL_S_SI_ALWAYS), c, 5);
+    return 1;
+}
+
 /* ---- bigger selections and groups ------------------------------------- */
 
 /* The button bar's special weapons.  For each special weapon of the selection,
@@ -938,7 +1081,10 @@ __attribute__((naked)) void spec_read_stub(void)
 {
     __asm__ __volatile__(
         "movl $_g_spec_ships, %esi\n\t"
-        "movl %eax, -0x28(%ebp)\n\t"
+        "pushl %ecx\n\t"
+        "movl _a2f_qol_msw_read_local, %ecx\n\t"
+        "movl %eax, (%ebp,%ecx)\n\t"
+        "popl %ecx\n\t"
         "pushl _a2s_qol_spec_cont_read\n\t"
         "ret\n\t");
 }
@@ -1013,7 +1159,8 @@ static int patch_selection(int max)
     int   i, k, n = (int)(sizeof k_sel / sizeof k_sel[0]);
 
     if (!g_rdySel) return 0;
-    overview = a2e_addr(QOL_S_OVERVIEW);
+    overview = ov_base();
+    if (!overview) return 0;
     disp = (DWORD)g_sel - overview;
     /* whatever is selected already comes along (nothing is, this early) */
     for (k = 0; k < 16; k++) g_sel[k] = *(volatile DWORD *)(overview + QOL_F_OV_SEL + 4 * k);
@@ -1109,6 +1256,7 @@ __declspec(dllexport) void __cdecl QOL_SettingsChanged(void)
     m[0] = 0;
     s_cat(m, "settings: applied ");
 
+    rebind_settings();
     a2_set_str(&g_ini, QOL_ROW_PANSPEED, val, sizeof val);
     f = pan_factor(val, &ok);
     if (f != g_panSpeed) {
@@ -1151,6 +1299,13 @@ __declspec(dllexport) void __cdecl QOL_SettingsChanged(void)
         if (!g_pathsOk) gate("PathStartsAtOnce", 0, 0);
     }
 
+    on = a2_set_int(&g_ini, QOL_ROW_RIGIGNORESSELF) != 0;
+    if (on != g_rigSelf) {
+        g_rigSelf = on;
+        changed(m, &n, "RigIgnoresSelf", on ? "1" : "0");
+        if (!g_rigOk) gate("RigIgnoresSelf", 0, 0);
+    }
+
     a2_set_str(&g_ini, QOL_ROW_WARPDISTANCE, val, sizeof val);
     f = s_parse(val);
     if (f < 0.0f) f = 0.0f;
@@ -1186,7 +1341,16 @@ static void startup(void)
     g_rdySpec = a2e_ready(QOL_H_SPECIAL_SELECT);
     g_rdySel = a2e_ready(QOL_H_SELECTION);
     g_rdyBar = a2e_ready(QOL_H_BAR_KEYS);
+    g_rdyRebind = a2e_ready(QOL_H_REBIND);
     g_rdyPaths = a2e_ready(QOL_H_MOVE_PATHS);
+    g_rdyRig = a2e_ready(QOL_H_RIG_SELF);
+    g_rdyScript = a2e_ready(QOL_H_SCRIPT_INPUT);
+    g_scriptOk = patch_script();
+    b[0] = 0;
+    s_cat(b, "--- QOL script input monitor: ");
+    if (g_scriptOk) s_cat(b, "called only while a script has one set, patched");
+    else not_patched(b, QOL_H_SCRIPT_INPUT);
+    logline(b);
     a2_set_str(&g_ini, QOL_ROW_PANSPEED, val, sizeof val);
     f = pan_factor(val, &ok);
     g_panSpeed = f;
@@ -1265,6 +1429,14 @@ static void startup(void)
     }
     logline(b);
     if (!g_barKeys) gate("BarKeys", 0, g_barOk);
+    rebind_settings();
+    b[0] = 0;
+    s_cat(b, "--- QOL [BarKeys] Rebind=");
+    s_cat(b, g_rbText);
+    if (!g_rbN) s_cat(b, "  (no key moved)");
+    else if (!g_rdyRebind || !g_barOk) not_patched(b, g_rdyRebind ? QOL_H_BAR_KEYS : QOL_H_REBIND);
+    else s_cat(b, "  -> applied in memory while the position keys are on, the game's own keys back when they stop");
+    logline(b);
 
     g_pathStart = a2_set_int(&g_ini, QOL_ROW_PATHSTARTSATONCE) != 0;
     g_pathsOk = patch_paths();
@@ -1272,14 +1444,29 @@ static void startup(void)
     s_cat(b, "--- QOL PathStartsAtOnce=");
     s_cat(b, g_pathStart ? "1" : "0");
     if (!g_pathStart) {
-        s_cat(b, "  (a sketched path is sent when the key is let go, as in stock)");
+        s_cat(b, "  (a sketched path is sent when the key is let go, as in stock; no queues)");
     } else if (g_pathsOk) {
-        s_cat(b, "  -> a path sketched with the waypoint key is sent at each point, patched");
+        s_cat(b, "  -> move queues: Tab points (and minimap points) queued per ship, flown at once, patched");
     } else {
         not_patched(b, QOL_H_MOVE_PATHS);
     }
     logline(b);
     if (!g_pathStart) gate("PathStartsAtOnce", 0, g_pathsOk);
+
+    g_rigSelf = a2_set_int(&g_ini, QOL_ROW_RIGIGNORESSELF) != 0;
+    g_rigOk = patch_rig();
+    b[0] = 0;
+    s_cat(b, "--- QOL RigIgnoresSelf=");
+    s_cat(b, g_rigSelf ? "1" : "0");
+    if (!g_rigSelf) {
+        s_cat(b, "  (a construction ship blocks its own blueprint, as in stock)");
+    } else if (g_rigOk) {
+        s_cat(b, "  -> a construction ship does not block its own blueprint, patched");
+    } else {
+        not_patched(b, QOL_H_RIG_SELF);
+    }
+    logline(b);
+    if (!g_rigSelf) gate("RigIgnoresSelf", 0, g_rigOk);
 
     k = (int)a2_set_int(&g_ini, QOL_ROW_MAXSELECTION);
     b[0] = 0;

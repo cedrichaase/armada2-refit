@@ -112,7 +112,10 @@ pub extern "C" fn display8v1_dx12_pass(event: u32, pass: *const Dx12Pass8) {
     super::pass::forget();
     let p = passes();
     match event {
-        PASS_ENTER => p.alive += 1,
+        PASS_ENTER => {
+            p.alive += 1;
+            crate::host::drew();
+        }
         _ => {
             p.alive = p.alive.saturating_sub(1);
             if event == PASS_PUBLISH && !pass.is_null() {
