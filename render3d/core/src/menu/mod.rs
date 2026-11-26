@@ -251,6 +251,10 @@ struct Group {
     /// until then, after `delay` seconds, each ship `stagger` after the last, over `time`.
     cloak_view: Option<String>,
     cloak_delay: f32,
+    /// How long the view must have been the wanted one before the decloak (and its sound)
+    /// may begin (`CloakDwell=`, 0.5 s): a pointer only passing over the menu entry
+    /// that asks for the view moves the camera, but decloaks nothing.
+    cloak_dwell: f32,
     cloak_time: f32,
     cloak_stagger: f32,
     /// The sound each ship makes as it begins to decloak (`CloakSound=`, a file the
@@ -506,6 +510,7 @@ impl Map {
             )
         });
         let blend = t.f(s, "blend", 2.0).max(0.0);
+        let dwell = t.f(s, "cloakdwell", 0.5).max(0.0);
         // The groups; ships, gas and views name theirs (none: the map's origin).
         let mut groups = alloc::vec![Group {
             name: String::new(),
@@ -513,6 +518,7 @@ impl Map {
             yaw: 0.0,
             cloak_view: None,
             cloak_delay: 0.0,
+            cloak_dwell: 0.0,
             cloak_time: 1.0,
             cloak_stagger: 0.0,
             cloak_sound: String::new(),
@@ -529,6 +535,7 @@ impl Map {
                 yaw: t.f(sec, "yaw", 0.0) * DEG,
                 cloak_view: t.get(sec, "cloakview").map(rt::lower),
                 cloak_delay: t.f(sec, "cloakdelay", blend * 0.7).max(0.0),
+                cloak_dwell: t.f(sec, "cloakdwell", dwell).max(0.0),
                 cloak_time: t.f(sec, "cloaktime", 2.5).max(0.05),
                 cloak_stagger: t.f(sec, "cloakstagger", 0.5).max(0.0),
                 cloak_sound: t.get(sec, "cloaksound").map_or_else(|| String::from("clkdisen.wav"), String::from),
@@ -877,6 +884,8 @@ struct State {
     view: String,
     prev: String,
     since: f64,
+    /// How long the previous view was the wanted one before this one replaced it.
+    held: f32,
     /// The camera the last frame had, and the one blended from after a change of view.
     cam: Option<(V3, V3, f32)>,
     from: Option<(V3, V3, f32)>,
@@ -897,6 +906,7 @@ static mut STATE: State = State {
     view: String::new(),
     prev: String::new(),
     since: 0.0,
+    held: 0.0,
     cam: None,
     from: None,
     said: 0,
@@ -932,19 +942,29 @@ fn smooth(x: f32) -> f32 {
     t * t * (3.0 - 2.0 * t)
 }
 
+/// How far the ship `nth` of a decloaking group is back after `gone` seconds of its
+/// view: the decloak begins once the view has been wanted for the dwell as well as
+/// the camera's delay, so its sound waits for the dwell too. Negative before it starts.
+fn back_k(g: &Group, nth: usize, gone: f32) -> f32 {
+    (gone - g.cloak_delay.max(g.cloak_dwell) - nth as f32 * g.cloak_stagger) / g.cloak_time
+}
+
 /// How far the ship `nth` of a decloaking group is back, the view `view` shown since
-/// `since` (`now` the clock), the one before it `prev`; None when whole.
-fn cloak_of(g: &Group, nth: usize, view: &str, prev: &str, since: f64, now: f64, blend: f32) -> Option<f32> {
+/// `since` (`now` the clock), the one before it `prev`, which was shown `held` seconds;
+/// None when whole.
+fn cloak_of(g: &Group, nth: usize, view: &str, prev: &str, since: f64, held: f32, now: f64, blend: f32) -> Option<f32> {
     let cv = g.cloak_view.as_deref()?;
     let gone = (now - since) as f32;
     if cv == view {
-        let k = (gone - g.cloak_delay - nth as f32 * g.cloak_stagger) / g.cloak_time;
+        let k = back_k(g, nth, gone);
         return if k >= 1.0 { None } else { Some(k.max(0.0)) };
     }
-    // Leaving its view, the group stays as it was until the camera has gone; then it
-    // cloaks again, to decloak on the next arrival.
+    // Leaving its view, the group stays as it was until the camera has gone: whole if
+    // it was whole, cloaked (silent) if the view was only passed over; then it cloaks
+    // again, to decloak on the next arrival.
     if cv == prev && gone < blend {
-        return None;
+        let k = back_k(g, nth, held);
+        return if k >= 1.0 { None } else { Some(k.max(0.0)) };
     }
     Some(0.0)
 }
@@ -1022,6 +1042,7 @@ pub fn draw(name: &str, rect: PRect, depart: bool) -> bool {
     };
     if s.view != name {
         s.prev = core::mem::replace(&mut s.view, String::from(name));
+        s.held = (now - s.since) as f32;
         // Under the bench clock the front end's time stands (there is no simulation),
         // so a move to the new view has already happened: the view as it settles.
         let bench = crate::clock::bench();
@@ -1066,10 +1087,10 @@ pub fn draw(name: &str, rect: PRect, depart: bool) -> bool {
     } else {
         s.cam = Some((eye, at, fov));
     }
-    let (view, prev, since, blend) = (s.view.as_str(), s.prev.as_str(), s.since, m.blend);
+    let (view, prev, since, held, blend) = (s.view.as_str(), s.prev.as_str(), s.since, s.held, m.blend);
     // A departure leaves as the scene is: a mission is loading, so its campaign is open.
     let locked = if dep.is_some() { Vec::new() } else { m.locked_groups(&s.locked) };
-    let shot = m.shot(t, |g, nth| cloak_of(g, nth, view, prev, since, now, blend), dep.as_ref().map(|d| &d.0), &locked);
+    let shot = m.shot(t, |g, nth| cloak_of(g, nth, view, prev, since, held, now, blend), dep.as_ref().map(|d| &d.0), &locked);
     decloak_sounds(m, &shot, &mut s.cloaks);
     let lights = Lights { dirs: alloc::vec![m.key, m.fill], points: Vec::new() };
     let planet = m.planet.as_ref().map(|p| (p.6, p.2));

@@ -622,7 +622,11 @@ when the sprite table has no `mstar.0` (Roots'), and takes the stock sky recipe 
 for; then, after `CloakDelay` seconds (the camera arriving), each of its ships
 decloaks in turn (`CloakStagger` apart, over `CloakTime`), drawn with the hulls'
 cloak as the engine's decloaking state 3 with that much of the hull back, its running
-lights only once it is whole. When the camera leaves, the group stays as it is until
+lights only once it is whole. **Dwell.** The decloak (picture and sound together, so they never part) begins no earlier
+than `CloakDwell` (0.5 s) after the view was asked for: a pointer passing over the
+campaign's menu entry moves the camera but decloaks nothing and plays no sound. When the
+camera leaves, the group stays as it was (whole if it was whole, cloaked if the view was
+only passed over; it once popped whole, with the sound, on leaving) until
 the camera has gone (`Blend`), then cloaks again for the next arrival. A group's
 decloak is heard once, as its first ship's decloak begins (fully cloaked in one frame,
 part of it back in the next, while the rest of the group is still hidden; one sound per
@@ -692,8 +696,9 @@ is on the map from `From=` missions of that campaign complete (0) until `Until=`
 always there (issue #14's): the Federation fleet gains freighters, a mining station and
 at the end a second Sovereign with an Akira; the Klingon scene gains its cruisers, the
 Negh'Var from mission 6 and at the end more of the fleet; the Borg scene gains more
-spheres, the queen's Diamond and the hulls it has assimilated (drawn as their own hulls:
-there is no assimilated look yet). Since the main menu's view is the Federation fleet's, the
+spheres, the queen's Diamond and the Klingon and Federation hulls it has assimilated (a Vor'cha, then a Galaxy; drawn as
+their own hulls: there is no assimilated look yet; the Intrepid was taken out, a Federation
+ship in the Borg's distance). Since the main menu's view is the Federation fleet's, the
 Federation's progress shows there too. `UI.asi` says how far each campaign has got
 through a third export, `Render3D_MenuProgress(campaign, done)` (ui/MENUS.md,
 "Campaign progress"); a change re-reads the map at the next frame, as an edit does, so
@@ -741,6 +746,7 @@ time it is posed (`hulls: menu scene:`). Keys:
 | | `StarTiles`, `StarLevel` | the star sheet (the sprite `bstar.0`) laid on a cube of n x n tiles a face, fixed in the sky's frame (nothing turns to face the camera, so it holds still as the camera orbits), drawn at this level: for a build whose star sprite is a whole tile of small stars (Roots'), not one star |
 | | `KeyAxis`, `KeyColour`, `FillAxis`, `FillColour` | the two lights: the way each travels, and its colour |
 | | `Blend` | seconds the camera takes from one view to the next (2; the map's 1.6) |
+| | `CloakDwell` | seconds a view must have been the wanted one before a group's decloak, and its sound, may begin (0.5; 0: as soon as the delay has run); a group may give its own |
 | `[Warp]` | `Delay`, `Stagger`, `Ramp` | a departure: seconds before the first ship goes (0.9), between one and the next (0.18), from impulse to gone (0.75) |
 | | `Stretch`, `Speed` | the warp stretch at the end of the ramp (30); the impulse's acceleration, units/s² (120) |
 | | `Turn`, `Follow` | seconds the camera takes to swing behind the ships (1.3); its acceleration after them, units/s² (260) |
@@ -751,7 +757,7 @@ time it is posed (`hulls: menu scene:`). Keys:
 | `[Progress]` | `Default`, `<campaign>` | the missions complete of a campaign UI.asi has not told of (0; the map's 6); a count forced for one campaign |
 | `[Group.<name>]` | `At`, `Yaw` | the group's place on the map and its turn about +y in degrees |
 | | `Campaign` | the campaign whose progress its ships and gas follow, unless they name their own |
-| | `CloakView`, `CloakDelay`, `CloakTime`, `CloakStagger`, `CloakSound` | the view whose arrival decloaks its ships; the seconds before the first starts (`Blend` x 0.7), each takes (2.5), between one and the next (0.5); the sound heard once as the group's first ship begins (`clkdisen.wav`; empty for none) |
+| | `CloakView`, `CloakDelay`, `CloakTime`, `CloakStagger`, `CloakSound`, `CloakDwell` | the view whose arrival decloaks its ships; the seconds before the first starts (`Blend` x 0.7, at least the dwell), each takes (2.5), between one and the next (0.5); the sound heard once as the group's first ship begins (`clkdisen.wav`; empty for none) |
 | | `WarpColour` | the tunnel's tint when the group departs (0.45,0.62,1) |
 | | `LockedCloak` | 1: its ships are held cloaked, drawn in the cloak's glass, while a view of the group is locked (`Render3D_MenuLocked`) |
 | | `LockedYaw` | degrees each of its ships turns by, on top of its `Yaw`, while the group's view is locked (0); a ship's own `LockedYaw` takes precedence |
