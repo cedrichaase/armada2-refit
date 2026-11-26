@@ -299,6 +299,28 @@ const PAD_ONE: f32 = 0.65;
 const GAP_ONE: f32 = 0.7;
 const QUEUE_CELL: f32 = 44.0;
 
+/// The narrowest the one-object panel goes, against `W_ONE`: its bars are long and the five
+/// system boxes tighten, but the close-up, the name and the figures keep their size.
+const W_ONE_MIN: f32 = 0.8;
+
+/// The one-object panel's width (HUD.md, "The bottom row"): `W_ONE`, less where the row is
+/// short. With the bar beside the minimap the panel takes the room left between the bar and
+/// the unit view (or the screen's edge), if that is at least `W_ONE_MIN` of its width;
+/// else the bar goes above the minimap and the panel the whole row between the minimap and
+/// the unit view. It never goes past the screen, so no aspect makes it overlap another panel.
+fn one_width(ui: &Ui) -> f32 {
+    let want = ui.u(W_ONE);
+    let (lo, hi, bar, m) = unsafe { ROW };
+    let row = (hi - lo - 2.0 * m).max(0.0);
+    let beside = bar.map(|(bw, _)| hi - m - (libm::ceilf(lo + m + bw + m) + 1.0) - 1.0);
+    let w = match beside {
+        Some(b) if b >= want * W_ONE_MIN => want.min(b),
+        _ if row > 0.0 => want.min(row),
+        _ => want,
+    };
+    w.min(ui.w - ui.u(20.0))
+}
+
 fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
     let t = ui.theme;
     let pad = ui.u(t.pad * PAD_ONE);
@@ -322,7 +344,7 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
     let top_h = right_h.max(ui.u(WIRE * if s.craft { 1.0 } else { 0.8 }));
     let sys_h = if s.systems.is_empty() { 0.0 } else { ui.u(SYS_H_ONE) + gap };
     let queue_h = if queued > 0 { ui.u(QUEUE_CELL) + gap + ui.u(ms + 4.0) } else { 0.0 };
-    let w = ui.u(W_ONE).min(ui.w - ui.u(20.0));
+    let w = one_width(ui);
     // The frame's own bars (an LCARS frame's top and bottom) come on top of the padding.
     let (_, ft, _, fb) = theme::frame_margins(ui);
     let h = pad * 2.0 + top_h + sys_h + queue_h + ft + fb;
