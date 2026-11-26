@@ -1,7 +1,7 @@
 ---
 layers: [render3d]
 bump: patch
-games: [armada2, fo-roots]
+games: [fo-roots]
 ---
 
 ### Fixed

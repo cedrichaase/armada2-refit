@@ -1,7 +1,7 @@
 ---
 layers: [testbench]
 bump: patch
-games: [armada2, fo-roots]
+games: [fo-roots]
 ---
 
 ### Added

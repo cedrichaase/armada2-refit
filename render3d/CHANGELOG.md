@@ -4,6 +4,25 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 1.4.0 — 2026-11-26
+
+### Added
+- overlays: the move paths draw a formation move's followers. A move of several ships gives the group's leader the move and every other ship FOLLOW (command 11, stock's), which the paths skipped; a follower now draws its leader's path (once for the group), a leg to its own place at the leader's next point and a small dot at its place at each point after. Profile entries `cmd_follow`, `proc_follow_target`, `proc_follow_offset` (gog-1.1).
+- overlays: `EngineMoves` in a content set's `overlays.ini`: `sketched` (the stock set, as before: without QOL's queue only sketched paths draw) or `all` (every move of a selected ship draws). `31694d1` Installed, not yet seen in game.
+- Menu scene: a content set can supply its own map (sets/<set>/menu/map.ini; Menu\map.ini still wins), a view takes Orbit= (degrees a second, the eye turning about its target), and the menu sky falls back to the stock recipe and to bstar.0 for bright stars
+- Menu scene keys `SunAt=` (the way towards the sun, apart from the Key), `SunScale=` (the sun SOD's scale) and `StarTiles=`/`StarLevel=` (a star sheet laid on a fixed cube, for builds whose star sprite is a whole tile) `e4cd02f` Confirmed in game 2026-11-07.
+- The menu scene shows campaign progress (issue 15). render3d: `Campaign=`, `From=`, `Until=` on a `[Ship.*]` or `[Nebula.*]` (`Campaign=` also on a `[Group.*]`) put it on the map only at that many missions complete; `[Progress] Default=` and `[Progress] <campaign>=` in `map.ini`; the export `Render3D_MenuProgress(campaign, done)`, which re-reads the map on a change. The built-in map grows the Federation fleet (freighters, `fmining`, a second Sovereign and Akira), gates the Klingon cruisers and Negh'Var and the Borg Diamond by progress, and adds spheres to the Borg scene, over the ships issue #14 placed. UI: `menus::progress` tells render3d each campaign's missions complete before each scene frame, from the progress the campaign locks read (the game's memory, else `save\shell.set`). Draft: placements reckoned, not yet seen on the bench. Confirmed in game 2026-11-26.
+
+### Changed
+- testbench: `engine-syms` expects the overlays' 110 symbols (was 107).
+- testbench: `engine-syms` expects the effects module's 127/128 symbols (was 126/126, stale since the shield-hit entries). `31694d1` Installed, not yet seen in game.
+- Menu scene: the Borg scene no longer shows the assimilated Intrepid, Vor'cha and Galaxy (Borg hulls only); a decloak (and its sound) waits for CloakDwell (0.5 s) of the view being asked for, so a pointer passing over the Klingon entry plays nothing, and a view left before it decloaked stays cloaked instead of popping whole with the sound. `b22a954` Confirmed in game 2026-11-26.
+- The menu scene's map (`content/menu/map.ini`, issue #14): the `main` and `federation` cameras sit lower (6 and 2 degrees down, from 11 and 13) and keep the ships right of the menus' column; `federation` sees the whole fleet three-quarters from ahead and to port instead of the Galaxy's saucer. More ships and stations: an Excelsior, a second Defiant and Akira, a shipyard and a research station with the fleet; a second Vor'cha, two more Birds-of-Prey and a Klingon starbase (`Group.klingonbase`, not cloaked) in the Klingon scene, which is also re-aimed; a tactical cube, two spheres, an assimilator and a Borg starbase in the Borg scene. The stations have `Warp=0`. Confirmed in game 2026-11-26.
+
+### Fixed
+- A build without the object loop's draw site (stock) no longer logs `render3d.frame.obj_draw stands down`: the hook is asked about with a non-logging `present` before `ready`. `03b81b5` Installed, not yet seen in game.
+- Repair welds: the welds whose particle is gone are dropped before their light is placed, not only before they are drawn; at the first view of a match after an aborted one the old welds' hardpoint nodes (freed memory) were read through Entity::GetWorldPosition, which faulted at the end of the load (the engine then flipped to windowed and hung: a black screen). Logs `effects: repair: N weld(s) of a view T s ago dropped before their light` after a gap. `c41785c` Installed, not yet seen in game.
+
 ## 1.3.0 — 2026-11-06
 
 ### Added
