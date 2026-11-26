@@ -498,7 +498,7 @@ first, takes its place in it (`info::place`):
 - Else **moved right just far enough** for the bar to sit beside the minimap, if the
   row holds both with the HUD's margin between each. At 16:9 it does: at 1280x720 the
   row is about 860 px, the bar about 250 px with its margins and the one-object panel
-  520 px.
+  500 px.
 - Else **centred within the row** (clear of the minimap and the unit view) with the
   bar above the minimap (4:3: at 1024x768 the row is about 580 px).
 

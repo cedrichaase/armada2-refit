@@ -250,10 +250,11 @@ fn closeup_on(s: &Single) -> bool {
 
 /// A bar in a row: its icon or name at the left, the bar, its value at the right.
 fn bar_with(ui: &mut Ui, r: R, f: f32, col: Color, left: &str, right: &str) {
-    bar_icon(ui, r, f, col, 0, left, right)
+    bar_icon(ui, r, f, col, 0, left, right, ui.theme.small_size)
 }
 
-fn bar_icon(ui: &mut Ui, r: R, f: f32, col: Color, icon: usize, left: &str, right: &str) {
+/// `size` is the text's size (the one-object face prints smaller: `FONT`).
+fn bar_icon(ui: &mut Ui, r: R, f: f32, col: Color, icon: usize, left: &str, right: &str, size: f32) {
     let t = ui.theme;
     let has_icon = icon != 0 && sprite::art(icon).is_some();
     let lw = if has_icon { r.h + ui.u(6.0) } else if left.is_empty() { 0.0 } else { ui.u(BAR_LABEL) };
@@ -261,13 +262,13 @@ fn bar_icon(ui: &mut Ui, r: R, f: f32, col: Color, icon: usize, left: &str, righ
     if has_icon {
         sprite_in(ui, icon, R::new(r.x, r.y, r.h, r.h), t.text);
     } else if !left.is_empty() {
-        line(ui, R::new(r.x, r.y, lw - ui.u(4.0), r.h), left, t.small_size, t.text_dim, Weight::Regular, Align::Left);
+        line(ui, R::new(r.x, r.y, lw - ui.u(4.0), r.h), left, size, t.text_dim, Weight::Regular, Align::Left);
     }
-    let bh = ui.u(BAR_H * 0.6).max(4.0);
+    let bh = (r.h * 0.6).max(4.0);
     let br = R::new(r.x + lw, r.y + (r.h - bh) * 0.5, r.w - lw - vw, bh);
     theme::bar(ui, br, f, Some(col));
     if !right.is_empty() {
-        line(ui, R::new(r.right() - vw, r.y, vw, r.h), right, t.small_size, t.text, Weight::Bold, Align::Right);
+        line(ui, R::new(r.right() - vw, r.y, vw, r.h), right, size, t.text, Weight::Bold, Align::Right);
     }
 }
 
@@ -279,20 +280,32 @@ fn label_of(t: &Text) -> String {
 // ---- one object ------------------------------------------------------------------------
 
 const W_SINGLE: f32 = 600.0;
-const WIRE: f32 = 150.0;
 const BAR_H: f32 = 20.0;
 const BAR_LABEL: f32 = 70.0;
 const BAR_VALUE: f32 = 78.0;
 const STAT_H: f32 = 24.0;
 const SYS_H: f32 = 34.0;
+// The one-object face is the smaller one (HUD.md, "The one-object face"): its own
+// sizes, the shared ones above being the group face's and the bars'.
+const W_ONE: f32 = 575.0;
+/// The camera frame's side (was 150), 0.8 of it for a structure.
+const WIRE: f32 = 123.0;
+const BAR_H_ONE: f32 = 17.0;
+const SYS_H_ONE: f32 = 28.0;
+/// Text sizes of the face, against the theme's (was 1.0).
+const FONT: f32 = 0.9;
+/// Padding and row gap, against the theme's (was 1.0).
+const PAD_ONE: f32 = 0.65;
+const GAP_ONE: f32 = 0.7;
 const QUEUE_CELL: f32 = 44.0;
 
 fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
     let t = ui.theme;
-    let pad = ui.u(t.pad);
-    let gap = ui.u(t.gap);
+    let pad = ui.u(t.pad * PAD_ONE);
+    let gap = ui.u(t.gap * GAP_ONE);
+    let (hs, ss, ts, ms) = (t.heading_size * FONT, t.small_size * FONT, t.text_size * FONT, t.micro_size * FONT);
     // Heights, top to bottom, in pixels.
-    let head = ui.u(t.heading_size + 4.0) + if s.class.is_some() { ui.u(t.small_size + 2.0) } else { 0.0 };
+    let head = ui.u(hs + 3.0) + if s.class.is_some() { ui.u(ss + 2.0) } else { 0.0 };
     let queue = if builder { info::queue(s.obj) } else { alloc::vec![(0, 0); info::queue_len()] };
     // Only what is queued is drawn: an idle builder has no queue row, and no
     // construction bar standing at 0%.
@@ -303,20 +316,20 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
         .filter(|(k, b)| !(builder && queued == 0 && matches!(k, BarKind::Construction) && b.fraction() <= 0.0))
         .collect();
     let n_bars = s.hull.is_some() as usize + (s.shields.is_some() || s.shield_text.is_some()) as usize + bars.len();
-    let bars_h = n_bars as f32 * (ui.u(BAR_H) + ui.u(4.0));
-    let stats_h = if s.stats.is_empty() { 0.0 } else { ui.u(STAT_H) + gap };
+    let bars_h = n_bars as f32 * (ui.u(BAR_H_ONE) + ui.u(3.0));
+    let stats_h = if s.stats.is_empty() { 0.0 } else { ui.u(STAT_H * 0.9) + gap };
     let right_h = head + gap + bars_h + stats_h;
     let top_h = right_h.max(ui.u(WIRE * if s.craft { 1.0 } else { 0.8 }));
-    let sys_h = if s.systems.is_empty() { 0.0 } else { ui.u(SYS_H) + gap };
-    let queue_h = if queued > 0 { ui.u(QUEUE_CELL) + gap + ui.u(t.micro_size + 4.0) } else { 0.0 };
-    let w = ui.u(W_SINGLE).min(ui.w - ui.u(20.0));
+    let sys_h = if s.systems.is_empty() { 0.0 } else { ui.u(SYS_H_ONE) + gap };
+    let queue_h = if queued > 0 { ui.u(QUEUE_CELL) + gap + ui.u(ms + 4.0) } else { 0.0 };
+    let w = ui.u(W_ONE).min(ui.w - ui.u(20.0));
     // The frame's own bars (an LCARS frame's top and bottom) come on top of the padding.
     let (_, ft, _, fb) = theme::frame_margins(ui);
     let h = pad * 2.0 + top_h + sys_h + queue_h + ft + fb;
     let outer = place(ui, w, h);
     // Lamps in the frame (Starfleet): the info panel stands where Roots' has them.
     ui.panel_lit(outer);
-    let inner = theme::panel_inner(ui, outer);
+    let inner = theme::panel_inner(ui, outer).inset(pad - ui.u(t.pad));
 
     // The wireframe, at the left.
     let wire_side = ui.u(WIRE).min(top_h);
@@ -357,8 +370,8 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
         None => (class, String::new()),
     };
     let title = if t.caps_titles { theme::caps(&title) } else { title };
-    let tr = R::new(x, y, name_w, ui.u(t.heading_size + 4.0));
-    line(ui, tr, &title, t.heading_size, t.title, Weight::Bold, Align::Left);
+    let tr = R::new(x, y, name_w, ui.u(hs + 3.0));
+    line(ui, tr, &title, hs, t.title, Weight::Bold, Align::Left);
     if let Some(n) = s.name.as_ref().or(s.class.as_ref()) {
         let id = ui.id("info.name");
         if ui.interact(id, tr).0 {
@@ -367,8 +380,8 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
     }
     y += tr.h;
     if !sub.is_empty() {
-        let cr = R::new(x, y, name_w, ui.u(t.small_size + 2.0));
-        line(ui, cr, &sub, t.small_size, t.text_dim, Weight::Regular, Align::Left);
+        let cr = R::new(x, y, name_w, ui.u(ss + 2.0));
+        line(ui, cr, &sub, ss, t.text_dim, Weight::Regular, Align::Left);
         if let Some(c) = &s.class {
             let id = ui.id("info.class");
             if ui.interact(id, cr).0 {
@@ -377,24 +390,24 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
         }
         y += cr.h;
     } else if s.class.is_some() {
-        y += ui.u(t.small_size + 2.0);
+        y += ui.u(ss + 2.0);
     }
     y += gap;
 
     // Bars.
-    let bh = ui.u(BAR_H);
+    let bh = ui.u(BAR_H_ONE);
     if let Some(hb) = &s.hull {
         let br = R::new(x, y, cw, bh);
         let f = hb.fraction();
         let txt = s.hull_text.as_ref();
         let left = txt.map_or(String::new(), |t| label_of(t));
         let right = txt.map_or(crate::sfmt!("{:.0}/{:.0}", hb.value, hb.max), |t| t.text.clone());
-        bar_icon(ui, br, f, hull_colour(ui, f), txt.map_or(0, |t| t.icon), &left, &right);
+        bar_icon(ui, br, f, hull_colour(ui, f), txt.map_or(0, |t| t.icon), &left, &right, t.small_size * FONT);
         let id = ui.id("info.hull");
         if ui.interact(id, br).0 {
             *tip = Tip::Comp(hb.comp, br);
         }
-        y += bh + ui.u(4.0);
+        y += bh + ui.u(3.0);
     }
     if s.shields.is_some() || s.shield_text.is_some() {
         let br = R::new(x, y, cw, bh);
@@ -404,14 +417,14 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
         let left = txt.map_or(String::new(), |t| label_of(t));
         let right = txt.map_or(crate::sfmt!("{:.0}/{:.0}", now, max), |t| t.text.clone());
         let col = if s.shields_down { t.bad } else { t.fill };
-        bar_icon(ui, br, if s.shields_down { 0.0 } else { f }, col, txt.map_or(0, |t| t.icon), &left, &right);
+        bar_icon(ui, br, if s.shields_down { 0.0 } else { f }, col, txt.map_or(0, |t| t.icon), &left, &right, t.small_size * FONT);
         if let Some(st) = txt {
             let id = ui.id("info.shield");
             if ui.interact(id, br).0 {
                 *tip = Tip::Comp(st.comp, br);
             }
         }
-        y += bh + ui.u(4.0);
+        y += bh + ui.u(3.0);
     }
     for (i, kb) in bars.iter().enumerate() {
         let (kind, b) = (&kb.0, &kb.1);
@@ -433,20 +446,20 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
         if ui.interact(id, br).0 {
             *tip = Tip::Comp(b.comp, br);
         }
-        y += bh + ui.u(4.0);
+        y += bh + ui.u(3.0);
     }
 
     // Stats: icon and value, in a row.
     if !s.stats.is_empty() {
-        let sh = ui.u(STAT_H);
+        let sh = ui.u(STAT_H * 0.9);
         let mut sx = x;
         for (i, st) in s.stats.iter().enumerate() {
             let label = label_of(st);
             let value = st.text.trim();
             let isz = sh;
             let has_icon = st.icon != 0 && sprite::art(st.icon).is_some();
-            let lead = if has_icon { isz + ui.u(4.0) } else if !label.is_empty() { text_w(ui, &label, t.small_size, Weight::Regular) + ui.u(5.0) } else { 0.0 };
-            let vw = text_w(ui, value, t.text_size, Weight::Bold);
+            let lead = if has_icon { isz + ui.u(4.0) } else if !label.is_empty() { text_w(ui, &label, ss, Weight::Regular) + ui.u(5.0) } else { 0.0 };
+            let vw = text_w(ui, value, ts, Weight::Bold);
             let item = R::new(sx, y, lead + vw + ui.u(4.0), sh);
             if item.right() > inner.right() {
                 break;
@@ -454,9 +467,9 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
             if has_icon {
                 sprite_in(ui, st.icon, R::new(sx, y, isz, isz), mix(info::colour(st.icon_colour), 0xffffffff, 0.2));
             } else if !label.is_empty() {
-                line(ui, R::new(sx, y, lead, sh), &label, t.small_size, t.text_dim, Weight::Regular, Align::Left);
+                line(ui, R::new(sx, y, lead, sh), &label, ss, t.text_dim, Weight::Regular, Align::Left);
             }
-            line(ui, R::new(sx + lead, y, vw + ui.u(2.0), sh), value, t.text_size, status_colour(ui, st.colour), Weight::Bold, Align::Left);
+            line(ui, R::new(sx + lead, y, vw + ui.u(2.0), sh), value, ts, status_colour(ui, st.colour), Weight::Bold, Align::Left);
             let id = ui.id(&crate::sfmt!("info.stat{}", i));
             if ui.interact(id, item).0 {
                 *tip = Tip::Comp(st.comp, item);
@@ -470,7 +483,7 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
     if !s.systems.is_empty() {
         let n = s.systems.len() as f32;
         let cwid = (inner.w - gap * (n - 1.0)) / n;
-        let sh = ui.u(SYS_H);
+        let sh = ui.u(SYS_H_ONE);
         for (i, sy) in s.systems.iter().enumerate() {
             let r = R::new(inner.x + i as f32 * (cwid + gap), by, cwid, sh);
             let id = ui.id(&crate::sfmt!("info.sys{}", i));
@@ -481,15 +494,15 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
             st.focus = blink;
             theme::field(ui, r, st);
             let col = system_colour(ui, &sy.state, sy.flash);
-            let isz = sh - ui.u(10.0);
+            let isz = sh - ui.u(8.0);
             let icon = if sy.text.icon != 0 { sy.text.icon } else { sy.repair_icon };
-            let ir = R::new(r.x + ui.u(6.0), r.y + ui.u(5.0), isz, isz);
+            let ir = R::new(r.x + ui.u(6.0), r.y + ui.u(4.0), isz, isz);
             if !sprite_in(ui, icon, ir, col) {
-                line(ui, ir, &label_of(&sy.text), t.micro_size, col, Weight::Regular, Align::Left);
+                line(ui, ir, &label_of(&sy.text), ms, col, Weight::Regular, Align::Left);
             }
             let vr = R::new(ir.right() + ui.u(4.0), r.y, r.right() - ir.right() - ui.u(8.0), r.h);
             let value = sy.text.text.trim();
-            line(ui, vr, value, t.small_size, if damaged { col } else { status_colour(ui, sy.text.colour) }, Weight::Bold, Align::Right);
+            line(ui, vr, value, ss, if damaged { col } else { status_colour(ui, sy.text.colour) }, Weight::Bold, Align::Right);
             if damaged {
                 // What is repaired so far, along the chip's foot.
                 let fr = R::new(r.x + ui.u(4.0), r.bottom() - ui.u(5.0), r.w - ui.u(8.0), ui.u(3.0));
@@ -528,7 +541,7 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
             }
             if i == 0 {
                 if let Some(f) = progress {
-                    let pr = R::new(r.x, r.bottom() + ui.u(3.0), r.w, ui.u(t.micro_size * 0.5));
+                    let pr = R::new(r.x, r.bottom() + ui.u(3.0), r.w, ui.u(ms * 0.5));
                     theme::bar(ui, pr, f, Some(t.accent));
                 }
             }
