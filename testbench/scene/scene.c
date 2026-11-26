@@ -1897,8 +1897,14 @@ static void run_command(char *line)
     if (s_ieq(t[0], "zoom")) { zoom_command(n, t); return; }
     if (s_ieq(t[0], "spawn") && n >= 6) {
         float p[3];
+        int team = n >= 8 ? (int)s_atof(t[7]) : 1;
         p[0] = s_atof(t[3]); p[1] = s_atof(t[4]); p[2] = s_atof(t[5]);
-        spawn(t[1], t[2], n >= 8 ? (int)s_atof(t[7]) : 1, p, n >= 7 ? s_atof(t[6]) : 0);
+        /* `player`: the local player's team, which a match deals by race and slot. */
+        if (n >= 8 && s_ieq(t[7], "player")) {
+            if (!need(SCENE_H_OBJECTS)) return;
+            team = ((UserTeamFn)a2e_addr(SCENE_S_FN_USER_TEAM))();
+        }
+        spawn(t[1], t[2], team, p, n >= 7 ? s_atof(t[6]) : 0);
         return;
     }
     if (s_ieq(t[0], "attack") && n >= 3) {

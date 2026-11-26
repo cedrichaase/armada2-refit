@@ -14,8 +14,10 @@
 //! - each cell that is not clear, an inset tile in `warn` (the amber of stock's grid),
 //!   strongest about the footprint and fading with distance from it, to a floor that
 //!   still shows where the map is taken further off;
-//! - a cell under the footprint (in the world, its centre inside the footprint's
-//!   corners) in `bad`, crossed: what is in the way.
+//! - a cell under a blocked footprint (in the world, its centre inside the footprint's
+//!   corners) in `bad`, crossed: what is in the way. Under a clear footprint a taken
+//!   cell is an ordinary tile: the engine found the place clear over it, as for the
+//!   Orbital Processing Facility over its planet (#156).
 //!
 //! With `Placement=0` the engine's sprites are drawn as the engine drew them.
 use crate::engine::api::leftovers::{Art, Placement, Projector};
@@ -40,12 +42,12 @@ pub fn none() {
 pub fn run(ui: &mut Ui, p: &Placement, ours: bool) {
     let clip = R::new(p.view.vp[0], p.view.vp[1], p.view.vp[2], p.view.vp[3]);
     ui.draw.push_clip(clip);
-    let under = if ours { themed(ui, p, clip) } else { engine_art(ui, p, clip) };
+    let (under, crossed) = if ours { themed(ui, p, clip) } else { (engine_art(ui, p, clip), 0) };
     ui.draw.pop_clip();
-    log(p, under, ours);
+    log(p, under, crossed, ours);
 }
 
-fn log(p: &Placement, under: usize, ours: bool) {
+fn log(p: &Placement, under: usize, crossed: usize, ours: bool) {
     let state = (p.cells.len(), under, p.foot.map_or(0, |f| if f.clear { 1 } else { 2 }));
     unsafe {
         let last = LAST;
@@ -66,8 +68,9 @@ fn log(p: &Placement, under: usize, ours: bool) {
         _ => "none",
     };
     crate::log!(
-        "placement: footprint {}, {} cells not clear, {} under the footprint, drawn {}",
+        "placement: footprint {}, {} crossed, {} cells not clear, {} under the footprint, drawn {}",
         foot,
+        crossed,
         state.0,
         state.1,
         if ours { "in the theme" } else { "with the engine's sprites" }
@@ -141,8 +144,9 @@ fn at(c: &[P3; 4], u: f32, v: f32) -> P3 {
 
 // ---- in the theme ---------------------------------------------------------------------
 
-/// Draws the markers in the theme; returns how many cells are under the footprint.
-fn themed(ui: &mut Ui, p: &Placement, clip: R) -> usize {
+/// Draws the markers in the theme; returns how many cells are under the footprint, and
+/// how many of them are drawn crossed (in the way).
+fn themed(ui: &mut Ui, p: &Placement, clip: R) -> (usize, usize) {
     let t = &ui.theme;
     let (good, bad, warn) = (t.good, t.bad, t.warn);
     let line = ui.u(2.4).max(1.25);
@@ -177,12 +181,20 @@ fn themed(ui: &mut Ui, p: &Placement, clip: R) -> usize {
             }
         }
     }
-    let mut under = 0;
+    let (mut under, mut crossed) = (0, 0);
     for c in &p.cells {
         let mid = centre(c);
-        let hit = foot.is_some_and(|(f, _, _)| inside(&f.corners, mid));
-        if hit {
+        let under_foot = foot.is_some_and(|(f, _, _)| inside(&f.corners, mid));
+        if under_foot {
             under += 1;
+        }
+        // In the way only where the engine found the place blocked: a station that is
+        // placed over what takes the cells (the Orbital Processing Facility over its
+        // planet, whose class asks the planet, not the grid) has a clear footprint over
+        // taken cells, and those stay ordinary tiles (#156).
+        let hit = under_foot && foot.is_some_and(|(f, _, _)| !f.clear);
+        if hit {
+            crossed += 1;
         }
         // Strongest about the footprint, fading out over a few of its sizes; without a
         // placement (the map editor), all alike.
@@ -216,7 +228,7 @@ fn themed(ui: &mut Ui, p: &Placement, clip: R) -> usize {
     }
     // The footprint's edge over the cells: the glow outside it, the outline and, clear,
     // corner brackets along the edges, a quarter of each.
-    let Some((f, s)) = foot_s else { return under };
+    let Some((f, s)) = foot_s else { return (under, crossed) };
     let col: Color = if f.clear { good } else { bad };
     ui.draw.band(&s, line * 0.5, line * 0.5 + glow, fade(col, 0.32), fade(col, 0.0));
     ui.draw.band(&s, -line * 0.5, line * 0.5, fade(col, 0.85), fade(col, 0.85));
@@ -230,7 +242,7 @@ fn themed(ui: &mut Ui, p: &Placement, clip: R) -> usize {
             ui.draw.line_soft(a, to(z, 0.25), line * 2.2, aa, col);
         }
     }
-    under
+    (under, crossed)
 }
 
 // ---- with the engine's sprites ----------------------------------------------------------

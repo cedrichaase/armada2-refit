@@ -1634,9 +1634,17 @@ Drawn in the theme (`hud::placement`, `[HUD] Placement=1`, the default):
 - **The cells that are not clear**: each an inset tile (the cell drawn 12% smaller about
   its centre, so neighbours read as tiles, not a sheet) in `warn`, stock's amber,
   strongest within the footprint's reach and fading with distance from it to a fifth,
-  which still shows where the map is taken further off. A cell whose centre is inside
-  the footprint's corners (on the map's plane) is `bad` and crossed: what is in the way.
-  Without a footprint (the map editor) every cell alike.
+  which still shows where the map is taken further off. Under a **blocked** footprint, a
+  cell whose centre is inside the footprint's corners (on the map's plane) is `bad` and
+  crossed: what is in the way. Under a **clear** one it stays an ordinary tile, as stock
+  draws its yellow outline under the green brackets: the engine found the place clear
+  over it, so it is not in the way. That happens with the Orbital Processing Facility
+  (`classLabel = "p_mining"`, metal from a planet): its class's `CanPlaceHere`
+  (`PlanetMiningBaseClass::CanPlaceHere`) never asks the placement grid, only for a
+  planet within reach of the point that can take an orbital station and has none, and
+  the ghost and its footprint sit at the planet's edge, over the planet's own taken
+  cells. Crossing those cells under a green footprint read as "every cell taken" (issue
+  #156). Without a footprint (the map editor) every cell alike.
 - Everything is projected with the camera the engine gave, as the order ring is, and
   clipped to its viewport; a quad with a corner behind the eye, or wholly outside the
   viewport, is not drawn. Line weights are in units (`Ui::u`), so they keep their
@@ -1645,8 +1653,10 @@ Drawn in the theme (`hud::placement`, `[HUD] Placement=1`, the default):
 
 With `Placement=0` the UI draws the engine's sprites as the engine did (additive, the
 sprite's rectangle of `MBuild`). `UI.log` says each time the footprint's state changes
-("placement: footprint blocked, 280 cells not clear, 12 under the footprint, drawn in
-the theme"); `testbench/scenarios/ui-placement.md` checks both states.
+("placement: footprint blocked, 12 crossed, 280 cells not clear, 12 under the footprint, drawn in
+the theme"); `testbench/scenarios/ui-placement.md` checks both states, and
+`testbench/scenarios/ui-placement-orbital.md` the Orbital Processing Facility over its
+planet (green, its cells not crossed).
 
 ### What the stock overlay and minimap drew that ours left out, and the frame rate
 
