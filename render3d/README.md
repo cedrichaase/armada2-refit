@@ -696,9 +696,9 @@ is on the map from `From=` missions of that campaign complete (0) until `Until=`
 always there (issue #14's): the Federation fleet gains freighters, a mining station and
 at the end a second Sovereign with an Akira; the Klingon scene gains its cruisers, the
 Negh'Var from mission 6 and at the end more of the fleet; the Borg scene gains more
-spheres, the queen's Diamond and the Klingon and Federation hulls it has assimilated (a Vor'cha, then a Galaxy; drawn as
-their own hulls: there is no assimilated look yet; the Intrepid was taken out, a Federation
-ship in the Borg's distance). Since the main menu's view is the Federation fleet's, the
+spheres and the queen's Diamond (Borg hulls only: an assimilated Intrepid, Vor'cha and
+Galaxy were taken out, since they drew as their own hulls and there is no assimilated
+look yet). Since the main menu's view is the Federation fleet's, the
 Federation's progress shows there too. `UI.asi` says how far each campaign has got
 through a third export, `Render3D_MenuProgress(campaign, done)` (ui/MENUS.md,
 "Campaign progress"); a change re-reads the map at the next frame, as an edit does, so
