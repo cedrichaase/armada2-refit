@@ -26,6 +26,7 @@ pub mod gfx;
 pub mod hud;
 pub mod icons;
 pub mod input;
+pub mod keys;
 pub mod loading;
 pub mod math;
 pub mod menus;
@@ -89,6 +90,8 @@ fn startup() {
     }
     config::set(cfg);
     config::remember();
+    // The player's keys into Input.map, before the engine reads it (keys.rs).
+    keys::start();
     // With Display8 (contract 1.1) the parts' claims route its passthrough: registered
     // before any part is patched (README.md, "Claims").
     claims::register();

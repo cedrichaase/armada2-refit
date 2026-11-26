@@ -295,6 +295,17 @@ static int rebind_blocks(BYTE scan)
     return 0;
 }
 
+/* Whether a row of the table moves an action to the key of this set-1 scancode (applied or
+ * not): the bar's cell of that key gets no position key, so a key never does two things (the
+ * grid's keys are the player's, [Keys] CellN, and may be set to a rebind's target). */
+static int rebind_takes(BYTE scan)
+{
+    int r;
+    for (r = 0; r < g_rbN; r++)
+        if (g_rbRows[r].to == scan) return 1;
+    return 0;
+}
+
 /* Logs the keys left to the game (each with its action), once per change; called with the
  * bar's step. */
 static void rebind_note_blocked(void)

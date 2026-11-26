@@ -138,7 +138,8 @@ the build's own variables (`_a2f_qol_<id>`), filled at start-up.
 - **No game files in the repository** (hard rule 8). `Input.map` and `RTS_CFG.h` are
   game files. A change to them ships as a script that edits the player's own copy, with
   a backup and `--revert`, the way the retired `ui-widescreen.py` edited `misc/gui_*.cfg`.
-  It never ships as a modified copy of the file.
+  It never ships as a modified copy of the file. The UI's Keys tab does this for
+  `Input.map` in game (`ui/MENUS.md`, "The Keys tab").
 - **Which plugin.** See "Two plugins" above; each idea below says which.
 
 ---
@@ -170,9 +171,16 @@ button of that cell", and which button sits in which cell is the UI's layout.
   pointers (a global array that `Init` fills: popup, build, orders, trade, AI,
   formations) point at a zero for good. Nothing outside the bar reads them. The bar's
   vtable is never patched.
-- **The keys** are scancodes (Q W E R T / A S D F G / Z X C V B), turned into virtual
-  keys with `MapVirtualKeyA` and read with `GetAsyncKeyState`, so they are positions on
-  any layout. A key goes down once. Nothing happens while chat has the keyboard
+- **The keys** are scancodes (Q W E R T / A S D F G / Z X C V B by default), turned into
+  virtual keys with `MapVirtualKeyA` and read with `GetAsyncKeyState`, so they are
+  positions on any layout. A key goes down once. Which key presses which cell is
+  `[Keys] Cell1`..`Cell15` in `QOL.ini` (row by row, `Cell1` top left), each a key by its
+  name in the game's `Input.map` (`a2fmt::inputmap::KEYS`; `bar.c` holds the subset that is
+  not extended, with each one's scancode and its label on the button), read at start and
+  again by `QOL_SettingsChanged`. The Refit screen's Keys tab rebinds them
+  (`[QOL.Keys]` in `RefitPlayer.ini`, `ui/MENUS.md`, "The Keys tab"); a name the grid
+  cannot use keeps the cell's default (`bar: [Keys] Cell3=... is not a key the grid can
+  use`), and a change is logged (`bar: Cell3 E -> F1`). Nothing happens while chat has the keyboard
   (`TextInput_IsActive`), Ctrl or Alt is held, or the game is not the foreground window.
 - **Cells without a key.** `bk_key_cells` (a value of the build's profile, one bit per cell)
   says which cells get a key: all fifteen, on Armada II and on Fleet Operations: Roots.
@@ -188,7 +196,8 @@ button of that cell", and which button sits in which cell is the UI's layout.
   (`a2_find_export`; UI.asi loads after this plugin, so the lookup repeats until it
   succeeds): the UI's `UI_BarCell(cell)` (the stock button in cell 0..14, or NULL),
   the UI's `UI_BarStep(palette)` and this plugin's `QOL_BarLabel(cell)` (the key's
-  letter, NULL while the keys are off). **The keys work only while `UI_BarCell`
+  label, NULL while the keys are off) and `QOL_BarKeyName(cell)` (the key's `Input.map`
+  name whether the keys are on or off, for the Keys tab). **The keys work only while `UI_BarCell`
   exists and gives a cell**, i.e. while the UI's bar is drawn; otherwise
   they stand down with `bar: no refit bar, position keys off` in `QOL.log` and the stock
   bar keys run.
@@ -264,13 +273,18 @@ Stock ships the key empty.
   `Input.map`, and a key only makes the ordinary command it always made. A player with a rebind
   plays with stock players and with Roots players as before.
 
-### Keybinds page (later)
+### Keybinds page: the Refit screen's Keys tab
 
-The user wants a keybinds page in the game's settings (the Refit screen or Options) where every
-binding can be seen and changed, and where switching the hotkey layout to the grid applies its
-rebinds. The table is meant to feed it: the page lists the key map's controls and chords (the two
-arrays above), writes its changes as rows of `[BarKeys] Rebind` (or a table of the same rows per
-layout), and the grid preset is the rows a layout brings. Not built.
+The UI's Keys tab (`ui/MENUS.md`, "The Keys tab") lists every keyboard binding of
+`Input.map` and the grid's cells. It rebinds the grid's cells through `[QOL.Keys] CellN`
+(live, read by `QOL_SettingsChanged`), and the game's own bindings by rewriting the
+player's `Input.map` beside its `.a2neb-backup` (applied at the next start). The rebind
+table above is separate and stays as it is: in memory, only while the grid's keys are on,
+for a game's own key that must make way for a cell (Roots' W). The two meet in `bar.c`: a
+cell whose key is a row's FROM (until the row applies) or TO gets no key
+(`rebind_blocks`, `rebind_takes`), so a cell set to M on Roots stays empty. The tab does
+not yet list or write the table's rows; making the table the tab's way of moving the
+game's actions (in memory, no file written) is open.
 
 ## QOL-2: Configurable right-drag pan speed
 
