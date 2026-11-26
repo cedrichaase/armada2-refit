@@ -168,7 +168,7 @@ that is not one of the scene's is written `#<id>`, the handle as an unsigned dec
 | `camera rts` | back to the game's own camera |
 | `camera on <object>` | the game's own camera (a free one is switched off first), centred on the object (`ScriptInterfaceImp::CenterCamera`, as `center`) |
 | `zoom [<level>]` | the RTS camera's zoom level, 0 (closest) to 1 (farthest), clamped. With no level it only reads. It answers with the level the camera has now, the camera in use, its raw value and its limits: `zoom 0.37 (parabolic camera, height 809.81, limits 10.00 to 2200.00)`. `query` ends with the same line |
-| `spawn <name> <odf> <x> <y> <z> [heading] [team]` | build an object (anchored like the scene file's positions) |
+| `spawn <name> <odf> <x> <y> <z> [heading] [team]` | build an object (anchored like the scene file's positions); team `player` is the local player's (`Entity::GetUserTeam`), which an Instant Action match deals by race and slot |
 | `objects` | every game object, read-only, into `Scene.objects.jsonl` beside `Scene.log` (below, "Objects"); answers `objects N -> Scene.objects.jsonl` |
 | `attack <name> <target>` | order an attack |
 | `succeed [seconds]`, `fail [seconds]` | the mission ends, won or lost, after the delay, as its script ends it (`ScriptInterfaceImp::SucceedMission` and `FailMission`, `scene.mission`); for the screens that follow a mission (`scenarios/ui-menus-success.md`) |

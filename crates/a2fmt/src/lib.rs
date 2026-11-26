@@ -1,4 +1,4 @@
-//! Readers for Star Trek: Armada II's asset formats, for the renderer in `render3d/`.
+//! Readers for Star Trek: Armada II's asset formats, for the renderer in `render3d/` and the UI.
 //!
 //! - [`sod`]: the binary model format (`SOD/*.sod`), every version the engine accepts.
 //! - [`tga`]: Targa images as stock ships them, decoded to BGRA8 top-down, and the
@@ -10,6 +10,7 @@
 //! - [`fpq`], [`lzo`]: Fleet Operations: Roots' `.fpq` archive and the LZO1X it packs with.
 //! - [`vfs`]: one file system over a game's files: loose folders and `.fpq` archives mounted in
 //!   layers, `.zfs` declared; the system calls are the caller's.
+//! - [`inputmap`]: the key map (`Input.map`), read and rewritten.
 //!
 //! `no_std` with `alloc`: nothing here makes a system call. Callers hand in bytes, and,
 //! where a format includes other files (`.spr`, ODF), a closure that fetches them by name.
@@ -26,6 +27,7 @@ mod bytes;
 pub mod dds;
 pub mod fpq;
 pub mod image;
+pub mod inputmap;
 pub mod lzo;
 pub mod math;
 pub mod odf;

@@ -1843,7 +1843,7 @@ fn poll_button(top: HWND) {
     if dev.is_null() || unsafe { IsWindowEnabled(dev) } != 0 || down == was {
         return;
     }
-    crate::input::note_message(if down { WM_LBUTTONDOWN } else { WM_LBUTTONUP }, if down { MK_LBUTTON } else { 0 });
+    crate::input::note_message(if down { WM_LBUTTONDOWN } else { WM_LBUTTONUP }, if down { MK_LBUTTON } else { 0 }, 0);
 }
 
 /// The device window under the top form: its owner's, or, for a form whose owner is not
@@ -1869,12 +1869,14 @@ static mut KEYS_WAS: [bool; 2] = [false; 2];
 
 fn poll_keys(top: HWND) {
     const KEYS: [usize; 2] = [0x0d, 0x1b];
+    // Their set-1 scancodes, as a key message's lParam carries them (bits 16..23).
+    const SCANS: [isize; 2] = [0x1c, 0x01];
     let active = unsafe { GetActiveWindow() } == top;
     for (i, vk) in KEYS.iter().enumerate() {
         let down = active && unsafe { GetAsyncKeyState(*vk as i32) } as u16 & 0x8000 != 0;
         let was = unsafe { core::mem::replace(&mut (*core::ptr::addr_of_mut!(KEYS_WAS))[i], down) };
         if down && !was {
-            crate::input::note_message(WM_KEYDOWN, *vk);
+            crate::input::note_message(WM_KEYDOWN, *vk, SCANS[i] << 16);
         }
     }
 }

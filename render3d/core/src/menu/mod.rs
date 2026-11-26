@@ -14,6 +14,13 @@
 //! Every scene is on the one map, under one sun: a view names the camera, and asking
 //! for another view moves the camera over to it (`Blend=`). The planet turns about its
 //! axis and the sky about +x (the fleet's orbit).
+//!
+//! **Campaign progress.** A ship or gas field may belong to a campaign's progress
+//! (`Campaign=`, `From=`, `Until=`): it is on the map only while that many missions of
+//! the campaign are complete. `UI.asi` says how far each campaign has got through
+//! `Render3D_MenuProgress`; the map's `[Progress]` section gives the count for a
+//! campaign nobody has told it of (`Default=`) and can force one (`<campaign>=`), for
+//! tuning. A change of progress re-reads the map, as an edit does.
 
 use crate::frame::post::PRect;
 use crate::frame::steps::View;
@@ -244,6 +251,10 @@ struct Group {
     /// until then, after `delay` seconds, each ship `stagger` after the last, over `time`.
     cloak_view: Option<String>,
     cloak_delay: f32,
+    /// How long the view must have been the wanted one before the decloak (and its sound)
+    /// may begin (`CloakDwell=`, 0.5 s): a pointer only passing over the menu entry
+    /// that asks for the view moves the camera, but decloaks nothing.
+    cloak_dwell: f32,
     cloak_time: f32,
     cloak_stagger: f32,
     /// The sound each ship makes as it begins to decloak (`CloakSound=`, a file the
@@ -259,6 +270,9 @@ struct Group {
     locked_yaw: f32,
     /// The tunnel's tint when this group departs (`WarpColour=`).
     warp_colour: V3,
+    /// The campaign whose progress its ships and gas follow unless they name their own
+    /// (`Campaign=`, lower case; empty: none).
+    campaign: String,
 }
 
 impl Group {
@@ -267,6 +281,47 @@ impl Group {
         let (s, c) = (math::sinf(self.yaw), math::cosf(self.yaw));
         self.at + v3(p.x * c + p.z * s, p.y, -p.x * s + p.z * c)
     }
+}
+
+/// Whether a ship or gas field of section `sec` is on the map at this progress:
+/// `Campaign=` (else its group's) names the campaign, and it shows from `From=`
+/// missions complete (0) until `Until=` (never). One without a campaign always shows.
+fn gated_in(t: &Text, sec: &str, group_campaign: Option<&str>, progress: &dyn Fn(&str) -> u32) -> bool {
+    let own = t.get(sec, "campaign").map(rt::lower);
+    let Some(c) = own.as_deref().or(group_campaign).filter(|c| !c.is_empty()) else { return true };
+    let done = progress(c);
+    let from = t.f(sec, "from", 0.0).max(0.0) as u32;
+    let until = t.get(sec, "until").and_then(parse_f).map(|u| u.max(0.0) as u32);
+    done >= from && until.is_none_or(|u| done < u)
+}
+
+/// What `UI.asi` has said of each campaign's progress (`Render3D_MenuProgress`):
+/// (campaign, missions complete), and a count of the changes, which the map compares
+/// against to read itself again.
+static mut PROGRESS: Vec<(String, u32)> = Vec::new();
+static mut PROGRESS_GEN: u32 = 0;
+
+#[allow(static_mut_refs)]
+fn told(c: &str) -> Option<u32> {
+    unsafe { PROGRESS.iter().find(|e| e.0 == c).map(|e| e.1) }
+}
+
+/// Sets a campaign's progress; true when it changed.
+#[allow(static_mut_refs)]
+fn tell(c: &str, done: u32) -> bool {
+    unsafe {
+        match PROGRESS.iter_mut().find(|e| e.0 == c) {
+            Some(e) if e.1 == done => return false,
+            Some(e) => e.1 = done,
+            None => PROGRESS.push((String::from(c), done)),
+        }
+        PROGRESS_GEN = PROGRESS_GEN.wrapping_add(1);
+    }
+    true
+}
+
+fn progress_gen() -> u32 {
+    unsafe { PROGRESS_GEN }
 }
 
 struct ShipDef {
@@ -346,8 +401,10 @@ struct WarpDef {
 
 /// The map, read.
 struct Map {
-    /// What it was read from, to notice an edit.
+    /// What it was read from, to notice an edit, and the progress it was read at
+    /// (`progress_gen`), to notice a change.
     text: String,
+    progress: u32,
     sky: String,
     sky_rate: f32,
     stars: Vec<(V3, f32, f32)>,
@@ -411,6 +468,12 @@ impl Map {
         let (text, src) = text_of();
         let t = Text::parse(&text);
         let s = "scene";
+        // Each campaign's missions complete: forced by the map's `[Progress]`, else as
+        // UI.asi said, else the map's `Default=` (the built-in map's: its look before
+        // progress counted).
+        let default = t.f("progress", "default", 0.0).max(0.0) as u32;
+        let progress = |c: &str| -> u32 { t.get("progress", c).and_then(parse_f).map(|v| v.max(0.0) as u32).or_else(|| told(c)).unwrap_or(default) };
+        let read_at = progress_gen();
         let key_dir = t.v(s, "keyaxis", v3(-0.6, -0.35, 0.72)).norm();
         let fill_dir = t.v(s, "fillaxis", v3(0.5, 0.4, -0.6)).norm();
         let mut stars = Vec::new();
@@ -447,6 +510,7 @@ impl Map {
             )
         });
         let blend = t.f(s, "blend", 2.0).max(0.0);
+        let dwell = t.f(s, "cloakdwell", 0.5).max(0.0);
         // The groups; ships, gas and views name theirs (none: the map's origin).
         let mut groups = alloc::vec![Group {
             name: String::new(),
@@ -454,12 +518,14 @@ impl Map {
             yaw: 0.0,
             cloak_view: None,
             cloak_delay: 0.0,
+            cloak_dwell: 0.0,
             cloak_time: 1.0,
             cloak_stagger: 0.0,
             cloak_sound: String::new(),
             locked_cloak: false,
             locked_yaw: 0.0,
             warp_colour: v3(0.45, 0.62, 1.0),
+            campaign: String::new(),
         }];
         for (sec, _) in &t.sections {
             let Some(name) = named(sec, "group") else { continue };
@@ -469,12 +535,14 @@ impl Map {
                 yaw: t.f(sec, "yaw", 0.0) * DEG,
                 cloak_view: t.get(sec, "cloakview").map(rt::lower),
                 cloak_delay: t.f(sec, "cloakdelay", blend * 0.7).max(0.0),
+                cloak_dwell: t.f(sec, "cloakdwell", dwell).max(0.0),
                 cloak_time: t.f(sec, "cloaktime", 2.5).max(0.05),
                 cloak_stagger: t.f(sec, "cloakstagger", 0.5).max(0.0),
                 cloak_sound: t.get(sec, "cloaksound").map_or_else(|| String::from("clkdisen.wav"), String::from),
                 locked_cloak: t.f(sec, "lockedcloak", 0.0) != 0.0,
                 locked_yaw: t.f(sec, "lockedyaw", 0.0) * DEG,
                 warp_colour: t.v(sec, "warpcolour", v3(0.45, 0.62, 1.0)),
+                campaign: t.get(sec, "campaign").map(rt::lower).unwrap_or_default(),
             });
         }
         let group_of = |sec: &str| -> usize {
@@ -487,10 +555,13 @@ impl Map {
                 continue;
             }
             let Some(odf) = t.get(sec, "odf") else { continue };
+            let group = group_of(sec);
+            if !gated_in(&t, sec, Some(groups[group].campaign.as_str()), &progress) {
+                continue;
+            }
             let sod = assets::sod_of(odf);
             let scale_sod = assets::odf(odf).and_then(|o| o.get_f32("ScaleSOD")).filter(|x| *x > 0.0).unwrap_or(1.0);
             let team = t.get(sec, "team").map(|_| t.v(sec, "team", v3(1.0, 1.0, 1.0)));
-            let group = group_of(sec);
             let nth = ships.iter().filter(|s| s.group == group).count();
             ships.push(ShipDef {
                 odf: String::from(odf),
@@ -515,6 +586,9 @@ impl Map {
             }
             let Some(odf) = t.get(sec, "odf") else { continue };
             let g = &groups[group_of(sec)];
+            if !gated_in(&t, sec, Some(g.campaign.as_str()), &progress) {
+                continue;
+            }
             // The class's radius: the recipe's, else the ODF's `effectRadius`.
             let radius = t.get(sec, "radius").and_then(parse_f).or_else(|| assets::odf(odf).and_then(|o| o.get_f32("effectRadius"))).filter(|r| *r > 10.0).unwrap_or(300.0);
             // Centres on a jittered grid over an ellipse of half extents `Size` (x, z)
@@ -567,8 +641,28 @@ impl Map {
                 warp_target: at("warptarget"),
             });
         }
+        // The campaigns the map gates anything on, with the count each was read at.
+        let mut campaigns: Vec<String> = groups.iter().map(|g| g.campaign.clone()).filter(|c| !c.is_empty()).collect();
+        for (sec, _) in &t.sections {
+            if let Some(c) = t.get(sec, "campaign").map(rt::lower).filter(|c| !c.is_empty() && named(sec, "group").is_none()) {
+                campaigns.push(c);
+            }
+        }
+        campaigns.sort();
+        campaigns.dedup();
+        for c in &campaigns {
+            let how = if t.get("progress", c).is_some() {
+                "forced by the map"
+            } else if told(c).is_some() {
+                "as UI.asi said"
+            } else {
+                "the map's default"
+            };
+            log!("menu:   progress {}: {} missions complete ({})", c, progress(c), how);
+        }
         let m = Map {
             text: text.clone(),
+            progress: read_at,
             sky: t.str(s, "sky", "mbgblue"),
             sky_rate: t.f(s, "skyturn", 0.004),
             stars,
@@ -790,6 +884,8 @@ struct State {
     view: String,
     prev: String,
     since: f64,
+    /// How long the previous view was the wanted one before this one replaced it.
+    held: f32,
     /// The camera the last frame had, and the one blended from after a change of view.
     cam: Option<(V3, V3, f32)>,
     from: Option<(V3, V3, f32)>,
@@ -810,6 +906,7 @@ static mut STATE: State = State {
     view: String::new(),
     prev: String::new(),
     since: 0.0,
+    held: 0.0,
     cam: None,
     from: None,
     said: 0,
@@ -845,19 +942,29 @@ fn smooth(x: f32) -> f32 {
     t * t * (3.0 - 2.0 * t)
 }
 
+/// How far the ship `nth` of a decloaking group is back after `gone` seconds of its
+/// view: the decloak begins once the view has been wanted for the dwell as well as
+/// the camera's delay, so its sound waits for the dwell too. Negative before it starts.
+fn back_k(g: &Group, nth: usize, gone: f32) -> f32 {
+    (gone - g.cloak_delay.max(g.cloak_dwell) - nth as f32 * g.cloak_stagger) / g.cloak_time
+}
+
 /// How far the ship `nth` of a decloaking group is back, the view `view` shown since
-/// `since` (`now` the clock), the one before it `prev`; None when whole.
-fn cloak_of(g: &Group, nth: usize, view: &str, prev: &str, since: f64, now: f64, blend: f32) -> Option<f32> {
+/// `since` (`now` the clock), the one before it `prev`, which was shown `held` seconds;
+/// None when whole.
+fn cloak_of(g: &Group, nth: usize, view: &str, prev: &str, since: f64, held: f32, now: f64, blend: f32) -> Option<f32> {
     let cv = g.cloak_view.as_deref()?;
     let gone = (now - since) as f32;
     if cv == view {
-        let k = (gone - g.cloak_delay - nth as f32 * g.cloak_stagger) / g.cloak_time;
+        let k = back_k(g, nth, gone);
         return if k >= 1.0 { None } else { Some(k.max(0.0)) };
     }
-    // Leaving its view, the group stays as it was until the camera has gone; then it
-    // cloaks again, to decloak on the next arrival.
+    // Leaving its view, the group stays as it was until the camera has gone: whole if
+    // it was whole, cloaked (silent) if the view was only passed over; then it cloaks
+    // again, to decloak on the next arrival.
     if cv == prev && gone < blend {
-        return None;
+        let k = back_k(g, nth, held);
+        return if k >= 1.0 { None } else { Some(k.max(0.0)) };
     }
     Some(0.0)
 }
@@ -917,7 +1024,11 @@ pub fn draw(name: &str, rect: PRect, depart: bool) -> bool {
     let wall = rt::now();
     if s.map.is_none() || wall - s.checked > 1.0 {
         s.checked = wall;
-        if s.map.as_ref().is_none_or(|m| m.text != text_of().0) {
+        // A change of progress shows at once, not at the next look at the file.
+        if s.map.as_ref().is_some_and(|m| m.progress != progress_gen()) {
+            s.cloaks.clear();
+        }
+        if s.map.as_ref().is_none_or(|m| m.text != text_of().0 || m.progress != progress_gen()) {
             s.map = Some(Map::read());
         }
     }
@@ -931,6 +1042,7 @@ pub fn draw(name: &str, rect: PRect, depart: bool) -> bool {
     };
     if s.view != name {
         s.prev = core::mem::replace(&mut s.view, String::from(name));
+        s.held = (now - s.since) as f32;
         // Under the bench clock the front end's time stands (there is no simulation),
         // so a move to the new view has already happened: the view as it settles.
         let bench = crate::clock::bench();
@@ -975,10 +1087,10 @@ pub fn draw(name: &str, rect: PRect, depart: bool) -> bool {
     } else {
         s.cam = Some((eye, at, fov));
     }
-    let (view, prev, since, blend) = (s.view.as_str(), s.prev.as_str(), s.since, m.blend);
+    let (view, prev, since, held, blend) = (s.view.as_str(), s.prev.as_str(), s.since, s.held, m.blend);
     // A departure leaves as the scene is: a mission is loading, so its campaign is open.
     let locked = if dep.is_some() { Vec::new() } else { m.locked_groups(&s.locked) };
-    let shot = m.shot(t, |g, nth| cloak_of(g, nth, view, prev, since, now, blend), dep.as_ref().map(|d| &d.0), &locked);
+    let shot = m.shot(t, |g, nth| cloak_of(g, nth, view, prev, since, held, now, blend), dep.as_ref().map(|d| &d.0), &locked);
     decloak_sounds(m, &shot, &mut s.cloaks);
     let lights = Lights { dirs: alloc::vec![m.key, m.fill], points: Vec::new() };
     let planet = m.planet.as_ref().map(|p| (p.6, p.2));
@@ -1064,6 +1176,24 @@ pub extern "C" fn Render3D_MenuLocked(names: *const u8) -> u32 {
     if s.locked != new {
         log!("menu: locked views: {}", if list.trim().is_empty() { "none" } else { list.as_str() });
         s.locked = new;
+    }
+    1
+}
+
+/// `UI.asi`'s call: the campaign `name` (a NUL-terminated name, as the map's
+/// `Campaign=` gives it: `tutorials`, `federation`, `klingon`, `borg`) has `done`
+/// missions complete. The map is read again at the next frame when that changes what
+/// it was read at; the ships and gas of the campaign's progress (`From=`, `Until=`)
+/// come and go with it. Returns 1. Before the first call, a campaign counts as the
+/// map's `[Progress] Default=`.
+#[unsafe(no_mangle)]
+pub extern "C" fn Render3D_MenuProgress(name: *const u8, done: u32) -> u32 {
+    if name.is_null() {
+        return 0;
+    }
+    let n = rt::lower(unsafe { rt::cstr_at(name, 32) });
+    if tell(&n, done) {
+        log!("menu: progress {}: {} missions complete", n, done);
     }
     1
 }

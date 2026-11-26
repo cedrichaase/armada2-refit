@@ -22,7 +22,7 @@ a construction ship spawned off screen. The bar's keys open its build menu (Q) a
 the starbase (Q again). At 640,180 the starbase's footprint overlaps the advanced
 shipyard behind the middle yard and the middle yard's own cells: blocked, with cells
 under it. At 100,120, top left, it is clear. `UI.log` says each time the footprint
-changes ("placement: footprint blocked, 280 cells not clear, 12 under the footprint,
+changes ("placement: footprint blocked, 12 crossed, 280 cells not clear, 12 under the footprint,
 drawn in the theme"). The scene's stations take some 280 cells: more than the 256
 quads the UI kept a frame before ui 0.20.0, which crowded the footprint out.
 

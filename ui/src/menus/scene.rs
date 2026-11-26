@@ -17,6 +17,9 @@
 //! view that showed last is asked of render3d's `Render3D_MenuWarp`, whose ships go to
 //! warp with the camera following them into the warp's tunnel (`begin_departure` when
 //! the load's splash goes up, `draw_departure` in each loading frame).
+//!
+//! **Campaign progress.** Before each frame of the scene, `progress::tell` gives
+//! render3d each campaign's missions complete, and its map shows that much progress.
 use crate::rt::win::{GetModuleHandleA, GetProcAddress};
 
 type SceneFn = unsafe extern "C" fn(*const u8, u32, u32, u32, u32) -> u32;
@@ -142,6 +145,7 @@ pub fn draw(w: u32, h: u32) {
         return;
     };
     send_locked(&super::locks::locked_scenes());
+    super::progress::tell();
     let drew = unsafe { f(name.as_ptr() as *const u8, 0, 0, w, h) } != 0;
     unsafe {
         SHOWN = drew;

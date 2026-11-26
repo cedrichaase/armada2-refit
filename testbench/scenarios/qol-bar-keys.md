@@ -19,7 +19,7 @@ at about 640,175, 1280x720).
 
 1. Include "_enter-instant-action".
 2. Expect "UI.log" contains "bar: ours".
-3. Expect "QOL.log" contains "--- QOL BarKeys=1  -> Q W E R T / A S D F G / Z X C V B press the Refit bar's cells, patched".
+3. Expect "QOL.log" contains "--- QOL BarKeys=1  -> the grid's keys ([Keys]) press the Refit bar's cells, patched".
 4. Note "Home puts the camera on the base; select the first Assembler there".
 5. Press Home.
 6. Wait 2 seconds.
