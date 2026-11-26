@@ -115,6 +115,7 @@ the build's own variables (`_a2f_qol_<id>`), filled at start-up.
 | `qol.move_paths` | `PathStartsAtOnce` | `mAddPathPoint`'s two calls in `mNormalModeRightClick` and `QueueCommand`'s in `mProcessWaypoints` (`call`), those two functions, the craft process's command, path and point fields, the action's no-order flag, the order's packet limit | paths sent on release, as stock |
 | `qol.rig_self` | `RigIgnoresSelf` | two patches in `ConstructionRig::GetAction` (`patch`, each with two continue points as `label`) and the two vtable slots the stubs call | the ghost as stock |
 | `qol.script_input` | none (always on) | `ScriptInputCallbacks::AlwaysSimulate` at its entry (`patch`, its whole body as the check) and the callback's field | the editor after a scripted mission crashes, as stock |
+| `qol.astar_path` | none (always on) | the path walk in `A_Star_Search::Plan_Path` (`patch`), its found-path and no-path returns (`label`), `linked_list::Add_Data` (`fn`), the search's path list, start and goal fields and `Get_From`'s vtable slot | a looping path chain runs the game out of memory, as stock |
 
 `MaxSelection` needs both of its hooks; the log names the one that failed.
 
@@ -1072,6 +1073,54 @@ run before it there; the guard is the same on both builds.
 End Mission, Map Editor, Create new map, the editor up). Roots as it ships was driven the same way
 by hand in a stock session (PLAN-FLEETOPS.md, decision 500): the editor opens from a fresh start
 and crashes after the tutorial.
+
+## A* path construction (an Out of Memory fix, hook `qol.astar_path`)
+
+*`QOL.asi`, no key: it changes nothing a player sees, only a crash late in long games. The
+bug is stock's code (issue #174).*
+
+**The crash.** Late in long skirmishes the game stops with *"Out of Memory: Increase swap
+file size."*, with plenty of memory free. Seen on the bench of armada2-decomp (a harness of
+AI-only games on Armada II 1.1): 6 of 6 such crashes on `mp02ring`, each the 2 GB address
+space used up by one runaway loop; the failing request was each time a 12 KB chunk of list
+cells, under `A_Star_Search::Plan_Path` <- `Path_Planner::Plan_A_Path` <-
+`CraftProcess::Path_To_Tactical_Range`, in the moments after a craft left a wormhole.
+
+**Why.** When `Plan_Path` (0x40ad40) reaches the goal, it builds the result by following each
+node's `Get_From` (A_Star_Node vtable +0x2c) back from the goal (search +0x18) towards the
+start (+0x14), appending every node to the search's path list (+0x10) with
+`linked_list::Add_Data`. The walk stops only on reaching the start or a null link. When a
+chain loops back on itself without passing the start, as one left over from a wormhole exit
+does, the walk never ends: it appends until the allocator fails, and the engine's out-of-memory
+handler ends the game.
+
+**The fix.** QOL replaces the walk at its first test (0x40ae5b, a jump) with a function of
+its own (`astar_build` in `qol.c`) that walks the same way and adds the same nodes, but stops
+after 20,000 nodes (`ASTAR_CAP`; a real path is a few hundred at most). A walk that reaches
+the start goes on to `Plan_Path`'s found-path return (0x40ae8b), as stock. A walk that is
+stopped goes to its no-path return (0x40ae4d), a result `Plan_A_Path` already handles (it
+hands back no `AiPath`, and the craft asks again later); `Setup_Search` empties the path
+list before the next search, so the partial list is not reused. The two returns are where
+stock's own code restores `Plan_Path`'s registers and frame.
+
+**Stock players.** Path planning is part of the simulation, so a change to it would
+ordinarily belong to the rules layer. This one stays in `QOL.asi` because it changes no
+result stock arrives at: a path stock builds is built the same, node for node, and the only
+walk that differs is one stock never finishes, where stock crashes. A player with it can
+play a player without it; in a game where the loop happens, the player without it still
+crashes, as before.
+
+`QOL.log` says `--- QOL A* path construction: a path whose chain never reaches its start is
+no path, patched` at start-up and, each time the cap is needed (the first 20, then every
+1000th), `astar: a path's Get_From chain does not reach its start: no path (<n>)`.
+
+**Seen:** on armada2-decomp's harness, 6 `mp02ring` games that ran out of memory 3 times in 6
+before ran to their end with the same plugin logic; the cap fired once, just after a craft was
+queued at a wormhole exit, and memory stayed flat. Then with this `QOL.asi`, under Wine, three
+`mp02ring` games against three without any cap: one of the three without ran out of memory
+(the failing request again a 12 KB chunk, from inside the walk), none of the three with it did;
+in one of those the cap fired once and the game played on to its 40-minute limit, its address
+space flat at about 290 MB. Not yet on this repository's bench.
 
 ## On Fleet Operations: Roots
 
