@@ -18,6 +18,7 @@ pub mod generic;
 pub mod locks;
 pub mod main_layout;
 pub mod model;
+pub mod progress;
 pub mod refit;
 pub mod scene;
 pub mod title_art;

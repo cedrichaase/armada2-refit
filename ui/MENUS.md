@@ -1075,6 +1075,15 @@ a Mutara nebula with the queen's Diamond (`render3d/README.md`, "The menu scene"
 - **A mission loaded over it departs from it**: the loading screen draws over the
   view that showed last, whose ships go to warp into render3d's tunnel
   (`LOADING.md`, "Over the menu scene"; `Render3D_MenuWarp`).
+- **Campaign progress** (issue 15; `src/menus/progress.rs`). Before each frame of the
+  scene the UI tells render3d each campaign's missions complete
+  (`Render3D_MenuProgress`), and render3d's map shows that much of the campaign's
+  scene (render3d/README.md, "Campaign progress"). The count is the progress the
+  campaign locks read ("Locked campaigns": the game's memory, else `save\shell.set`):
+  the furthest mission reached, plus one once the campaign is complete. Read at most
+  once a second; with neither source nothing is told, and the map uses its
+  `[Progress] Default=`. Nothing is written. UI.log:
+  `menus: progress <campaign>: N missions complete (from <source>)`.
 - **For the bench**, UI.log says `menus: scene <name> on` and `menus: scene off` at
   each change of screen. `testbench/ui.json` gives the main menu's and the campaign
   selection's targets a `label`, which `Click the <target>` clicks (by OCR) while the

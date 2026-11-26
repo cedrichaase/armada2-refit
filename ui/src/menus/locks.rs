@@ -73,6 +73,20 @@ fn from_file() -> Option<Progress> {
     Some(Progress { reached: [b[0], b[1], b[2], b[3]], complete: [b[4], b[5], b[6], b[7]], missions: [0; 4] })
 }
 
+/// The player's progress and where it was read from: the game's memory, else
+/// `save\shell.set`, else None. Also the menu scene's (`menus::progress`), whatever
+/// `CampaignLocks` says.
+pub fn current() -> (Option<Progress>, &'static str) {
+    if let Some(p) = crate::engine::api::progress::read() {
+        (Some(p), "memory")
+    } else {
+        match from_file() {
+            Some(p) => (Some(p), FILE),
+            None => (None, "none: no progress in memory nor in save\\shell.set"),
+        }
+    }
+}
+
 /// Reads the progress again (four times a second) and works the locks out when it changed.
 fn refresh() {
     let s = st();
@@ -82,16 +96,7 @@ fn refresh() {
     }
     s.checked = now;
     let cfg = crate::config::get();
-    let read = if !cfg.campaign_locks {
-        (None, "off (CampaignLocks=0)")
-    } else if let Some(p) = crate::engine::api::progress::read() {
-        (Some(p), "memory")
-    } else {
-        match from_file() {
-            Some(p) => (Some(p), FILE),
-            None => (None, "none: no progress in memory nor in save\\shell.set"),
-        }
-    };
+    let read = if !cfg.campaign_locks { (None, "off (CampaignLocks=0)") } else { current() };
     if s.last == Some(read) {
         return;
     }
