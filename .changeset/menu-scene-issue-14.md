@@ -1,7 +1,7 @@
 ---
 render3d: patch
 games: [armada2]
-status: Installed, not yet seen in game
+status: Confirmed in game 2026-11-26
 ---
 
 ### Changed

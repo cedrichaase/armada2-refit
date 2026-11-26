@@ -2,6 +2,7 @@
 layers: [render3d]
 bump: minor
 games: [armada2]
+status: Confirmed in game 2026-11-26
 ---
 
 ### Changed

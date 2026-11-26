@@ -2,6 +2,7 @@
 layers: [ui]
 bump: patch
 games: [armada2]
+status: Confirmed in game 2026-11-26
 ---
 
 ### Fixed
