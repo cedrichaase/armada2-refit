@@ -1,7 +1,7 @@
 ---
 layers: [root]
 bump: minor
-games: [armada2, fo-roots]
+games: [fo-roots]
 status: none
 ---
 
