@@ -2,7 +2,7 @@
 display: minor
 ui: patch
 root: patch
-games: [armada2, fo-roots]
+games: [fo-roots]
 ---
 
 ### Fixed

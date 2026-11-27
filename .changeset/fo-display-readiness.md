@@ -1,7 +1,7 @@
 ---
 layers: [display]
 bump: minor
-games: [armada2, fo-roots]
+games: [fo-roots]
 ---
 
 ### Added

@@ -1,7 +1,7 @@
 ---
 layers: [testbench, root]
 bump: minor
-games: [armada2, fo-roots]
+games: [fo-roots]
 ---
 
 ### Added

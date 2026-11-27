@@ -4,6 +4,19 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 1.2.0 — 2026-11-26
+
+### Added
+- Block-compressed textures for a game that loads DDS through D3DX8: CheckDeviceFormat answers DXT1, DXT3 and DXT5 as 2D textures when the backend samples BC1, BC2 and BC3 (Vulkan textureCompressionBC, enabled when present; Direct3D 12 always), mirrored and sampled natively with every level, small mips included. CheckDeviceMultiSampleType accepts a multisample type (ignored). A later CreateDevice on another window moves the swap chain to it, on Vulkan and on Direct3D 12 (both seen on the bench). Bench-only keys BenchTextures and BenchWindow (which hides its popup when it hands the game's window back, gives the activation back to the game's window when the popup takes it, and logs the Presents made after each handover). GetDesc of a standalone block-compressed surface gives its bytes. The stock engine is unchanged. `77c072e` Confirmed in game 2026-11-27.
+- [Window] OneWindow (default 1): where the build's profile says the game makes its device on a new window at each switch (profile value device_windows), Display8 keeps one top-level window of its own for the whole game and puts each device window inside it, so the window manager sees no window close or open and the focus stays; empty frames presented right after a switch are not shown until a frame with content, so the picture holds instead of going black. Armada II is unchanged. `8ceab8f` Confirmed in game 2026-11-27.
+
+### Changed
+- Comments and help text in the shipped inis and the Refit screen's Theme row, and in the guides, describe other games neutrally; no key, default or behaviour changes. `735f7b6`
+- A later CreateDevice on another window logs the new window's class, whether it is shown and its thread, and whether the old window is still there, before the swap chain follows it; the README says Armada II meets this path when its engine makes its display again (its flip to windowed after an assert or a crash), where following is right. `c41785c` Confirmed in game 2026-11-27.
+
+### Fixed
+- Contract 1.5: CLAIM_WINDOW (gpu/src/display.rs). Display8 makes its one window ([Window] OneWindow) only when a plugin claims it at the first CreateDevice; the UI claims it while a game's front-end forms are its own ([Menus] Forms=1). `53f19ae` Confirmed in game 2026-11-27.
+
 ## 1.1.0 — 2026-11-06
 
 ### Changed
