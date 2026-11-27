@@ -188,7 +188,7 @@ pub mod setup {
 
 pub mod shell {
     pub use crate::engine::shell::{
-        credits_ours, hide_os_cursor, install, leave_to_main_menu, run_screen_under, Pumped,
+        credits_ours, own_cursor_drawn, install, leave_to_main_menu, run_screen_under, Pumped,
     };
 }
 

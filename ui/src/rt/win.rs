@@ -82,7 +82,11 @@ unsafe extern "system" {
     pub fn SetFocus(w: HWND) -> HWND;
     pub fn ClipCursor(r: *const WinRect) -> i32;
     pub fn GetClipCursor(r: *mut WinRect) -> i32;
+    pub fn SetClassLongA(w: HWND, idx: i32, v: usize) -> usize;
+    pub fn SetTimer(w: HWND, id: usize, ms: u32, f: unsafe extern "system" fn(HWND, u32, usize, u32)) -> usize;
 }
+
+pub const GCL_HCURSOR: i32 = -12;
 
 #[link(name = "kernel32")]
 unsafe extern "system" {

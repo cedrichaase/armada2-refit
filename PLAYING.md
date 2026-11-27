@@ -373,6 +373,7 @@ antivirus holds).
 | Black bars at the sides of the main menu | The widescreen backdrop is built from your game's own art and is not in a release. Black sides are the intended fallback ([`ui/MENUS.md`](ui/MENUS.md)) |
 | A plugin is missing after install, or the installer cannot copy one | Antivirus. See the README section linked above |
 | The Refit screen's row is dimmed with a note | That part is not running; the note says why. Your choice is kept |
+| Two cursors, the system's arrow beside the game's (seen under Wine on a Mac) | The UI hides the system cursor over the game window while it draws its own, and gives it back when it stops (`UI.log`: `cursor: system cursor hidden` / `system cursor back`). If you are left with no cursor at all, set `HideSystemCursor=0` under `[UI]` in `RefitPlayer.ini` (or `UI.ini`) |
 | A change in Refit has no effect | Check its badge: *Next mission* and *Restart* rows apply later |
 | A key changed on the Keys tab does nothing | The game reads its keys when it starts: restart it. A key under *Bar:* does nothing while Grid keys are on (Interface tab). `UI.log` says what was written (`keys: ...`) |
 | Joiners cannot connect | Check `Online.log` on both sides: it says whether the direct path or the relay was used. A host with `Server=` emptied in `Online.ini` needs the address |

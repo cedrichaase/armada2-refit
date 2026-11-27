@@ -323,12 +323,23 @@ uses of it:
     sprite's `@origin` scaled the same way, so the click point is exact. The engine's own
     cursor is stretched by its 800x600 reference (`HUD.md`, same section); ours is square at any
     aspect and at the back buffer's resolution.
-  - **In a front-end screen of ours Windows' arrow is hidden** (`shell::hide_os_cursor`,
-    the window's `WM_SETCURSOR` answer) for as long as the screen runs. The same holds
-    for every hosted dialog (`Context::Menus`: the main menu, every shell menu and the
-    in-mission ones), so with `Cursor=1` the cursor is ours in every context of the
-    game: the shell's system arrow shows only while no dialog is hosted and no screen
-    of ours runs (between two screens, for a frame), or with `[Menus] Enable=0`.
+  - **The system's cursor is hidden whenever ours is drawn** (`[UI] HideSystemCursor=1`,
+    `shell::own_cursor_drawn`, called after each frame's cursor, in every context: a
+    mission, a screen of ours, every hosted dialog (`Context::Menus`: the main menu, every shell menu and the
+    in-mission ones)). Three documented means, since Wine's drivers differ: the window's
+    `WM_SETCURSOR` answer (the call at 0x488883, patched once, `shell::patch_wm_setcursor`)
+    is `SetCursor(NULL)`; the window class's cursor is cleared (`SetClassLong`); and
+    `ShowCursor`'s count is held one below. **Read from the engine's `WindowProc`:** after
+    its own `SetCursor(NULL)` it returns TRUE only when a flag of an object it keeps is
+    set; otherwise it falls to `DefWindowProc`, which for the client area sets the class
+    cursor back. That, and the clip-and-lock of Wine's X11 driver in a mission, which
+    hides the pointer by itself, is the likely reason only Wine's macOS driver showed the
+    arrow beside ours (inference: not run on a Mac). It all comes back (`release`, logged
+    as `cursor: system cursor back (why)`) when no frame has drawn our cursor for 250 ms,
+    which a thread timer on the game's thread notices (a stock dialog, a crash dialog,
+    the loading screen, the end of a mission), when a window of another program has the
+    foreground (alt-tab), or with the key at 0. The shell's system arrow shows only while no dialog is hosted and no screen
+    of ours runs, or with `[Menus] Enable=0`.
   - `UI.log` says each change of the shape drawn (`cursor: Mission draws c_attack`), which
     the scenario `ui-widgets-cursor` reads. Seen on the bench: `standard_cursor` with
     nothing selected, `c_move` over empty space with a ship selected, `c_attack` over an
@@ -394,10 +405,10 @@ Each frame, `run_screen`:
 
 The 3D window's `WindowProc` answers `WM_SETCURSOR` with no cursor, so that the sprite
 cursor shows in a mission (and the Credits show none): `push 0; call [SetCursor]`, the
-call at 0x488883. While a screen of ours or a hosted dialog runs, that one call is
-ours (patched once, checked to be stock, `shell::patch_wm_setcursor`): it sets the
-arrow, as the GDI menus have, or no cursor while the UI draws its own; otherwise it
-passes the engine's "none" on.
+call at 0x488883. That one call is ours (patched once, checked to be stock,
+`shell::patch_wm_setcursor`): no cursor while the UI draws its own (any context), the
+arrow while a screen of ours or a hosted dialog runs without it, as the GDI menus have;
+otherwise it passes the engine's "none" on.
 
 **Never subclass the 3D window.** Up to ui 0.15 the arrow came from a subclass of the
 window procedure (`SetWindowLongA(GWL_WNDPROC)`), installed the first time a dialog

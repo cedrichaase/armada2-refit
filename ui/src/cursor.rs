@@ -237,8 +237,8 @@ pub fn draw(ctx: Context, ui: &mut Ui) {
     }
     ui.draw.image_uv(d.tex, R::new(x, y, w, h), uv, 0xffffffff);
     match ctx {
-        Context::Mission => crate::engine::api::cursor::hide_this_frame(),
-        Context::Shell | Context::Menus => crate::engine::api::shell::hide_os_cursor(),
-        Context::Loading => crate::engine::api::cursor::hide_this_frame(),
+        Context::Mission | Context::Loading => crate::engine::api::cursor::hide_this_frame(),
+        Context::Shell | Context::Menus => {}
     }
+    crate::engine::api::shell::own_cursor_drawn();
 }
