@@ -500,7 +500,19 @@ first, takes its place in it (`info::place`):
   row is about 860 px, the bar about 250 px with its margins and the one-object panel
   500 px.
 - Else **centred within the row** (clear of the minimap and the unit view) with the
-  bar above the minimap (4:3: at 1024x768 the row is about 580 px).
+  bar above the minimap.
+
+**The one-object panel gives up width before the bar leaves the row** (`info::one_width`):
+its width is `W_ONE` (575 units, times `[HUD] InfoScale`), less where the room beside the
+bar is shorter, down to 0.8 of it (`W_ONE_MIN`: the bars are long and the five system boxes
+tighten; the close-up, name and figures keep their size). Below that minimum the bar goes
+above the minimap and the panel is the row's width at most, so it never reaches the
+minimap or the unit view at any aspect. Measured on the bench (Federation theme, one
+ship): 1280x800 (16:10) bar 262..532, panel 541..1095 of 1280, unchanged; 1024x768 (4:3)
+the room beside the bar is 497 px of the panel's 532, so it narrows to 497 (it was the bar
+above the minimap before) and the bar stays beside the minimap; 1280x720 (16:9, Borg)
+panel 463..961, as before. 1280x1024 did not start on the bench (Direct3D 8 init failed).
+A group is already no wider than the room beside the bar.
 
 The first version centred the panel and put the bar above it whenever the gap at its
 left was too narrow, which at 16:9 was always for one unit: the bar sat over the play

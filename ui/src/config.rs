@@ -20,6 +20,9 @@ pub struct Config {
     /// `[UI] PointerLog`: log the focus changes and the pointer's jumps between two
     /// frames (`input::diagnose`), for the cursor that jumps after a change of focus.
     pub pointer_log: bool,
+    /// `[UI] HideSystemCursor`: while our own cursor is drawn, the operating system's is
+    /// hidden over the game window (`engine::shell::own_cursor_drawn`).
+    pub hide_system_cursor: bool,
     /// `[UI] RefitKey`: the virtual key that, with Ctrl, opens the Refit screen as a modal
     /// over a mission (`menus::refit::mission_frame`); 0 for none (PLAN-FLEETOPS.md, FO-6,
     /// decision 86).
@@ -183,6 +186,7 @@ pub fn load() -> Config {
         cursor_size: ini.float("UI", "CursorSize", 32.0).clamp(16.0, 128.0),
         movies: ini.int("UI", "Movies", 1) != 0,
         pointer_log: ini.int("UI", "PointerLog", 0) != 0,
+        hide_system_cursor: ini.int("UI", "HideSystemCursor", 1) != 0,
         refit_key: ini.int("UI", "RefitKey", 0).clamp(0, 255) as u8,
         theme: {
             let l = rt::lower(value(&ini, UI_THEME).trim());

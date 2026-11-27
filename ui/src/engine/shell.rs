@@ -224,7 +224,6 @@ fn pump(p: &mut Pumped) -> Option<i32> {
 // case.
 static mut ARROW: HANDLE = core::ptr::null_mut();
 static mut ARROW_ON: bool = false;
-static mut OS_CURSOR_HIDDEN: bool = false;
 static mut SETCURSOR_PATCHED: bool = false;
 
 /// Points the engine's `WM_SETCURSOR` answer at ours (once); false, and the engine's
@@ -256,24 +255,129 @@ fn patch_wm_setcursor() -> bool {
 }
 
 /// `SetCursor` as the engine's `WM_SETCURSOR` calls it (stdcall, the cursor it wants:
-/// none).
+/// none). While our own cursor is drawn the answer is none whatever the context; else
+/// the arrow while a screen of ours or a hosted dialog runs; else the engine's.
 unsafe extern "system" fn wm_setcursor(c: HANDLE) -> HANDLE {
     unsafe {
+        if HIDING && !own_fresh() {
+            release("the UI stopped drawing its cursor");
+        }
+        if HIDING {
+            return SetCursor(core::ptr::null_mut());
+        }
         if ARROW_ON {
-            return SetCursor(if OS_CURSOR_HIDDEN { core::ptr::null_mut() } else { ARROW });
+            return SetCursor(ARROW);
         }
         SetCursor(c)
     }
 }
 
-/// Hides the arrow Windows draws over a screen of ours, for the UI to draw its own
-/// (cursor.rs). Lasts until the screen ends.
-pub fn hide_os_cursor() {
+// The system cursor while the UI draws its own (`[UI] HideSystemCursor`, default 1).
+// Three documented means, because Wine's drivers differ in which they honour: the
+// `WM_SETCURSOR` answer above (the engine's procedure falls to the default handling
+// after it unless a flag of its own is set, which would put the window class's cursor
+// back), the class cursor cleared (`SetClassLong`), and `ShowCursor`'s count kept below
+// zero. All three are given back by `release`, which a timer on the game's thread runs
+// when frames stop (a stock dialog, a crash dialog, the end of a mission) or another
+// program's window has the foreground, so the player is never left with no cursor.
+static mut HIDING: bool = false;
+static mut OWN_TICK: u32 = 0;
+static mut SAVED_CLASS: usize = 0;
+static mut COUNTED: bool = false;
+static mut HID_WIN: HWND = core::ptr::null_mut();
+static mut TIMER_ON: bool = false;
+static mut LOGGED_NOPATCH: bool = false;
+/// A frame older than this no longer draws our cursor.
+const OWN_STALE_MS: u32 = 250;
+
+fn own_fresh() -> bool {
+    unsafe { GetTickCount().wrapping_sub(OWN_TICK) < OWN_STALE_MS }
+}
+
+/// Whether a window of another program has the foreground (our own windows, the hosted
+/// dialogs, are not "another"; no foreground window at all is not either).
+fn foreign_foreground() -> bool {
     unsafe {
-        if ARROW_ON {
-            OS_CURSOR_HIDDEN = true;
-            SetCursor(core::ptr::null_mut());
+        let fg = GetForegroundWindow();
+        if fg.is_null() || fg == HID_WIN {
+            return false;
         }
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(fg, &mut pid);
+        pid != 0 && pid != GetCurrentProcessId()
+    }
+}
+
+unsafe extern "system" fn hide_timer(_w: HWND, _m: u32, _id: usize, _t: u32) {
+    unsafe {
+        if !HIDING {
+            return;
+        }
+        if !own_fresh() {
+            release("the UI stopped drawing its cursor");
+        } else if foreign_foreground() {
+            release("another program has the foreground");
+        }
+    }
+}
+
+/// Gives the system cursor back.
+fn release(why: &str) {
+    unsafe {
+        if !HIDING {
+            return;
+        }
+        HIDING = false;
+        let n = if COUNTED { ShowCursor(1) } else { 0 };
+        COUNTED = false;
+        if !HID_WIN.is_null() && IsWindow(HID_WIN) != 0 {
+            SetClassLongA(HID_WIN, GCL_HCURSOR, SAVED_CLASS);
+        }
+        if ARROW_ON {
+            SetCursor(ARROW);
+        }
+        log!("cursor: system cursor back ({}; ShowCursor count {})", why, n);
+    }
+}
+
+/// Called each frame the UI has drawn its cursor, in any context: hides the system's
+/// over the game window (once; the answer to `WM_SETCURSOR` then keeps it so).
+pub fn own_cursor_drawn() {
+    unsafe {
+        if !crate::config::try_get().is_some_and(|c| c.hide_system_cursor) {
+            return;
+        }
+        OWN_TICK = GetTickCount();
+        if HIDING {
+            return;
+        }
+        let w = crate::input::window();
+        if w.is_null() {
+            return;
+        }
+        HID_WIN = w;
+        if foreign_foreground() {
+            return;
+        }
+        let patched = patch_wm_setcursor();
+        if !patched && !LOGGED_NOPATCH {
+            LOGGED_NOPATCH = true;
+            log!("cursor: WindowProc's WM_SETCURSOR is not stock; the class cursor and ShowCursor hide the system's");
+        }
+        HIDING = true;
+        SAVED_CLASS = SetClassLongA(w, GCL_HCURSOR, 0);
+        let n = ShowCursor(0);
+        COUNTED = true;
+        SetCursor(core::ptr::null_mut());
+        if !TIMER_ON {
+            TIMER_ON = SetTimer(core::ptr::null_mut(), 0, 250, hide_timer) != 0;
+        }
+        log!(
+            "cursor: system cursor hidden (WM_SETCURSOR {}, class cursor {:#x} cleared, ShowCursor count {})",
+            if patched { "answered" } else { "not ours" },
+            SAVED_CLASS,
+            n
+        );
     }
 }
 
@@ -286,7 +390,6 @@ fn subclass(_w: HWND) {
             return;
         }
         ARROW_ON = true;
-        OS_CURSOR_HIDDEN = false;
         SetCursor(ARROW);
     }
 }
@@ -294,7 +397,6 @@ fn subclass(_w: HWND) {
 fn unsubclass() {
     unsafe {
         ARROW_ON = false;
-        OS_CURSOR_HIDDEN = false;
     }
 }
 
