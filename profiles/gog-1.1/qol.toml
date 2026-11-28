@@ -50,6 +50,9 @@ rows = ["QOL.RigIgnoresSelf"]
 [hook.script_input]
 doc = "A script's input monitor called only while set: the editor after a scripted mission no longer calls a cleared one"
 
+[hook.astar_path]
+doc = "A found path's Get_From walk stopped at a cap: a chain that never reaches its start is no path, not an Out of Memory"
+
 [[sym]]
 id = "pan_site"
 symbol = "RTS_Configure"
@@ -2031,3 +2034,79 @@ kind = "value"
 value = 8
 used_by = ["rebind"]
 
+
+# A_Star_Search::Plan_Path builds a found path by walking each node's Get_From back to
+# the start; qol.astar_path replaces that walk with the same walk, stopped at a cap
+[[sym]]
+id = "as_walk"
+symbol = "A_Star_Search::Plan_Path"
+kind = "patch"
+addr = 0x40ae5b
+check = "85 f6 74 2c 3b 77 14 74 1b 8b 4f 10 56"
+in = "A_Star_Search::Plan_Path"
+used_by = ["astar_path"]
+
+# the found-path return (the walk's end)
+[[sym]]
+id = "as_found"
+symbol = "A_Star_Search::Plan_Path"
+kind = "label"
+addr = 0x40ae8b
+check = "5f 5e b8 02 00 00 00 5b 8b e5 5d c2 0c 00"
+in = "A_Star_Search::Plan_Path"
+used_by = ["astar_path"]
+
+# the no-path return
+[[sym]]
+id = "as_no_path"
+symbol = "A_Star_Search::Plan_Path"
+kind = "label"
+addr = 0x40ae4d
+check = "5f 5e b8 01 00 00 00 5b 8b e5 5d c2 0c 00"
+in = "A_Star_Search::Plan_Path"
+used_by = ["astar_path"]
+
+[[sym]]
+id = "as_add_data"
+symbol = "linked_list::Add_Data"
+kind = "fn"
+addr = 0x4029e0
+check = "55 8b ec 6a ff 68"
+used_by = ["astar_path"]
+
+# the search's path list, start and goal nodes
+[[sym]]
+id = "as_path"
+symbol = "A_Star_Search"
+kind = "field"
+struct = "A_Star_Search"
+offset = 0x10
+type = "ptr"
+used_by = ["astar_path"]
+
+[[sym]]
+id = "as_start"
+symbol = "A_Star_Search"
+kind = "field"
+struct = "A_Star_Search"
+offset = 0x14
+type = "ptr"
+used_by = ["astar_path"]
+
+[[sym]]
+id = "as_goal"
+symbol = "A_Star_Search"
+kind = "field"
+struct = "A_Star_Search"
+offset = 0x18
+type = "ptr"
+used_by = ["astar_path"]
+
+[[sym]]
+id = "as_vt_from"
+symbol = "A_Star_Node vtable (Get_From)"
+kind = "field"
+struct = "A_Star_Node vtable (Get_From)"
+offset = 0x2c
+type = "ptr"
+used_by = ["astar_path"]

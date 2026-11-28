@@ -1060,6 +1060,79 @@ static int patch_script(void)
     return 1;
 }
 
+/* ---- A* path construction ----------------------------------------------- */
+
+/* When A_Star_Search::Plan_Path finds the goal it builds the path by following each
+ * node's Get_From back from the goal to the start, adding every node to the search's
+ * path list.  If that chain loops without reaching the start (seen late in games after
+ * a craft leaves a wormhole), the walk adds list cells until the address space is gone
+ * and the game dies with "Out of Memory".  This replaces the walk (a jump at its first
+ * test) with the same walk, stopped after ASTAR_CAP nodes; a stopped walk returns
+ * Plan_Path's own no-path result, which Path_Planner::Plan_A_Path already handles, and
+ * Setup_Search empties the list before the next search.  A path stock builds is built
+ * the same here: only the walk that would never end differs. */
+#define ASTAR_CAP 20000         /* nodes; real paths are a few hundred at most */
+static int  g_rdyAstar, g_astarOk;
+static long g_astarStopped;
+
+/* 1 when the walk was stopped (no path), 0 when it reached the start */
+int __cdecl astar_build(BYTE *search)
+{
+    typedef void *(__thiscall *AddFn)(BYTE *list, BYTE *data);
+    typedef BYTE *(__thiscall *FromFn)(BYTE *node);
+    AddFn add  = (AddFn)a2e_addr(QOL_S_AS_ADD_DATA);
+    BYTE *list = *(BYTE **)(search + QOL_F_AS_PATH);
+    BYTE *start = *(BYTE **)(search + QOL_F_AS_START);
+    BYTE *n = *(BYTE **)(search + QOL_F_AS_GOAL);
+    int i;
+    for (i = 0; n && n != start; i++) {
+        if (i >= ASTAR_CAP) {
+            if (++g_astarStopped <= 20 || !(g_astarStopped % 1000)) {
+                char b[120];
+                b[0] = 0;
+                s_cat(b, "astar: a path's Get_From chain does not reach its start: no path (");
+                s_num(b, g_astarStopped);
+                s_cat(b, ")");
+                logline(b);
+            }
+            return 1;
+        }
+        add(list, n);
+        n = (*(FromFn *)(*(BYTE **)n + QOL_F_AS_VT_FROM))(n);
+    }
+    if (n) add(list, start);
+    return 0;
+}
+
+/* At the walk's first test: edi is the search.  Back to Plan_Path's found-path or
+ * no-path return, which restore its registers and frame. */
+__attribute__((naked)) void astar_stub(void)
+{
+    __asm__ __volatile__(
+        "pushal\n\t"
+        "pushl %edi\n\t"
+        "call _astar_build\n\t"
+        "addl $4, %esp\n\t"
+        "movl %eax, 28(%esp)\n\t"
+        "popal\n\t"
+        "testl %eax, %eax\n\t"
+        "jnz 1f\n\t"
+        "pushl _a2s_qol_as_found\n\t"
+        "ret\n"
+        "1:\n\t"
+        "pushl _a2s_qol_as_no_path\n\t"
+        "ret\n\t");
+}
+
+static int patch_astar(void)
+{
+    BYTE c[7];
+    if (!g_rdyAstar) return 0;
+    jmp_to(c, a2e_addr(QOL_S_AS_WALK), 7, astar_stub);
+    poke((BYTE *)a2e_addr(QOL_S_AS_WALK), c, 7);
+    return 1;
+}
+
 /* ---- bigger selections and groups ------------------------------------- */
 
 /* The button bar's special weapons.  For each special weapon of the selection,
@@ -1352,6 +1425,13 @@ static void startup(void)
     s_cat(b, "--- QOL script input monitor: ");
     if (g_scriptOk) s_cat(b, "called only while a script has one set, patched");
     else not_patched(b, QOL_H_SCRIPT_INPUT);
+    logline(b);
+    g_rdyAstar = a2e_ready(QOL_H_ASTAR_PATH);
+    g_astarOk = patch_astar();
+    b[0] = 0;
+    s_cat(b, "--- QOL A* path construction: ");
+    if (g_astarOk) s_cat(b, "a path whose chain never reaches its start is no path, patched");
+    else not_patched(b, QOL_H_ASTAR_PATH);
     logline(b);
     a2_set_str(&g_ini, QOL_ROW_PANSPEED, val, sizeof val);
     f = pan_factor(val, &ok);

@@ -233,6 +233,14 @@
 #define QOL_F_RB_MAP_KEYS ((int)a2f_qol_rb_map_keys)
 #define QOL_V_RB_KEY_STRIDE ((int)a2f_qol_rb_key_stride)
 #define QOL_V_RB_MAX_KEYS ((int)a2f_qol_rb_max_keys)
+#define QOL_S_AS_WALK 230
+#define QOL_S_AS_FOUND 231
+#define QOL_S_AS_NO_PATH 232
+#define QOL_S_AS_ADD_DATA 233
+#define QOL_F_AS_PATH ((int)a2f_qol_as_path)
+#define QOL_F_AS_START ((int)a2f_qol_as_start)
+#define QOL_F_AS_GOAL ((int)a2f_qol_as_goal)
+#define QOL_F_AS_VT_FROM ((int)a2f_qol_as_vt_from)
 #define QOL_H_PAN_SPEED 0
 #define QOL_H_SHIFT_GROUP 1
 #define QOL_H_SELECTION 2
@@ -244,6 +252,7 @@
 #define QOL_H_REBIND 8
 #define QOL_H_RIG_SELF 9
 #define QOL_H_SCRIPT_INPUT 10
+#define QOL_H_ASTAR_PATH 11
 
 A2E_U32 a2s_qol_pan_site __attribute__((used));
 A2E_U32 a2s_qol_fastscroll __attribute__((used));
@@ -393,6 +402,10 @@ A2E_U32 a2s_qol_rb_fields __attribute__((used));
 A2E_U32 a2s_qol_rb_n_fields __attribute__((used));
 A2E_U32 a2s_qol_rb_maps __attribute__((used));
 A2E_U32 a2s_qol_rb_n_maps __attribute__((used));
+A2E_U32 a2s_qol_as_walk __attribute__((used));
+A2E_U32 a2s_qol_as_found __attribute__((used));
+A2E_U32 a2s_qol_as_no_path __attribute__((used));
+A2E_U32 a2s_qol_as_add_data __attribute__((used));
 A2E_U32 a2f_qol_ov_count __attribute__((used)) = (A2E_U32)0xb8;
 A2E_U32 a2f_qol_ov_sel __attribute__((used)) = (A2E_U32)0xbc;
 A2E_U32 a2f_qol_ov_shipgrp __attribute__((used)) = (A2E_U32)0x14c;
@@ -475,6 +488,10 @@ A2E_U32 a2f_qol_rb_map_n __attribute__((used)) = (A2E_U32)0x4;
 A2E_U32 a2f_qol_rb_map_keys __attribute__((used)) = (A2E_U32)0x8;
 A2E_U32 a2f_qol_rb_key_stride __attribute__((used)) = (A2E_U32)12;
 A2E_U32 a2f_qol_rb_max_keys __attribute__((used)) = (A2E_U32)8;
+A2E_U32 a2f_qol_as_path __attribute__((used)) = (A2E_U32)0x10;
+A2E_U32 a2f_qol_as_start __attribute__((used)) = (A2E_U32)0x14;
+A2E_U32 a2f_qol_as_goal __attribute__((used)) = (A2E_U32)0x18;
+A2E_U32 a2f_qol_as_vt_from __attribute__((used)) = (A2E_U32)0x2c;
 
 static A2E_U32 *const qol_vars[] = {
     &a2s_qol_pan_site,
@@ -707,6 +724,14 @@ static A2E_U32 *const qol_vars[] = {
     &a2f_qol_rb_map_keys,
     &a2f_qol_rb_key_stride,
     &a2f_qol_rb_max_keys,
+    &a2s_qol_as_walk,
+    &a2s_qol_as_found,
+    &a2s_qol_as_no_path,
+    &a2s_qol_as_add_data,
+    &a2f_qol_as_path,
+    &a2f_qol_as_start,
+    &a2f_qol_as_goal,
+    &a2f_qol_as_vt_from,
 };
 
 static const A2ESymDef qol_syms[] = {
@@ -940,6 +965,14 @@ static const A2ESymDef qol_syms[] = {
     {"rb_map_keys", "DiscreteMap", 10},
     {"rb_key_stride", "sizeof(DiscreteMap key)", 11},
     {"rb_max_keys", "DiscreteMap keys", 11},
+    {"as_walk", "A_Star_Search::Plan_Path", 5},
+    {"as_found", "A_Star_Search::Plan_Path", 4},
+    {"as_no_path", "A_Star_Search::Plan_Path", 4},
+    {"as_add_data", "linked_list::Add_Data", 0},
+    {"as_path", "A_Star_Search", 10},
+    {"as_start", "A_Star_Search", 10},
+    {"as_goal", "A_Star_Search", 10},
+    {"as_vt_from", "A_Star_Node vtable (Get_From)", 10},
 };
 static const char *const qol_h0_rows[] = {"QOL.PanSpeed", 0};
 static const A2E_U16 qol_h0_syms[] = {0, 1, 0};
@@ -963,6 +996,8 @@ static const char *const qol_h9_rows[] = {"QOL.RigIgnoresSelf", 0};
 static const A2E_U16 qol_h9_syms[] = {210, 211, 212, 213, 214, 215, 0};
 static const char *const qol_h10_rows[] = {0};
 static const A2E_U16 qol_h10_syms[] = {216, 217, 0};
+static const char *const qol_h11_rows[] = {0};
+static const A2E_U16 qol_h11_syms[] = {230, 231, 232, 233, 234, 235, 236, 237, 0};
 static const A2EHookDef qol_hooks[] = {
     {"qol.pan_speed", 0, qol_h0_rows, 1, qol_h0_syms, 2},
     {"qol.shift_group", 0, qol_h1_rows, 1, qol_h1_syms, 10},
@@ -975,6 +1010,7 @@ static const A2EHookDef qol_hooks[] = {
     {"qol.rebind", 0, qol_h8_rows, 1, qol_h8_syms, 12},
     {"qol.rig_self", 0, qol_h9_rows, 1, qol_h9_syms, 6},
     {"qol.script_input", 0, qol_h10_rows, 0, qol_h10_syms, 2},
+    {"qol.astar_path", 0, qol_h11_rows, 0, qol_h11_syms, 8},
 };
 static const A2E_U8 qol_b0_c0[] = {0x68, 0xcc, 0xd7, 0x6f, 0x00, 0xe8, 0x00, 0x6c, 0x1c, 0x00, 0x8b, 0x45, 0xf0, 0x85, 0xc0, 0x75, 0x08, 0xd9, 0x1d, 0xb4, 0xfb, 0x70, 0x00, 0xeb, 0x02};
 static const A2E_U8 qol_b0_c2[] = {0x8b, 0x15, 0x3c, 0x13, 0x76, 0x00, 0x83, 0x3a, 0x00, 0x74, 0x1c, 0xa1, 0x40, 0x13, 0x76, 0x00};
@@ -1082,6 +1118,10 @@ static const A2E_U8 qol_b0_c211[] = {0x8b, 0x75, 0x0c, 0x84, 0xc0, 0x75, 0x4b};
 static const A2E_U8 qol_b0_c212[] = {0x8b, 0x4e, 0x0c, 0x6a, 0x01, 0x6a, 0x00, 0x57, 0x8b, 0x11, 0xff, 0x52, 0x08, 0x84, 0xc0, 0x8b, 0x45, 0x08, 0x74, 0xe0};
 static const A2E_U8 qol_b0_c213[] = {0x84, 0xc0, 0x8b, 0x45, 0x08, 0x74, 0xe0};
 static const A2E_U8 qol_b0_c216[] = {0x56, 0x8b, 0xf1, 0xff, 0x56, 0x24, 0x84, 0xc0, 0x75, 0x07, 0xc7, 0x46, 0x24, 0x00, 0x00, 0x00, 0x00, 0x5e, 0xc2, 0x04, 0x00};
+static const A2E_U8 qol_b0_c230[] = {0x85, 0xf6, 0x74, 0x2c, 0x3b, 0x77, 0x14, 0x74, 0x1b, 0x8b, 0x4f, 0x10, 0x56};
+static const A2E_U8 qol_b0_c231[] = {0x5f, 0x5e, 0xb8, 0x02, 0x00, 0x00, 0x00, 0x5b, 0x8b, 0xe5, 0x5d, 0xc2, 0x0c, 0x00};
+static const A2E_U8 qol_b0_c232[] = {0x5f, 0x5e, 0xb8, 0x01, 0x00, 0x00, 0x00, 0x5b, 0x8b, 0xe5, 0x5d, 0xc2, 0x0c, 0x00};
+static const A2E_U8 qol_b0_c233[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68};
 static const A2EEntry qol_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 25, 0x491766, 0x0, 0, qol_b0_c0, 0, ""}, /* pan_site */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x70fbb4, 0x0, 0, 0, 0, ""}, /* fastscroll */
@@ -1313,6 +1353,14 @@ static const A2EEntry qol_b0_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 8, 0, 0, ""}, /* rb_map_keys */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 12, 0, 0, ""}, /* rb_key_stride */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 8, 0, 0, ""}, /* rb_max_keys */
+    {1, 0, 0xffff, 0xffff, 0, 0, 13, 0x40ae5b, 0x0, 0, qol_b0_c230, 0, ""}, /* as_walk */
+    {1, 0, 0xffff, 0xffff, 0, 0, 14, 0x40ae8b, 0x0, 0, qol_b0_c231, 0, ""}, /* as_found */
+    {1, 0, 0xffff, 0xffff, 0, 0, 14, 0x40ae4d, 0x0, 0, qol_b0_c232, 0, ""}, /* as_no_path */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4029e0, 0x0, 0, qol_b0_c233, 0, ""}, /* as_add_data */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 16, 0, 0, ""}, /* as_path */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 20, 0, 0, ""}, /* as_start */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 24, 0, 0, ""}, /* as_goal */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 44, 0, 0, ""}, /* as_vt_from */
 };
 static const A2EBlock qol_b0_blocked[] = {
     {0xffff, 0, 0, 0}
@@ -1431,6 +1479,10 @@ static const A2E_U8 qol_b1_c211[] = {0x8b, 0x75, 0x0c, 0x84, 0xc0, 0x75, 0x4b};
 static const A2E_U8 qol_b1_c212[] = {0x8b, 0x4e, 0x0c, 0x6a, 0x01, 0x6a, 0x00, 0x57, 0x8b, 0x11, 0xff, 0x52, 0x08, 0x84, 0xc0, 0x8b, 0x45, 0x08, 0x74, 0xe0};
 static const A2E_U8 qol_b1_c213[] = {0x84, 0xc0, 0x8b, 0x45, 0x08, 0x74, 0xe0};
 static const A2E_U8 qol_b1_c216[] = {0x56, 0x8b, 0xf1, 0xff, 0x56, 0x24, 0x84, 0xc0, 0x75, 0x07, 0xc7, 0x46, 0x24, 0x00, 0x00, 0x00, 0x00, 0x5e, 0xc2, 0x04, 0x00};
+static const A2E_U8 qol_b1_c230[] = {0x85, 0xf6, 0x74, 0x2c, 0x3b, 0x77, 0x14, 0x74, 0x1b, 0x8b, 0x4f, 0x10, 0x56};
+static const A2E_U8 qol_b1_c231[] = {0x5f, 0x5e, 0xb8, 0x02, 0x00, 0x00, 0x00, 0x5b, 0x8b, 0xe5, 0x5d, 0xc2, 0x0c, 0x00};
+static const A2E_U8 qol_b1_c232[] = {0x5f, 0x5e, 0xb8, 0x01, 0x00, 0x00, 0x00, 0x5b, 0x8b, 0xe5, 0x5d, 0xc2, 0x0c, 0x00};
+static const A2E_U8 qol_b1_c233[] = {0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68};
 static const A2EEntry qol_b1_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 25, 0x491766, 0x0, 0, qol_b1_c0, 0, ""}, /* pan_site */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x70fbb4, 0x0, 0, 0, 0, ""}, /* fastscroll */
@@ -1662,6 +1714,14 @@ static const A2EEntry qol_b1_entries[] = {
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 8, 0, 0, ""}, /* rb_map_keys */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 12, 0, 0, ""}, /* rb_key_stride */
     {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 8, 0, 0, ""}, /* rb_max_keys */
+    {1, 0, 0xffff, 0xffff, 0, 0, 13, 0x40ae5b, 0x0, 0, qol_b1_c230, 0, ""}, /* as_walk */
+    {1, 0, 0xffff, 0xffff, 0, 0, 14, 0x40ae8b, 0x0, 0, qol_b1_c231, 0, ""}, /* as_found */
+    {1, 0, 0xffff, 0xffff, 0, 0, 14, 0x40ae4d, 0x0, 0, qol_b1_c232, 0, ""}, /* as_no_path */
+    {1, 0, 0xffff, 0xffff, 0, 0, 6, 0x4029e0, 0x0, 0, qol_b1_c233, 0, ""}, /* as_add_data */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 16, 0, 0, ""}, /* as_path */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 20, 0, 0, ""}, /* as_start */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 24, 0, 0, ""}, /* as_goal */
+    {1, 0, 0xffff, 0xffff, 0, 0, 0, 0x0, 0x0, 44, 0, 0, ""}, /* as_vt_from */
 };
 static const A2EBlock qol_b1_blocked[] = {
     {2, "cOverViewImp::mCheckGroupSelect", "is changed by fo-roots-5.0Z11 (not yet verified)", "Stands down: cOverViewImp::mCheckGroupSelect is changed by fo-roots-5.0Z11, not yet verified"},
@@ -1687,18 +1747,18 @@ static const A2EBlock qol_b1_blocked_mod[] = {
     {0xffff, 0, 0, 0}
 };
 static const A2EBuild qol_builds[] = {
-    {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qol_b0_entries, qol_b0_blocked, 0, 230, qol_b0_fcrc, 0, qol_b0_mods, 0, qol_b0_blocked_mod, 0, 230},
-    {"fo-roots-5.0Z11", "armada2/fo-roots-5.0Z11", "ArmadaL.exe", 0x3c4c76bd, 0x405000, 0xca07c55a, 0x400000, qol_b1_entries, qol_b1_blocked, 3, 149, qol_b1_fcrc, 2, qol_b1_mods, 1, qol_b1_blocked_mod, 5, 20},
+    {"gog-1.1", "armada2/gog-1.1", "Armada2.exe", 0x3c4c76bd, 0x3fa000, 0xa1a8a321, 0x400000, qol_b0_entries, qol_b0_blocked, 0, 238, qol_b0_fcrc, 0, qol_b0_mods, 0, qol_b0_blocked_mod, 0, 238},
+    {"fo-roots-5.0Z11", "armada2/fo-roots-5.0Z11", "ArmadaL.exe", 0x3c4c76bd, 0x405000, 0xca07c55a, 0x400000, qol_b1_entries, qol_b1_blocked, 3, 157, qol_b1_fcrc, 2, qol_b1_mods, 1, qol_b1_blocked_mod, 5, 28},
 };
 
-static A2E_U8 qol_hook_state[11];
-static A2E_U8 qol_sym_flags[230];
-static A2E_U32 qol_sym_addr[230];
-static char qol_notes[11][A2E_NOTE_MAX + 1];
+static A2E_U8 qol_hook_state[12];
+static A2E_U8 qol_sym_flags[238];
+static A2E_U32 qol_sym_addr[238];
+static char qol_notes[12][A2E_NOTE_MAX + 1];
 
 static const A2ETable QOL_ENGINE = {
     "armada2", "qol",
-    qol_syms, 230, qol_hooks, 11, qol_builds, 2, 0,
+    qol_syms, 238, qol_hooks, 12, qol_builds, 2, 0,
     qol_vars, qol_hook_state, qol_sym_flags, qol_sym_addr, qol_notes
 };
 
